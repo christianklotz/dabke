@@ -54,7 +54,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "rm -rf dist && npm run generate:llmstxt && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "npm run typecheck && npm run test:unit",
@@ -68,6 +68,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "commander": "^14.0.2"
+    "commander": "^14.0.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }
