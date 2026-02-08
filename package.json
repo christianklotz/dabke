@@ -1,0 +1,76 @@
+{
+  "name": "dabke",
+  "version": "0.78.0",
+  "license": "MIT",
+  "description": "Scheduling library powered by constraint programming (CP-SAT)",
+  "author": "Christian Klotz <hello@christianklotz.co.uk>",
+  "homepage": "https://github.com/christianklotz/dabke#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/christianklotz/dabke.git"
+  },
+  "bugs": {
+    "url": "https://github.com/christianklotz/dabke/issues"
+  },
+  "keywords": [
+    "scheduling",
+    "staff-scheduling",
+    "constraint-programming",
+    "cp-sat",
+    "workforce-management",
+    "optimization",
+    "operations-research",
+    "or-tools"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "src",
+    "solver",
+    "llms.txt",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./llms": {
+      "types": "./dist/llms.d.ts",
+      "default": "./dist/llms.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "npm run typecheck && npm run test:unit",
+    "test:unit": "vitest run --project=unit",
+    "test:unit:watch": "vitest --watch --project=unit",
+    "test:integration": "[ -f .env ] && { set -a; source .env; set +a; } && vitest run --project=integration",
+    "test:integration:watch": "[ -f .env ] && { set -a; source .env; set +a; } && vitest --watch --project=integration",
+    "generate:llmstxt": "tsx scripts/generate-llmstxt.ts && oxfmt --write llms.txt src/llms.ts"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "commander": "^14.0.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
