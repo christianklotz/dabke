@@ -22,9 +22,12 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/build-push-action@v6
         with:
           context: solver
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             christianklotz/dabke-solver:${{ steps.version.outputs.version }}
