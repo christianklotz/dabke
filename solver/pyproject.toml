@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scheduler-solver"
+version = "0.1.0"
+description = "CP-SAT solver microservice for scheduling primitives"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+  "pydantic>=2.10.0",
+  "ortools>=9.15.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.3", "httpx>=0.28.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = "src"
+
+[dependency-groups]
+dev = ["pytest>=8.3.3", "httpx>=0.28.1"]

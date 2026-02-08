@@ -1,0 +1,2188 @@
+# dabke
+
+> Scheduling library powered by constraint programming (CP-SAT)
+
+Scheduling library powered by constraint programming (CP-SAT).
+
+Define teams, shifts, coverage, and rules — dabke turns them
+into an optimized schedule.
+
+## Core Concepts
+
+**ModelBuilder**: Creates the constraint programming model from your team,
+shift patterns, coverage requirements, and rules.
+
+**Semantic Time**: Flexible time period definitions that can vary by day or date.
+- `{ name: "morning", startTime: { hours: 8 }, endTime: { hours: 12 } }`
+- The same semantic name can map to different times based on context
+- Enables business-friendly scheduling: "Need 3 waiters during lunch_rush"
+
+**Rules System**: Translate business requirements into scheduling constraints.
+- 12 built-in rules: hours limits, time-off, rest periods, prioritization, etc.
+- Scoping: Apply rules globally, per person, per role, or per time period
+- Priority levels: MANDATORY (hard constraint) vs LOW/MEDIUM/HIGH (soft preferences)
+
+---
+
+# CP-SAT Scheduling API
+
+Core scheduling types for the CP-SAT solver.
+
+## Interfaces
+
+### TimeOfDay
+Time of day representation (hours and minutes, with optional seconds/nanos).
+
+Used for defining shift start/end times and semantic time boundaries.
+Hours are in 24-hour format (0-23).
+
+**Example:**
+```typescript
+const morningStart: TimeOfDay = {
+  hours: 9,
+  minutes: 0
+};
+
+const afternoonEnd: TimeOfDay = {
+  hours: 17,
+  minutes: 30
+};
+```
+
+**Properties:**
+- `hours: number`
+- `minutes: number`
+- `seconds?: number | undefined`
+- `nanos?: number | undefined`
+
+### CalendarDate
+Calendar date representation (year, month, day).
+
+**Example:**
+```typescript
+const christmas: CalendarDate = {
+  year: 2025,
+  month: 12,
+  day: 25
+};
+```
+
+**Properties:**
+- `year: number`
+- `month: number`
+- `day: number`
+
+### TimeHorizon
+Time horizon defining the start and end dates for scheduling.
+
+Specifies the date range over which the schedule should be generated.
+The range is inclusive of start date and exclusive of end date.
+
+**Example:**
+```typescript
+// One week schedule starting Monday, March 3, 2025
+const horizon: TimeHorizon = {
+  start: new Date('2025-03-03'),  // Monday
+  end: new Date('2025-03-10')     // Following Monday (exclusive)
+};
+```
+
+**Properties:**
+- `start: Date`
+- `end: Date`
+
+### DateTimeComponents
+**Properties:**
+- `year?: number | undefined`
+- `month?: number | undefined`
+- `day?: number | undefined`
+- `hours?: number | undefined`
+- `minutes?: number | undefined`
+- `seconds?: number | undefined`
+- `nanos?: number | undefined`
+
+### DateTimeRange
+Represents a time range with start and end DateTimes.
+Used for checking overlaps and scheduling constraints.
+
+**Properties:**
+- `start: DateTimeWithUtcOffset | DateTimeWithTimeZone`
+- `end: DateTimeWithUtcOffset | DateTimeWithTimeZone`
+
+### SolverClient
+**Properties:**
+- `solve: (request: SolverRequest, options?: { signal?: AbortSignal; }) => Promise<SolverResponse>`
+- `health?: (() => Promise<void>) | undefined`
+
+### ModelBuilderConfig
+Configuration for ModelBuilder.
+
+**Example:**
+Date range with day-of-week filtering (restaurant closed Mon/Tue)
+```typescript
+const config: ModelBuilderConfig = {
+employees: [...],
+shiftPatterns: [...],
+coverage: [...],
+schedulingPeriod: {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+},
+};
+```
+
+**Properties:**
+- `employees: SchedulingEmployee[]`
+- `shiftPatterns: ShiftPattern[]`
+- `schedulingPeriod: { dateRange: { start: string; end: string; }; daysOfWeek?: DayOfWeek[]; specificDates?: never; } | { specificDates: string[]; dateRange?: never; daysOfWeek?: never; }` - Defines when scheduling should occur. Can specify either a date range
+(with optional day-of-week filtering) or a list of specific dates.
+- `coverage: CoverageRequirement[]`
+- `rules?: CompilationRule[] | undefined` - Pre-compiled rules; use this for custom rules that are not part of the registry.
+- `ruleConfigs?: CpsatRuleConfigEntry[] | undefined` - Named rule configurations that will be compiled using the provided rule factories.
+- `ruleFactories?: CpsatRuleFactories | undefined` - Rule factories to use when compiling ruleConfigs. Defaults to built-in CP-SAT rules.
+- `reporter?: ValidationReporter | undefined` - Optional validation reporter for diagnostics.
+
+### CompilationResult
+**Properties:**
+- `request: { variables: ({ type: "bool"; name: string; } | { type: "int"; name: string; min: number; max: number; } | { type: "interval"; name: string; start: number; end: number; size: number; presenceVar?: string | undefined; })[]; constraints: ({ type: "linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">=" | "=="; rhs: number; } | { type: "soft_linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">="; rhs: number; penalty: number; id?: string | undefined; } | { type: "exactly_one"; vars: string[]; } | { type: "at_most_one"; vars: string[]; } | { type: "implication"; if: string; then: string; } | { type: "bool_or"; vars: string[]; } | { type: "bool_and"; vars: string[]; } | { type: "no_overlap"; intervals: string[]; })[]; objective?: { sense: "minimize" | "maximize"; terms: { var: string; coeff: number; }[]; } | undefined; options?: { timeLimitSeconds?: number | undefined; solutionLimit?: number | undefined; } | undefined; }`
+- `validation: ScheduleValidation`
+- `canSolve: boolean`
+
+### CompilationRule
+**Properties:**
+- `compile: (builder: ModelBuilder) => void`
+- `validate?: ((assignments: ResolvedShiftAssignment[], reporter: ValidationReporter, context: RuleValidationContext) => void) | undefined`
+
+### RuleValidationContext
+Context provided to rules during post-solve validation.
+
+**Properties:**
+- `employees: SchedulingEmployee[]`
+- `days: string[]`
+- `shiftPatterns: ShiftPattern[]`
+
+### ShiftAssignment
+A shift assignment extracted from the solver response.
+
+**Properties:**
+- `employeeId: string`
+- `shiftPatternId: string`
+- `day: string`
+
+### ResolvedShiftAssignment
+A shift assignment with resolved times.
+
+**Properties:**
+- `employeeId: string`
+- `day: string`
+- `startTime: TimeOfDay`
+- `endTime: TimeOfDay`
+
+### SolverResult
+Parsed solver result with assignments and metadata.
+
+**Properties:**
+- `status: "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT" | "ERROR"`
+- `assignments: ShiftAssignment[]`
+- `statistics?: { solveTimeMs?: number | undefined; conflicts?: number | undefined; branches?: number | undefined; } | undefined`
+- `error?: string | undefined`
+
+### CpsatRuleRegistry
+**Properties:**
+- `"assign-together": { groupEmployeeIds: [string, string, ...string[]]; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; }`
+- `"employee-assignment-priority": { preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `"location-preference": { locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `"max-consecutive-days": { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `"max-hours-day": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `"max-hours-week": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `"max-shifts-day": { shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `"min-consecutive-days": { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `"min-hours-day": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `"min-hours-week": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `"min-rest-between-shifts": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `"time-off": { priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+### SemanticTimeDef
+Base definition for a semantic time period.
+
+**Properties:**
+- `startTime: TimeOfDay`
+- `endTime: TimeOfDay`
+
+### SemanticTimeVariant
+Variant of a semantic time that applies to specific days or dates.
+
+**Properties:**
+- `days?: DayOfWeek[] | undefined` - Apply this variant only on these days of the week
+- `dates?: string[] | undefined` - Apply this variant only on these specific dates (YYYY-MM-DD)
+
+### SemanticTimeContext
+Result of defineSemanticTimes - provides type-safe coverage function.
+
+**Properties:**
+- `defs: { [P in S]: SemanticTimeEntry; }` - The semantic time definitions
+- `coverage: (reqs: MixedCoverageRequirement<S>[]) => MixedCoverageRequirement<S>[]` - Create coverage requirements with type-safe semantic time names.
+Accepts both semantic references and concrete one-off requirements.
+- `resolve: (reqs: MixedCoverageRequirement<S>[], days: string[]) => CoverageRequirement[]` - Resolve all coverage requirements to concrete CoverageRequirement[]
+for the given days in the scheduling horizon.
+
+### SchedulingEmployee
+**Properties:**
+- `id: string`
+- `roleIds: string[]`
+- `skillIds?: string[] | undefined`
+
+### ShiftPattern
+A shift pattern defines WHEN people can work — the time slots available for assignment.
+
+Shift patterns are templates that repeat across all scheduling days. The solver assigns
+team members to these patterns based on coverage requirements and constraints.
+
+**Example:**
+// Simple venue: one shift type, anyone can work it
+const patterns: ShiftPattern[] = [
+  { id: "day", startTime: { hours: 9 }, endTime: { hours: 17 } }
+];
+
+**Example:**
+// Restaurant: different shifts for different roles
+const patterns: ShiftPattern[] = [
+  { id: "kitchen_morning", startTime: { hours: 6 }, endTime: { hours: 14 }, roleIds: ["chef", "prep_cook"] },
+  { id: "floor_lunch", startTime: { hours: 11 }, endTime: { hours: 15 }, roleIds: ["waiter", "host"] },
+];
+
+**Properties:**
+- `id: string` - Unique identifier for this shift pattern.
+Used in assignments and rule configurations.
+- `roleIds?: [string, ...string[]] | undefined` - Restricts who can be assigned to this shift based on their roles.
+
+- If omitted: anyone can work this shift
+- If provided: only team members whose roleIds overlap with this list can be assigned
+
+Most venues have the same shifts for everyone and don't need this.
+Use it when different roles have different schedules (e.g., kitchen staff starts
+earlier than floor staff).
+- `daysOfWeek?: DayOfWeek[] | undefined` - Restricts which days of the week this shift pattern can be used.
+
+- If omitted: shift can be used on any day
+- If provided: shift can only be assigned on the specified days
+
+**Example:**
+```typescript
+// Saturday-only short shift
+{ id: "saturday_shift", startTime: t(9), endTime: t(14), daysOfWeek: ["saturday"] }
+
+// Weekday-only full shift
+{ id: "full_shift", startTime: t(9), endTime: t(18), daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] }
+```
+- `locationId?: string | undefined` - Physical location where this shift takes place.
+Used for multi-location scheduling and location-based constraints.
+- `startTime: TimeOfDay` - When the shift starts (e.g., { hours: 9, minutes: 0 } for 9:00 AM)
+- `endTime: TimeOfDay` - When the shift ends (e.g., { hours: 17, minutes: 30 } for 5:30 PM)
+
+### TimeInterval
+**Properties:**
+- `day: string`
+- `startTime: TimeOfDay`
+- `endTime: TimeOfDay`
+
+### ModelBuilderOptions
+**Properties:**
+- `weekStartsOn?: DayOfWeek | undefined`
+- `solverOptions?: { timeLimitSeconds?: number | undefined; solutionLimit?: number | undefined; } | undefined`
+- `coverageBucketMinutes?: number | undefined` - Bucket size used when translating coverage requirements into time-indexed constraints.
+Smaller buckets are more accurate but increase the number of constraints.
+- `fairDistribution?: boolean | undefined` - Whether to enable fair distribution of shifts across team members.
+
+When enabled (default), the solver minimizes the maximum number of shifts
+any single person works, ensuring work is distributed evenly. Each person
+works between floor(total/n) and ceil(total/n) shifts.
+
+Disable this if you want other rules (like employee-assignment-priority)
+to have full control over shift distribution.
+
+### ValidationReporter
+**Properties:**
+- `excludeFromCoverage: (exclusion: CoverageExclusion) => void`
+- `reportCoverageError: (error: Omit<CoverageError, "type" | "id">) => void`
+- `reportRuleError: (error: Omit<RuleError, "type" | "id">) => void`
+- `reportSolverError: (reason: string) => void`
+- `reportCoverageViolation: (violation: Omit<CoverageViolation, "type" | "id">) => void`
+- `reportRuleViolation: (violation: Omit<RuleViolation, "type" | "id">) => void`
+- `reportCoveragePassed: (passed: Omit<CoveragePassed, "type" | "id">) => void`
+- `reportRulePassed: (passed: Omit<RulePassed, "type" | "id">) => void`
+- `trackConstraint: (constraint: TrackedConstraint) => void`
+- `hasErrors: () => boolean`
+- `getValidation: () => ScheduleValidation`
+- `getExclusions: () => CoverageExclusion[]`
+- `analyzeSolution: (response: SolverResponse) => void`
+
+### TrackedConstraint
+**Properties:**
+- `id: string`
+- `type: "coverage" | "rule"`
+- `rule?: string | undefined`
+- `description: string`
+- `targetValue: number`
+- `comparator: "<=" | ">="`
+- `day?: string | undefined`
+- `timeSlot?: string | undefined`
+- `roleIds?: string[] | undefined`
+- `skillIds?: readonly string[] | undefined`
+- `context: ValidationContext`
+- `groupKey?: GroupKey | undefined`
+
+### CoverageExclusion
+Coverage exclusion - indicates a team member is unavailable for coverage during a time period.
+Used during compile-time to determine coverage feasibility.
+
+**Properties:**
+- `employeeId: string`
+- `day: string`
+- `startTime?: TimeOfDay | undefined`
+- `endTime?: TimeOfDay | undefined`
+
+### ScheduleValidation
+**Properties:**
+- `errors: readonly ScheduleError[]`
+- `violations: readonly ScheduleViolation[]`
+- `passed: readonly SchedulePassed[]`
+
+### CoverageError
+**Properties:**
+- `id: string`
+- `type: "coverage"`
+- `day: string`
+- `timeSlots: readonly string[]`
+- `roleIds?: string[] | undefined`
+- `skillIds?: readonly string[] | undefined`
+- `reason: string`
+- `suggestions?: readonly string[] | undefined`
+- `groupKey?: GroupKey | undefined`
+
+### CoverageViolation
+**Properties:**
+- `id: string`
+- `type: "coverage"`
+- `day: string`
+- `timeSlots: readonly string[]`
+- `roleIds?: string[] | undefined`
+- `skillIds?: readonly string[] | undefined`
+- `targetCount: number`
+- `actualCount: number`
+- `shortfall: number`
+- `groupKey?: GroupKey | undefined`
+
+### CoveragePassed
+**Properties:**
+- `id: string`
+- `type: "coverage"`
+- `day: string`
+- `timeSlots: readonly string[]`
+- `roleIds?: string[] | undefined`
+- `skillIds?: readonly string[] | undefined`
+- `description: string`
+- `groupKey?: GroupKey | undefined`
+
+### RuleError
+**Properties:**
+- `id: string`
+- `type: "rule"`
+- `rule: string`
+- `reason: string`
+- `context: ValidationContext`
+- `suggestions?: readonly string[] | undefined`
+- `groupKey?: GroupKey | undefined`
+
+### RuleViolation
+**Properties:**
+- `id: string`
+- `type: "rule"`
+- `rule: string`
+- `reason: string`
+- `context: ValidationContext`
+- `shortfall?: number | undefined`
+- `overflow?: number | undefined`
+- `groupKey?: GroupKey | undefined`
+
+### RulePassed
+**Properties:**
+- `id: string`
+- `type: "rule"`
+- `rule: string`
+- `description: string`
+- `context: ValidationContext`
+- `groupKey?: GroupKey | undefined`
+
+### SolverError
+**Properties:**
+- `id: string`
+- `type: "solver"`
+- `reason: string`
+
+### ValidationContext
+Context shared across validation results for grouping/display.
+
+**Properties:**
+- `days?: string[] | undefined`
+- `timeSlots?: string[] | undefined`
+- `employeeIds?: string[] | undefined`
+
+### ValidationSummary
+Summary of validation items grouped by their source instruction.
+Use `summarizeValidation()` to create these from a ScheduleValidation.
+
+**Properties:**
+- `groupKey: string & { readonly [GroupKeyBrand]: never; }`
+- `type: "coverage" | "rule"`
+- `description: string`
+- `days: readonly string[]`
+- `status: "passed" | "partial" | "failed"`
+- `passedCount: number`
+- `violatedCount: number`
+- `errorCount: number`
+
+### CoverageValidationResult
+Result of coverage role validation.
+
+**Properties:**
+- `valid: boolean`
+- `unknownRoles: string[]` - Role IDs used in coverage that don't match any team member
+- `knownRoles: string[]` - Role IDs used in coverage that match team members
+
+### SkillValidationResult
+Result of coverage skill validation.
+
+**Properties:**
+- `valid: boolean`
+- `unknownSkills: string[]` - Skill IDs used in coverage that don't match any team member
+- `knownSkills: string[]` - Skill IDs used in coverage that match team members
+
+### CoverageConfigValidationResult
+Combined validation result for coverage requirements.
+
+**Properties:**
+- `valid: boolean`
+- `roles: CoverageValidationResult`
+- `skills: SkillValidationResult`
+- `errors: string[]` - Human-readable error messages
+
+## Type Aliases
+
+### DayOfWeek
+```typescript
+"monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"
+```
+
+
+### DateTime
+Date and time representation supporting both UTC offset and timezone-aware formats.
+
+Can be specified either with a UTC offset (e.g., "-08:00") or with a timezone ID
+(e.g., "America/Los_Angeles").
+
+```typescript
+DateTimeWithUtcOffset | DateTimeWithTimeZone
+```
+
+
+### SchedulingPeriod
+Defines a scheduling period either as a date range or specific dates.
+
+Use this to specify when scheduling should occur. This is more expressive
+than a simple list of days because it can filter by day-of-week.
+
+**Example:**
+Date range with day-of-week filtering (restaurant closed Mon/Tue)
+```typescript
+const period: SchedulingPeriod = {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+};
+```
+
+**Example:**
+Date range for all days
+```typescript
+const period: SchedulingPeriod = {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+};
+```
+
+**Example:**
+Specific dates (non-contiguous or custom selection)
+```typescript
+const period: SchedulingPeriod = {
+specificDates: ['2025-02-05', '2025-02-07', '2025-02-10'],
+};
+```
+
+```typescript
+{ dateRange: { start: string; end: string; }; daysOfWeek?: DayOfWeek[]; specificDates?: never; } | { specificDates: string[]; dateRange?: never; daysOfWeek?: never; }
+```
+
+
+### SolverRequest
+```typescript
+{ variables: ({ type: "bool"; name: string; } | { type: "int"; name: string; min: number; max: number; } | { type: "interval"; name: string; start: number; end: number; size: number; presenceVar?: string | undefined; })[]; constraints: ({ type: "linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">=" | "=="; rhs: number; } | { type: "soft_linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">="; rhs: number; penalty: number; id?: string | undefined; } | { type: "exactly_one"; vars: string[]; } | { type: "at_most_one"; vars: string[]; } | { type: "implication"; if: string; then: string; } | { type: "bool_or"; vars: string[]; } | { type: "bool_and"; vars: string[]; } | { type: "no_overlap"; intervals: string[]; })[]; objective?: { sense: "minimize" | "maximize"; terms: { var: string; coeff: number; }[]; } | undefined; options?: { timeLimitSeconds?: number | undefined; solutionLimit?: number | undefined; } | undefined; }
+```
+
+
+### SolverResponse
+```typescript
+{ status: "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT" | "ERROR"; values?: Record<string, number> | undefined; statistics?: { solveTimeMs?: number | undefined; conflicts?: number | undefined; branches?: number | undefined; } | undefined; error?: string | undefined; solutionInfo?: string | undefined; softViolations?: { constraintId: string; violationAmount: number; targetValue: number; actualValue: number; }[] | undefined; }
+```
+
+
+### SolverVariable
+```typescript
+{ type: "bool"; name: string; } | { type: "int"; name: string; min: number; max: number; } | { type: "interval"; name: string; start: number; end: number; size: number; presenceVar?: string | undefined; }
+```
+
+
+### SolverConstraint
+```typescript
+{ type: "linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">=" | "=="; rhs: number; } | { type: "soft_linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">="; rhs: number; penalty: number; id?: string | undefined; } | { type: "exactly_one"; vars: string[]; } | { type: "at_most_one"; vars: string[]; } | { type: "implication"; if: string; then: string; } | { type: "bool_or"; vars: string[]; } | { type: "bool_and"; vars: string[]; } | { type: "no_overlap"; intervals: string[]; }
+```
+
+
+### SolverTerm
+```typescript
+{ var: string; coeff: number; }
+```
+
+
+### SolverObjective
+```typescript
+{ sense: "minimize" | "maximize"; terms: { var: string; coeff: number; }[]; }
+```
+
+
+### SolverStatus
+```typescript
+"OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT" | "ERROR"
+```
+
+
+### SoftConstraintViolation
+```typescript
+{ constraintId: string; violationAmount: number; targetValue: number; actualValue: number; }
+```
+
+
+### FetcherLike
+```typescript
+((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | { fetch: typeof fetch; }
+```
+
+
+### AssignTogetherConfig
+```typescript
+{ groupEmployeeIds: [string, string, ...string[]]; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; }
+```
+
+
+### EmployeeAssignmentPriorityConfig
+```typescript
+{ preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+```
+
+
+### LocationPreferenceConfig
+```typescript
+{ locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+```
+
+
+### MaxConsecutiveDaysConfig
+```typescript
+{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+```
+
+
+### MaxHoursDayConfig
+```typescript
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+```
+
+
+### MaxHoursWeekConfig
+```typescript
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+```
+
+
+### MaxShiftsDayConfig
+```typescript
+{ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+```
+
+
+### MinConsecutiveDaysConfig
+```typescript
+{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+```
+
+
+### MinHoursDayConfig
+```typescript
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+```
+
+
+### MinHoursWeekConfig
+```typescript
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+```
+
+
+### MinRestBetweenShiftsConfig
+```typescript
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+```
+
+
+### TimeOffConfig
+```typescript
+{ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+```
+
+
+### CpsatRuleName
+```typescript
+keyof CpsatRuleRegistry
+```
+
+
+### CpsatRuleConfigEntry
+```typescript
+{ name: K; config: CpsatRuleRegistry[K]; }
+```
+
+
+### CpsatRuleFactories
+```typescript
+{ [ruleName: string]: CreateCpsatRuleFunction<any>; }
+```
+
+
+### BuiltInCpsatRuleFactories
+```typescript
+[Complex type: __type]
+```
+
+
+### CreateCpsatRuleFunction
+```typescript
+(config: TConfig) => CompilationRule
+```
+
+
+### CpsatRuleRegistryFromFactories
+```typescript
+{ [K in keyof F]: InferCpsatRuleConfig<F[K]>; }
+```
+
+
+### SemanticTimeEntry
+A semantic time can be a simple definition (applies every day)
+or an array of variants with different times for different days/dates.
+
+```typescript
+SemanticTimeDef | SemanticTimeVariant[]
+```
+
+
+### SemanticCoverageRequirement
+Coverage requirement that references a semantic time by name.
+Type-safe: S is constrained to known semantic time names.
+
+This is a discriminated union enforcing at compile time that at least
+one of `roleIds` or `skillIds` must be provided.
+
+```typescript
+RoleBasedSemanticCoverageRequirement<S> | SkillBasedSemanticCoverageRequirement<S>
+```
+
+
+### ConcreteCoverageRequirement
+Concrete coverage requirement with explicit day and times.
+Used for one-off requirements that don't fit a semantic time.
+
+This is a discriminated union enforcing at compile time that at least
+one of `roleIds` or `skillIds` must be provided.
+
+```typescript
+RoleBasedConcreteCoverageRequirement | SkillBasedConcreteCoverageRequirement
+```
+
+
+### MixedCoverageRequirement
+Union type for coverage - either semantic (type-safe) or concrete.
+
+```typescript
+ConcreteCoverageRequirement | SemanticCoverageRequirement<S>
+```
+
+
+### Employee
+```typescript
+SchedulingEmployee
+```
+
+
+### CoverageRequirement
+Defines staffing needs for a specific time period.
+
+This is a discriminated union that enforces at compile time that at least
+one of `roleIds` or `skillIds` must be provided:
+
+- Role-based: `{ roleIds: ["waiter"], ... }` - anyone with ANY of these roles (OR logic)
+- Role + skill: `{ roleIds: ["waiter"], skillIds: ["senior"], ... }` - role AND skills
+- Skill-only: `{ skillIds: ["keyholder"], ... }` - any role with ALL skills (AND logic)
+
+**Example:**
+// Need 2 waiters during lunch (role-based)
+{ day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 14 }, roleIds: ["waiter"], targetCount: 2, priority: "MANDATORY" }
+
+**Example:**
+// Need 1 manager OR supervisor during service (OR logic on roles)
+{ day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 22 }, roleIds: ["manager", "supervisor"], targetCount: 1, priority: "MANDATORY" }
+
+**Example:**
+// Need 1 keyholder for opening (skill-only, any role)
+{ day: "2024-01-01", startTime: { hours: 6 }, endTime: { hours: 8 }, skillIds: ["keyholder"], targetCount: 1, priority: "MANDATORY" }
+
+**Example:**
+// Need 1 senior waiter for training shift (role + skill filter)
+{ day: "2024-01-01", startTime: { hours: 9 }, endTime: { hours: 17 }, roleIds: ["waiter"], skillIds: ["senior"], targetCount: 1, priority: "HIGH" }
+
+```typescript
+RoleBasedCoverageRequirement | SkillBasedCoverageRequirement
+```
+
+
+### Priority
+```typescript
+"LOW" | "MEDIUM" | "HIGH" | "MANDATORY"
+```
+
+
+### ScheduleError
+```typescript
+CoverageError | RuleError | SolverError
+```
+
+
+### ScheduleViolation
+```typescript
+CoverageViolation | RuleViolation
+```
+
+
+### SchedulePassed
+```typescript
+CoveragePassed | RulePassed
+```
+
+
+### GroupKey
+Branded type for validation group keys.
+Groups related validation items that originated from the same instruction.
+
+```typescript
+string & { readonly [GroupKeyBrand]: never; }
+```
+
+
+### InferCpsatRuleConfig
+```typescript
+T extends CreateCpsatRuleFunction<infer Config> ? Config : never
+```
+
+
+### Term
+```typescript
+{ var: string; coeff: number; }
+```
+
+
+## Functions
+
+### dateToCalendarDate
+Converts a JavaScript Date to a CalendarDate
+
+**Parameters:**
+- `date: Date`
+
+**Returns:** `CalendarDate`
+
+
+### dateTimeToDate
+Converts a DateTime to a JavaScript Date
+Internal helper function
+
+**Parameters:**
+- `dateTime: DateTimeWithUtcOffset | DateTimeWithTimeZone`
+
+**Returns:** `Date`
+
+
+### compareDateTimes
+Compares two DateTimes
+Returns:
+ -1 if dateTime1 < dateTime2
+  0 if dateTime1 = dateTime2
+  1 if dateTime1 > dateTime2
+
+**Parameters:**
+- `dateTime1: DateTimeWithUtcOffset | DateTimeWithTimeZone`
+- `dateTime2: DateTimeWithUtcOffset | DateTimeWithTimeZone`
+
+**Returns:** `number`
+
+
+### toDayOfWeek
+Helper to get the day of week name from a Date (local time)
+
+**Parameters:**
+- `date: Date`
+
+**Returns:** `"monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"`
+
+
+### toDayOfWeekUTC
+Helper to get the day of week name from a Date (UTC)
+Use this when working with date strings like "2026-01-10" that are timezone-agnostic.
+
+**Parameters:**
+- `date: Date`
+
+**Returns:** `"monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"`
+
+
+### formatDateString
+Formats a date as YYYY-MM-DD string
+
+**Parameters:**
+- `date: Date`
+
+**Returns:** `string`
+
+
+### generateDays
+Generates an array of day strings (YYYY-MM-DD) from a time horizon.
+
+**Example:**
+```typescript
+const days = generateDays({
+  start: new Date('2025-01-01'),
+  end: new Date('2025-01-04')
+});
+// Returns: ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-04"]
+```
+
+**Parameters:**
+- `horizon: { start: Date; end: Date; }`
+
+**Returns:** `string[]`
+
+
+### splitPeriodIntoDays
+Splits a time period into consecutive day ranges.
+
+Each range represents a single calendar day within the period from start to end.
+This is useful for rules that need to apply constraints on a per-day basis,
+such as maximum or minimum hours per day.
+
+**Example:**
+```typescript
+const ranges = splitPeriodIntoDays({
+  start: new Date('2025-01-01'),
+  end: new Date('2025-01-03')
+});
+// Returns:
+// [
+//   [Date('2025-01-01'), Date('2025-01-02')],
+//   [Date('2025-01-02'), Date('2025-01-03')]
+// ]
+```
+
+**Parameters:**
+- `{ start, end }: { start: Date; end: Date; }`
+
+**Returns:** `[Date, Date][]`
+
+
+### splitPeriodIntoWeeks
+Splits a time period into consecutive week ranges.
+
+Each range represents a week period starting on the specified day of the week.
+This is useful for rules that need to apply constraints on a per-week basis,
+such as maximum or minimum hours per week.
+
+The first range starts at the provided start date (not necessarily on weekStartsOn).
+Subsequent ranges align to the weekStartsOn day. The last range's end date will be
+the provided end date.
+
+**Example:**
+```typescript
+const ranges = splitPeriodIntoWeeks({
+  start: new Date('2025-01-01'), // Wednesday
+  end: new Date('2025-01-15'),
+  weekStartsOn: 'monday'
+});
+// Returns ranges starting from Jan 1 (Wed), then aligning to Mondays:
+// [
+//   [Date('2025-01-01 Wed'), Date('2025-01-06 Mon')],
+//   [Date('2025-01-06 Mon'), Date('2025-01-13 Mon')],
+//   [Date('2025-01-13 Mon'), Date('2025-01-15 Wed')]
+// ]
+```
+
+**Parameters:**
+- `{
+  start,
+  end,
+  weekStartsOn,
+}: { start: Date; end: Date; weekStartsOn: DayOfWeek; }`
+
+**Returns:** `[Date, Date][]`
+
+
+### dateTimeRangesOverlap
+Checks if two DateTime ranges overlap in both date and time.
+Ranges overlap if they share any moment in time.
+
+Two ranges overlap if: range1.start < range2.end AND range2.start < range1.end
+
+**Example:**
+```typescript
+// Same day, overlapping times (9-17 overlaps with 12-20)
+dateTimeRangesOverlap(
+  {
+    start: { year: 2025, month: 6, day: 1, hours: 9, minutes: 0 },
+    end: { year: 2025, month: 6, day: 1, hours: 17, minutes: 0 }
+  },
+  {
+    start: { year: 2025, month: 6, day: 1, hours: 12, minutes: 0 },
+    end: { year: 2025, month: 6, day: 1, hours: 20, minutes: 0 }
+  }
+); // true
+
+// Different days - no overlap
+dateTimeRangesOverlap(
+  {
+    start: { year: 2025, month: 6, day: 1, hours: 9, minutes: 0 },
+    end: { year: 2025, month: 6, day: 1, hours: 17, minutes: 0 }
+  },
+  {
+    start: { year: 2025, month: 6, day: 2, hours: 9, minutes: 0 },
+    end: { year: 2025, month: 6, day: 2, hours: 17, minutes: 0 }
+  }
+); // false
+
+// Works naturally with Shift objects
+dateTimeRangesOverlap(
+  { start: shift1.startDateTime, end: shift1.endDateTime },
+  { start: shift2.startDateTime, end: shift2.endDateTime }
+);
+```
+
+**Parameters:**
+- `range1: DateTimeRange`
+- `range2: DateTimeRange`
+
+**Returns:** `boolean`
+
+
+### daysBetween
+Calculates the number of complete days between two dates
+
+**Example:**
+```typescript
+daysBetween(new Date('2025-01-01'), new Date('2025-01-05')); // 4
+```
+
+**Parameters:**
+- `start: Date`
+- `end: Date`
+
+**Returns:** `number`
+
+
+### resolveDaysFromPeriod
+Computes the list of day strings (YYYY-MM-DD) from a SchedulingPeriod.
+
+For date ranges, generates all days between start and end (inclusive),
+optionally filtering to specific days of the week.
+
+For specific dates, returns the dates as-is (sorted).
+
+**Example:**
+Date range with day-of-week filter
+```typescript
+const days = resolveDaysFromPeriod({
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+daysOfWeek: ['wednesday', 'friday'],
+});
+// Returns: ['2025-02-05', '2025-02-07'] (Wed and Fri only)
+```
+
+**Example:**
+Date range without filter
+```typescript
+const days = resolveDaysFromPeriod({
+dateRange: { start: '2025-02-03', end: '2025-02-05' },
+});
+// Returns: ['2025-02-03', '2025-02-04', '2025-02-05']
+```
+
+**Example:**
+Specific dates
+```typescript
+const days = resolveDaysFromPeriod({
+specificDates: ['2025-02-07', '2025-02-03', '2025-02-10'],
+});
+// Returns: ['2025-02-03', '2025-02-07', '2025-02-10'] (sorted)
+```
+
+**Parameters:**
+- `period: { dateRange: { start: string; end: string; }; daysOfWeek?: DayOfWeek[]; specificDates?: never; } | { specificDates: string[]; dateRange?: never; daysOfWeek?: never; }`
+
+**Returns:** `string[]`
+
+
+### parseSolverResponse
+Extracts shift assignments from solver response.
+
+Parses variable names matching the pattern `assign:${employeeId}:${patternId}:${day}`
+and returns assignments where the variable value is 1 (true).
+
+IDs are validated by ModelBuilder to not contain colons,
+ensuring unambiguous parsing.
+
+**Example:**
+```typescript
+const response = await client.solve(request);
+const result = parseSolverResponse(response);
+
+if (result.status === "OPTIMAL" || result.status === "FEASIBLE") {
+  for (const assignment of result.assignments) {
+    console.log(`${assignment.employeeId} works ${assignment.shiftPatternId} on ${assignment.day}`);
+  }
+}
+```
+
+**Parameters:**
+- `response: { status: "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT" | "ERROR"; values?: Record<string, number> | undefined; statistics?: { solveTimeMs?: number | undefined; conflicts?: number | undefined; branches?: number | undefined; } | undefined; error?: string | undefined; solutionInfo?: string | undefined; softViolations?: { constraintId: string; violationAmount: number; targetValue: number; actualValue: number; }[] | undefined; }`
+
+**Returns:** `SolverResult`
+
+
+### resolveAssignments
+Resolves shift assignments to concrete times using shift patterns.
+
+**Example:**
+```typescript
+const result = parseScheduleResult(response);
+const resolved = resolveAssignments(result.assignments, shiftPatterns);
+
+for (const shift of resolved) {
+  console.log(`${shift.employeeId} works ${shift.day} from ${shift.startTime.hours}:${shift.startTime.minutes}`);
+}
+```
+
+**Parameters:**
+- `assignments: ShiftAssignment[]`
+- `shiftPatterns: ShiftPattern[]`
+
+**Returns:** `ResolvedShiftAssignment[]`
+
+
+### createAssignTogetherRule
+Encourages or enforces that team members in the group work the same shift patterns on a day.
+For each pair of team members in the group, ensures they are assigned to the same shifts.
+
+**Example:**
+```ts
+const rule = createAssignTogetherRule({
+  groupEmployeeIds: ["alice", "bob", "charlie"],
+  priority: "HIGH",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { groupEmployeeIds: [string, string, ...string[]]; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; }`
+
+**Returns:** `CompilationRule`
+
+
+### createEmployeeAssignmentPriorityRule
+Adds objective weight to prefer or avoid assigning team members.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+
+**Example:**
+Prefer specific team members
+```ts
+createEmployeeAssignmentPriorityRule({
+employeeIds: ["alice", "bob"],
+preference: "high",
+});
+```
+
+**Example:**
+Avoid assigning students on weekdays
+```ts
+createEmployeeAssignmentPriorityRule({
+roleIds: ["student"],
+dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+preference: "low",
+});
+```
+
+**Example:**
+Prefer experienced staff on weekends
+```ts
+createEmployeeAssignmentPriorityRule({
+skillIds: ["senior"],
+dayOfWeek: ["saturday", "sunday"],
+preference: "high",
+});
+```
+
+**Parameters:**
+- `config: { preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createLocationPreferenceRule
+Prefers assigning a person to shift patterns matching a specific location.
+
+**Example:**
+```ts
+const rule = createLocationPreferenceRule({
+  locationId: "terrace",
+  priority: "HIGH",
+  employeeIds: ["alice"],
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMaxConsecutiveDaysRule
+Limits how many consecutive days a person can be assigned.
+
+**Example:**
+```ts
+const rule = createMaxConsecutiveDaysRule({
+  days: 5,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMaxHoursDayRule
+Limits how many hours a person can work in a single day.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+
+**Example:**
+Limit everyone to 8 hours per day
+```ts
+createMaxHoursDayRule({
+hours: 8,
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Students limited to 4 hours on weekdays during term
+```ts
+createMaxHoursDayRule({
+roleIds: ["student"],
+hours: 4,
+dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+priority: "MANDATORY",
+});
+```
+
+**Parameters:**
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMaxHoursWeekRule
+Caps total hours a person can work within each scheduling week.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+Time scoping filters which days within each week count toward the limit.
+
+**Example:**
+Limit everyone to 40 hours per week
+```ts
+createMaxHoursWeekRule({
+hours: 40,
+priority: "HIGH",
+});
+```
+
+**Example:**
+Students limited to 20 hours during term time
+```ts
+createMaxHoursWeekRule({
+roleIds: ["student"],
+hours: 20,
+recurringPeriods: [
+{ name: "fall-term", startMonth: 9, startDay: 1, endMonth: 12, endDay: 15 },
+{ name: "spring-term", startMonth: 1, startDay: 15, endMonth: 5, endDay: 31 },
+],
+priority: "MANDATORY",
+});
+```
+
+**Parameters:**
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMaxShiftsDayRule
+Limits how many shifts a person can work in a single day.
+
+This rule controls the maximum number of distinct shift assignments per day,
+regardless of shift duration. For limiting total hours worked, use `max-hours-day`.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+
+**Example:**
+Limit to one shift per day (common for most schedules)
+```ts
+createMaxShiftsDayRule({
+shifts: 1,
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Allow up to two shifts per day for part-time workers
+```ts
+createMaxShiftsDayRule({
+roleIds: ["part-time"],
+shifts: 2,
+priority: "HIGH",
+});
+```
+
+**Example:**
+Students can work 2 shifts on weekends only
+```ts
+createMaxShiftsDayRule({
+roleIds: ["student"],
+shifts: 2,
+dayOfWeek: ["saturday", "sunday"],
+priority: "MANDATORY",
+});
+```
+
+**Parameters:**
+- `config: { shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMinConsecutiveDaysRule
+Requires that once a person starts working, they continue for a minimum
+number of consecutive days.
+
+**Example:**
+```ts
+const rule = createMinConsecutiveDaysRule({
+  days: 3,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMinHoursDayRule
+Ensures a person works at least a minimum number of hours per day.
+
+**Example:**
+```ts
+const rule = createMinHoursDayRule({
+  hours: 6,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMinHoursWeekRule
+Enforces a minimum total number of hours per scheduling week.
+
+**Example:**
+```ts
+const rule = createMinHoursWeekRule({
+  hours: 30,
+  priority: "HIGH",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createMinRestBetweenShiftsRule
+Enforces a minimum rest period between any two shifts a person works.
+
+**Example:**
+```ts
+const rule = createMinRestBetweenShiftsRule({
+  hours: 10,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Parameters:**
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createTimeOffRule
+Blocks or penalizes assignments during specified time periods.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+Optionally supports partial-day time-off with startTime/endTime.
+
+**Example:**
+Full day vacation
+```ts
+createTimeOffRule({
+employeeIds: ["alice"],
+dateRange: { start: "2024-02-01", end: "2024-02-05" },
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Every Wednesday afternoon off for students
+```ts
+createTimeOffRule({
+roleIds: ["student"],
+dayOfWeek: ["wednesday"],
+startTime: { hours: 14, minutes: 0 },
+endTime: { hours: 23, minutes: 59 },
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Specific date, partial day
+```ts
+createTimeOffRule({
+employeeIds: ["bob"],
+specificDates: ["2024-03-15"],
+startTime: { hours: 16, minutes: 0 },
+endTime: { hours: 23, minutes: 59 },
+priority: "MANDATORY",
+});
+```
+
+**Parameters:**
+- `config: { priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+**Returns:** `CompilationRule`
+
+
+### createCpsatRuleFactory
+Creates a rule factory map, preventing overriding built-in rules.
+
+**Parameters:**
+- `factories: F`
+
+**Returns:** `F`
+
+
+### defineSemanticTimes
+Define semantic times with type-safe names.
+
+Returns a context object that provides:
+- Type-safe coverage() function that only accepts defined semantic time names
+- resolve() function to expand semantic times to concrete requirements
+
+**Example:**
+Basic usage
+```typescript
+const times = defineSemanticTimes({
+opening: { startTime: { hours: 6 }, endTime: { hours: 8 } },
+lunch: { startTime: { hours: 11, minutes: 30 }, endTime: { hours: 14 } },
+closing: { startTime: { hours: 21 }, endTime: { hours: 23 } },
+});
+
+const coverage = times.coverage([
+{ semanticTime: "lunch", roleId: "server", targetCount: 3 },
+{ semanticTime: "opening", roleId: "keyholder", targetCount: 1, priority: "MANDATORY" },
+// Type error: "dinner" is not a defined semantic time
+// { semanticTime: "dinner", roleId: "server", targetCount: 2 },
+]);
+```
+
+**Example:**
+Variants for different days
+```typescript
+const times = defineSemanticTimes({
+lunch: [
+{ startTime: { hours: 11, minutes: 30 }, endTime: { hours: 14 }, days: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
+{ startTime: { hours: 12 }, endTime: { hours: 15 }, days: ["saturday", "sunday"] },
+],
+});
+```
+
+**Example:**
+Mixed semantic and concrete coverage
+```typescript
+const coverage = times.coverage([
+{ semanticTime: "lunch", roleId: "server", targetCount: 3 },
+// One-off party - concrete time
+{ day: "2026-01-14", startTime: { hours: 15 }, endTime: { hours: 20 }, roleId: "server", targetCount: 5 },
+]);
+```
+
+**Parameters:**
+- `defs: T`
+
+**Returns:** `SemanticTimeContext<keyof T & string>`
+
+
+### isConcreteCoverage
+Type guard to check if a requirement is concrete (has explicit day/times).
+
+**Parameters:**
+- `req: ConcreteCoverageRequirement | SemanticCoverageRequirement<S>`
+
+**Returns:** `boolean`
+
+
+### isSemanticCoverage
+Type guard to check if a requirement is semantic (references a named time).
+
+**Parameters:**
+- `req: ConcreteCoverageRequirement | SemanticCoverageRequirement<S>`
+
+**Returns:** `boolean`
+
+
+### groupKey
+Creates a GroupKey from a description string.
+Use this to create keys that group related validation items together.
+
+**Example:**
+```typescript
+const key = groupKey("2x waiter during lunch");
+coverage.groupKey = key;
+```
+
+**Parameters:**
+- `description: string`
+
+**Returns:** `string & { readonly [GroupKeyBrand]: never; }`
+
+
+### summarizeValidation
+Aggregates validation items by their groupKey into summaries.
+This is a pure function that doesn't modify the input.
+
+Items without a groupKey are grouped by their ID (ungrouped).
+
+**Example:**
+```typescript
+const validation = reporter.getValidation();
+const summaries = summarizeValidation(validation);
+// summaries[0] = {
+//   groupKey: "2x waiter during lunch",
+//   status: "passed",
+//   passedCount: 180,
+//   days: ["2026-02-02", "2026-02-03", ...]
+// }
+```
+
+**Parameters:**
+- `validation: ScheduleValidation`
+
+**Returns:** `readonly ValidationSummary[]`
+
+
+### validateCoverageRoles
+Validates that all roleIds used in coverage requirements match the team.
+
+This catches a common LLM error where the model generates coverage requirements
+using role names that don't match any team member's roleIds. Without this validation,
+such mismatches would result in valid but semantically wrong schedules (e.g.,
+coverage requirements that no one can satisfy).
+
+**Example:**
+```typescript
+const employees = [
+  { id: "alice", roleIds: ["cashier"] },
+  { id: "bob", roleIds: ["stocker"] },
+];
+
+const coverage = [
+  { roleId: "cashier", targetCount: 1, ... },  // OK
+  { roleId: "worker", targetCount: 1, ... },   // Unknown role!
+];
+
+const result = validateCoverageRoles(coverage, employees);
+// result.valid = false
+// result.unknownRoles = ["worker"]
+// result.knownRoles = ["cashier"]
+```
+
+**Parameters:**
+- `coverage: CoverageRequirement[]`
+- `employees: SchedulingEmployee[]`
+
+**Returns:** `CoverageValidationResult`
+
+
+### validateCoverageSkills
+Validates that all skillIds used in coverage requirements match the team.
+
+Similar to role validation, this catches LLM hallucinations where skill names
+in coverage don't match any team member's skillIds.
+
+**Example:**
+```typescript
+const employees = [
+  { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
+  { id: "bob", roleIds: ["server"] },
+];
+
+const coverage = [
+  { skillIds: ["keyholder"], targetCount: 1, ... },  // OK
+  { skillIds: ["manager"], targetCount: 1, ... },   // Unknown skill!
+];
+
+const result = validateCoverageSkills(coverage, employees);
+// result.valid = false
+// result.unknownSkills = ["manager"]
+```
+
+**Parameters:**
+- `coverage: CoverageRequirement[]`
+- `employees: SchedulingEmployee[]`
+
+**Returns:** `SkillValidationResult`
+
+
+### validateCoverageConfig
+Validates coverage requirements against team roles and skills.
+
+This is the primary validation function to call before building a scheduling model.
+It checks both roles and skills, returning a combined result with error messages.
+
+**Example:**
+```typescript
+const result = validateCoverageConfig(coverage, employees);
+if (!result.valid) {
+  throw new Error(result.errors.join("; "));
+}
+```
+
+**Parameters:**
+- `coverage: CoverageRequirement[]`
+- `employees: SchedulingEmployee[]`
+
+**Returns:** `CoverageConfigValidationResult`
+
+
+### addMinutesToDate
+Adds a number of minutes to a base date and returns a DateTime.
+Treats the base date as a reference point (typically midnight of horizon start),
+and the minutes parameter as absolute minutes from that point.
+
+**Example:**
+```typescript
+// Add 90 minutes from midnight
+addMinutesToDate(new Date('2025-01-01'), 90);
+// Returns: { year: 2025, month: 1, day: 1, hours: 1, minutes: 30 }
+
+// Add 1500 minutes (spans to next day)
+addMinutesToDate(new Date('2025-01-01'), 1500);
+// Returns: { year: 2025, month: 1, day: 2, hours: 1, minutes: 0 }
+```
+
+**Parameters:**
+- `baseDate: Date`
+- `minutes: number`
+
+**Returns:** `DateTimeWithUtcOffset | DateTimeWithTimeZone`
+
+
+### splitPoints
+Returns the points where a range should be split, filtered to within [start, end).
+Always includes range start. Sorted ascending.
+
+**Parameters:**
+- `[start, end]: [number, number]`
+- `splitAt: number[]`
+
+**Returns:** `number[]`
+
+
+### parseDayString
+Parse a day string (YYYY-MM-DD) to a UTC Date.
+Used internally for day-of-week calculations and date comparisons.
+
+**Parameters:**
+- `day: string`
+
+**Returns:** `Date`
+
+
+### timeOfDayToMinutes
+**Parameters:**
+- `time: TimeOfDay`
+
+**Returns:** `number`
+
+
+### normalizeEndMinutes
+**Parameters:**
+- `startMinutes: number`
+- `endMinutes: number`
+
+**Returns:** `number`
+
+
+### priorityToPenalty
+**Parameters:**
+- `priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"`
+
+**Returns:** `number`
+
+
+### splitIntoWeeks
+**Parameters:**
+- `days: string[]`
+- `weekStartsOn: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"`
+
+**Returns:** `string[][]`
+
+
+## Classes
+
+### ORSchedulingError
+Error thrown when Google OR Tools scheduling API requests fail.
+
+Contains the HTTP status code and raw response data from the API for debugging.
+Common causes include infeasible constraints, invalid requests, or API unavailability.
+
+
+### HttpSolverClient
+Generic HTTP client for the solver service.
+
+
+### ModelBuilder
+Compilation context that creates variables, constraints, and objectives
+and emits a `SolverRequest` for the Python CP-SAT solver service.
+
+
+### ValidationReporterImpl
+
+## Constants
+
+### DayOfWeekSchema
+Zod schema for {@link DayOfWeek}.
+Useful for rule configs that need to accept a day-of-week string.
+
+**Type:** `z.ZodUnion<readonly [z.ZodLiteral<"monday">, z.ZodLiteral<"tuesday">, z.ZodLiteral<"wednesday">, z.ZodLiteral<"thursday">, z.ZodLiteral<"friday">, z.ZodLiteral<"saturday">, z.ZodLiteral<"sunday">]>`
+
+
+### SOLVER_STATUS
+**Type:** `{ readonly OPTIMAL: "OPTIMAL"; readonly FEASIBLE: "FEASIBLE"; readonly INFEASIBLE: "INFEASIBLE"; readonly TIMEOUT: "TIMEOUT"; readonly ERROR: "ERROR"; }`
+
+
+### SolverRequestSchema
+**Type:** `[Complex type: ZodObject]`
+
+
+### SolverResponseSchema
+**Type:** `z.ZodObject<{ status: z.ZodEnum<{ OPTIMAL: "OPTIMAL"; FEASIBLE: "FEASIBLE"; INFEASIBLE: "INFEASIBLE"; TIMEOUT: "TIMEOUT"; ERROR: "ERROR"; }>; values: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodNumber>>; statistics: z.ZodOptional<z.ZodObject<{ solveTimeMs: z.ZodOptional<z.ZodNumber>; conflicts: z.ZodOptional<z.ZodNumber>; branches: z.ZodOptional<z.ZodNumber>; }, z.core.$strip>>; error: z.ZodOptional<z.ZodString>; solutionInfo: z.ZodOptional<z.ZodString>; softViolations: z.ZodOptional<z.ZodArray<z.ZodObject<{ constraintId: z.ZodString; violationAmount: z.ZodNumber; targetValue: z.ZodNumber; actualValue: z.ZodNumber; }, z.core.$strip>>>; }, z.core.$strip>`
+
+
+### builtInCpsatRuleFactories
+**Type:** `[Complex type: __type]`
+
+
+### OBJECTIVE_WEIGHTS
+Standard objective weights for the scheduling solver.
+
+These weights define the relative importance of different objectives.
+Higher weights mean stronger preference. Rules can use these as reference
+points when adding their own penalties.
+
+Weight hierarchy (highest to lowest priority):
+- SHIFT_ACTIVE (1000): Minimize number of active shift patterns
+- ASSIGNMENT_PREFERENCE (10): Per-assignment preference (e.g., prefer permanent staff)
+- FAIRNESS (5): Fair distribution of shifts across team members
+- ASSIGNMENT_BASE (1): Tiebreaker - minimize total assignments
+
+**Example:**
+Using weights in a custom rule
+```ts
+import { OBJECTIVE_WEIGHTS } from "feasible";
+
+// Prefer senior staff with same weight as employee-assignment-priority
+b.addPenalty(assignment, -OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE);
+
+// Strong preference (2x normal)
+b.addPenalty(assignment, -2 * OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE);
+```
+
+**Type:** `{ readonly SHIFT_ACTIVE: 1000; readonly ASSIGNMENT_PREFERENCE: 10; readonly FAIRNESS: 5; readonly ASSIGNMENT_BASE: 1; }`
+
+
+### DAY_OF_WEEK_MAP
+**Type:** `{ sunday: number; monday: number; tuesday: number; wednesday: number; thursday: number; friday: number; saturday: number; }`
+
+
+### SolverTermSchema
+**Type:** `z.ZodObject<{ var: z.ZodString; coeff: z.ZodNumber; }, z.core.$strip>`
+
+
+### BoolVariableSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"bool">; name: z.ZodString; }, z.core.$strip>`
+
+
+### IntVariableSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"int">; name: z.ZodString; min: z.ZodNumber; max: z.ZodNumber; }, z.core.$strip>`
+
+
+### IntervalVariableSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"interval">; name: z.ZodString; start: z.ZodNumber; end: z.ZodNumber; size: z.ZodNumber; presenceVar: z.ZodOptional<z.ZodString>; }, z.core.$strip>`
+
+
+### SolverVariableSchema
+**Type:** `z.ZodUnion<readonly [z.ZodObject<{ type: z.ZodLiteral<"bool">; name: z.ZodString; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"int">; name: z.ZodString; min: z.ZodNumber; max: z.ZodNumber; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"interval">; name: z.ZodString; start: z.ZodNumber; end: z.ZodNumber; size: z.ZodNumber; presenceVar: z.ZodOptional<z.ZodString>; }, z.core.$strip>]>`
+
+
+### LinearConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"linear">; terms: z.ZodArray<z.ZodObject<{ var: z.ZodString; coeff: z.ZodNumber; }, z.core.$strip>>; op: z.ZodUnion<readonly [z.ZodLiteral<"<=">, z.ZodLiteral<">=">, z.ZodLiteral<"==">]>; rhs: z.ZodNumber; }, z.core.$strip>`
+
+
+### SoftLinearConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"soft_linear">; terms: z.ZodArray<z.ZodObject<{ var: z.ZodString; coeff: z.ZodNumber; }, z.core.$strip>>; op: z.ZodUnion<readonly [z.ZodLiteral<"<=">, z.ZodLiteral<">=">]>; rhs: z.ZodNumber; penalty: z.ZodNumber; id: z.ZodOptional<z.ZodString>; }, z.core.$strip>`
+
+
+### ExactlyOneConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"exactly_one">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>`
+
+
+### AtMostOneConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"at_most_one">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>`
+
+
+### ImplicationConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"implication">; if: z.ZodString; then: z.ZodString; }, z.core.$strip>`
+
+
+### BoolOrConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"bool_or">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>`
+
+
+### BoolAndConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"bool_and">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>`
+
+
+### NoOverlapConstraintSchema
+**Type:** `z.ZodObject<{ type: z.ZodLiteral<"no_overlap">; intervals: z.ZodArray<z.ZodString>; }, z.core.$strip>`
+
+
+### SolverConstraintSchema
+**Type:** `z.ZodUnion<readonly [z.ZodObject<{ type: z.ZodLiteral<"linear">; terms: z.ZodArray<z.ZodObject<{ var: z.ZodString; coeff: z.ZodNumber; }, z.core.$strip>>; op: z.ZodUnion<readonly [z.ZodLiteral<"<=">, z.ZodLiteral<">=">, z.ZodLiteral<"==">]>; rhs: z.ZodNumber; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"soft_linear">; terms: z.ZodArray<z.ZodObject<{ var: z.ZodString; coeff: z.ZodNumber; }, z.core.$strip>>; op: z.ZodUnion<readonly [z.ZodLiteral<"<=">, z.ZodLiteral<">=">]>; rhs: z.ZodNumber; penalty: z.ZodNumber; id: z.ZodOptional<z.ZodString>; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"exactly_one">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"at_most_one">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"implication">; if: z.ZodString; then: z.ZodString; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"bool_or">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"bool_and">; vars: z.ZodArray<z.ZodString>; }, z.core.$strip>, z.ZodObject<{ type: z.ZodLiteral<"no_overlap">; intervals: z.ZodArray<z.ZodString>; }, z.core.$strip>]>`
+
+
+### SolverObjectiveSchema
+**Type:** `z.ZodObject<{ sense: z.ZodUnion<readonly [z.ZodLiteral<"minimize">, z.ZodLiteral<"maximize">]>; terms: z.ZodArray<z.ZodObject<{ var: z.ZodString; coeff: z.ZodNumber; }, z.core.$strip>>; }, z.core.$strip>`
+
+
+### SolverOptionsSchema
+**Type:** `z.ZodObject<{ timeLimitSeconds: z.ZodOptional<z.ZodNumber>; solutionLimit: z.ZodOptional<z.ZodNumber>; }, z.core.$strip>`
+
+
+### SolverStatusSchema
+**Type:** `z.ZodEnum<{ OPTIMAL: "OPTIMAL"; FEASIBLE: "FEASIBLE"; INFEASIBLE: "INFEASIBLE"; TIMEOUT: "TIMEOUT"; ERROR: "ERROR"; }>`
+
+
+### SolverStatisticsSchema
+**Type:** `z.ZodObject<{ solveTimeMs: z.ZodOptional<z.ZodNumber>; conflicts: z.ZodOptional<z.ZodNumber>; branches: z.ZodOptional<z.ZodNumber>; }, z.core.$strip>`
+
+
+### SoftConstraintViolationSchema
+**Type:** `z.ZodObject<{ constraintId: z.ZodString; violationAmount: z.ZodNumber; targetValue: z.ZodNumber; actualValue: z.ZodNumber; }, z.core.$strip>`
+
+
+### MINUTES_PER_DAY
+**Type:** `number`
+
+
+
+## Built-In Rules Reference
+
+Rules are constraints and preferences you can apply to schedules using `ctx.addRule(ruleName, config)`.
+
+### assign-together
+
+
+
+Encourages or enforces that team members in the group work the same shift patterns on a day.
+For each pair of team members in the group, ensures they are assigned to the same shifts.
+
+**Example:**
+```ts
+const rule = createAssignTogetherRule({
+  groupEmployeeIds: ["alice", "bob", "charlie"],
+  priority: "HIGH",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ groupEmployeeIds: [string, string, ...string[]]; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; }`
+
+### employee-assignment-priority
+
+
+
+Adds objective weight to prefer or avoid assigning team members.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+
+**Example:**
+Prefer specific team members
+```ts
+createEmployeeAssignmentPriorityRule({
+employeeIds: ["alice", "bob"],
+preference: "high",
+});
+```
+
+**Example:**
+Avoid assigning students on weekdays
+```ts
+createEmployeeAssignmentPriorityRule({
+roleIds: ["student"],
+dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+preference: "low",
+});
+```
+
+**Example:**
+Prefer experienced staff on weekends
+```ts
+createEmployeeAssignmentPriorityRule({
+skillIds: ["senior"],
+dayOfWeek: ["saturday", "sunday"],
+preference: "high",
+});
+```
+
+**Config:** `{ preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+### location-preference
+
+
+
+Prefers assigning a person to shift patterns matching a specific location.
+
+**Example:**
+```ts
+const rule = createLocationPreferenceRule({
+  locationId: "terrace",
+  priority: "HIGH",
+  employeeIds: ["alice"],
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+### max-consecutive-days
+
+
+
+Limits how many consecutive days a person can be assigned.
+
+**Example:**
+```ts
+const rule = createMaxConsecutiveDaysRule({
+  days: 5,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+### max-hours-day
+
+
+
+Limits how many hours a person can work in a single day.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+
+**Example:**
+Limit everyone to 8 hours per day
+```ts
+createMaxHoursDayRule({
+hours: 8,
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Students limited to 4 hours on weekdays during term
+```ts
+createMaxHoursDayRule({
+roleIds: ["student"],
+hours: 4,
+dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+priority: "MANDATORY",
+});
+```
+
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+### max-hours-week
+
+
+
+Caps total hours a person can work within each scheduling week.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+Time scoping filters which days within each week count toward the limit.
+
+**Example:**
+Limit everyone to 40 hours per week
+```ts
+createMaxHoursWeekRule({
+hours: 40,
+priority: "HIGH",
+});
+```
+
+**Example:**
+Students limited to 20 hours during term time
+```ts
+createMaxHoursWeekRule({
+roleIds: ["student"],
+hours: 20,
+recurringPeriods: [
+{ name: "fall-term", startMonth: 9, startDay: 1, endMonth: 12, endDay: 15 },
+{ name: "spring-term", startMonth: 1, startDay: 15, endMonth: 5, endDay: 31 },
+],
+priority: "MANDATORY",
+});
+```
+
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+### max-shifts-day
+
+
+
+Limits how many shifts a person can work in a single day.
+
+This rule controls the maximum number of distinct shift assignments per day,
+regardless of shift duration. For limiting total hours worked, use `max-hours-day`.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+
+**Example:**
+Limit to one shift per day (common for most schedules)
+```ts
+createMaxShiftsDayRule({
+shifts: 1,
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Allow up to two shifts per day for part-time workers
+```ts
+createMaxShiftsDayRule({
+roleIds: ["part-time"],
+shifts: 2,
+priority: "HIGH",
+});
+```
+
+**Example:**
+Students can work 2 shifts on weekends only
+```ts
+createMaxShiftsDayRule({
+roleIds: ["student"],
+shifts: 2,
+dayOfWeek: ["saturday", "sunday"],
+priority: "MANDATORY",
+});
+```
+
+**Config:** `{ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
+### min-consecutive-days
+
+
+
+Requires that once a person starts working, they continue for a minimum
+number of consecutive days.
+
+**Example:**
+```ts
+const rule = createMinConsecutiveDaysRule({
+  days: 3,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+### min-hours-day
+
+
+
+Ensures a person works at least a minimum number of hours per day.
+
+**Example:**
+```ts
+const rule = createMinHoursDayRule({
+  hours: 6,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+### min-hours-week
+
+
+
+Enforces a minimum total number of hours per scheduling week.
+
+**Example:**
+```ts
+const rule = createMinHoursWeekRule({
+  hours: 30,
+  priority: "HIGH",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+### min-rest-between-shifts
+
+
+
+Enforces a minimum rest period between any two shifts a person works.
+
+**Example:**
+```ts
+const rule = createMinRestBetweenShiftsRule({
+  hours: 10,
+  priority: "MANDATORY",
+});
+builder = new ModelBuilder({ ...config, rules: [rule] });
+```
+
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+
+### time-off
+
+
+
+Blocks or penalizes assignments during specified time periods.
+
+Supports entity scoping (people, roles, skills) and time scoping
+(date ranges, specific dates, days of week, recurring periods).
+Optionally supports partial-day time-off with startTime/endTime.
+
+**Example:**
+Full day vacation
+```ts
+createTimeOffRule({
+employeeIds: ["alice"],
+dateRange: { start: "2024-02-01", end: "2024-02-05" },
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Every Wednesday afternoon off for students
+```ts
+createTimeOffRule({
+roleIds: ["student"],
+dayOfWeek: ["wednesday"],
+startTime: { hours: 14, minutes: 0 },
+endTime: { hours: 23, minutes: 59 },
+priority: "MANDATORY",
+});
+```
+
+**Example:**
+Specific date, partial day
+```ts
+createTimeOffRule({
+employeeIds: ["bob"],
+specificDates: ["2024-03-15"],
+startTime: { hours: 16, minutes: 0 },
+endTime: { hours: 23, minutes: 59 },
+priority: "MANDATORY",
+});
+```
+
+**Config:** `{ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+
