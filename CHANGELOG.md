@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.78.2 (2026-02-08)
+
+- Fix solver Docker image to support both amd64 and arm64 (Apple Silicon)
+- Fix npm publish by upgrading npm before publish in CI
+
 ## 0.78.1 (2026-02-08)
 
 - Add AGENTS.md and CONTRIBUTING.md
