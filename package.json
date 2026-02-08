@@ -1,6 +1,6 @@
 {
   "name": "dabke",
-  "version": "0.78.1",
+  "version": "0.78.2",
   "license": "MIT",
   "description": "Scheduling library powered by constraint programming (CP-SAT)",
   "author": "Christian Klotz <hello@christianklotz.co.uk>",
