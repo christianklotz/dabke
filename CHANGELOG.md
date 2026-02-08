@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.78.1 (2026-02-08)
+
+- Add AGENTS.md and CONTRIBUTING.md
+- Improve README with hero example, "Why dabke?" section, solver quickstart, scoping and custom rules docs
+- Improve solver README with Docker Hub image reference and API docs
+- Add GitHub Actions workflow for publishing solver Docker image to Docker Hub
+
 ## 0.78.0 (2026-02-07)
 
 - Rename package from `scheduling-core` to `dabke`
