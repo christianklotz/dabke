@@ -1,0 +1,33 @@
+name: Publish Solver Image
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: solver
+          push: true
+          tags: |
+            christianklotz/dabke-solver:${{ steps.version.outputs.version }}
+            christianklotz/dabke-solver:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
