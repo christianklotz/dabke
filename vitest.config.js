@@ -13,6 +13,7 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["**/*.integration.test.ts"],
+          globalSetup: "./tests/global-setup.ts",
         },
       },
     ],

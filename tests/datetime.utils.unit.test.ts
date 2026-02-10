@@ -418,25 +418,46 @@ describe("generateDays", () => {
 });
 
 describe("resolveDaysFromPeriod", () => {
-  describe("with specificDates", () => {
-    it("should return specific dates sorted", () => {
+  describe("with dates filter", () => {
+    it("should return only specified dates within range", () => {
       const days = resolveDaysFromPeriod({
-        specificDates: ["2025-02-07", "2025-02-03", "2025-02-10"],
+        dateRange: { start: "2025-02-03", end: "2025-02-10" },
+        dates: ["2025-02-07", "2025-02-03", "2025-02-10"],
       });
       expect(days).toEqual(["2025-02-03", "2025-02-07", "2025-02-10"]);
     });
 
-    it("should return empty array for empty specificDates", () => {
+    it("should return empty array for empty dates filter", () => {
       const days = resolveDaysFromPeriod({
-        specificDates: [],
+        dateRange: { start: "2025-02-03", end: "2025-02-05" },
+        dates: [],
       });
       expect(days).toEqual([]);
     });
 
-    it("should handle single date", () => {
+    it("should handle single date filter", () => {
       const days = resolveDaysFromPeriod({
-        specificDates: ["2025-02-05"],
+        dateRange: { start: "2025-02-03", end: "2025-02-07" },
+        dates: ["2025-02-05"],
       });
+      expect(days).toEqual(["2025-02-05"]);
+    });
+
+    it("should ignore dates outside the range", () => {
+      const days = resolveDaysFromPeriod({
+        dateRange: { start: "2025-02-03", end: "2025-02-05" },
+        dates: ["2025-02-01", "2025-02-04", "2025-02-10"],
+      });
+      expect(days).toEqual(["2025-02-04"]);
+    });
+
+    it("should compose with daysOfWeek filter", () => {
+      const days = resolveDaysFromPeriod({
+        dateRange: { start: "2025-02-03", end: "2025-02-09" },
+        daysOfWeek: ["wednesday", "friday"],
+        dates: ["2025-02-05", "2025-02-06"], // Wed and Thu
+      });
+      // Only 2025-02-05 (Wed) passes both filters
       expect(days).toEqual(["2025-02-05"]);
     });
   });

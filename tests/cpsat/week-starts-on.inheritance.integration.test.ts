@@ -1,24 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: weekStartsOn inheritance", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("uses ModelBuilder.weekStartsOn when weekly rule omits weekStartsOn", async () => {
@@ -38,7 +26,7 @@ describe("CP-SAT: weekStartsOn inheritance", () => {
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 }, // 8h
       },
-      schedulingPeriod: { specificDates: ["2024-02-09", "2024-02-10"] }, // Fri, Sat
+      schedulingPeriod: { dateRange: { start: "2024-02-09", end: "2024-02-10" } }, // Fri, Sat
       targetCount: 1,
     });
 

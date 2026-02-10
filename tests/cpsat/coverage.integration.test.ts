@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
-import { startSolverContainer, decodeAssignments } from "./helpers.js";
+import { getSolverClient, decodeAssignments } from "./helpers.js";
 
 /**
  * Integration tests for coverage requirements.
@@ -9,17 +9,10 @@ import { startSolverContainer, decodeAssignments } from "./helpers.js";
  * They can be specified by role, skills, or both.
  */
 describe("Coverage requirements (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   describe("Overlapping coverage", () => {
@@ -40,7 +33,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -84,7 +77,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -133,7 +126,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 23, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -183,7 +176,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 20, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -227,7 +220,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 20, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -273,7 +266,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 15, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -310,7 +303,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 15, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -352,7 +345,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -388,7 +381,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -420,7 +413,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -454,7 +447,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -498,7 +491,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 15, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -534,7 +527,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -579,7 +572,7 @@ describe("Coverage requirements (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",

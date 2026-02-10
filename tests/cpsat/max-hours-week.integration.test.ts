@@ -1,24 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: max-hours-week rule", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("caps weekly assignments and shifts remaining work to other employees", async () => {
@@ -30,7 +18,7 @@ describe("CP-SAT: max-hours-week rule", () => {
         startTime: { hours: 10, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
       },
-      schedulingPeriod: { specificDates: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-08" } },
     });
 
     const preferenceRules: CpsatRuleConfigEntry[] = [

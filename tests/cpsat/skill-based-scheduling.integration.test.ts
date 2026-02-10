@@ -1,12 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  startSolverContainer,
-  decodeAssignments,
-  solveWithRules,
-  createBaseConfig,
-} from "./helpers.js";
+import { getSolverClient, decodeAssignments, solveWithRules, createBaseConfig } from "./helpers.js";
 
 /**
  * Tests for skill-based scheduling via time-off rules.
@@ -21,17 +16,10 @@ import {
  * These tests demonstrate skill-based scheduling patterns using these mechanisms.
  */
 describe("Skill-based scheduling (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("uses time-off by skill to restrict non-skilled employees from shifts", async () => {
@@ -46,7 +34,7 @@ describe("Skill-based scheduling (integration)", () => {
         startTime: { hours: 7, minutes: 0 },
         endTime: { hours: 15, minutes: 0 },
       },
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       targetCount: 1,
     });
 
@@ -88,7 +76,7 @@ describe("Skill-based scheduling (integration)", () => {
         startTime: { hours: 7, minutes: 0 },
         endTime: { hours: 15, minutes: 0 },
       },
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       targetCount: 1,
     });
 
@@ -127,7 +115,7 @@ describe("Skill-based scheduling (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -165,7 +153,7 @@ describe("Skill-based scheduling (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -203,7 +191,7 @@ describe("Skill-based scheduling (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -238,7 +226,7 @@ describe("Skill-based scheduling (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",

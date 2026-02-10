@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import { resolveAssignments } from "../../src/cpsat/response.js";
-import { startSolverContainer, decodeAssignments } from "./helpers.js";
+import { getSolverClient, decodeAssignments } from "./helpers.js";
 
 /**
  * Integration tests for ShiftPattern daysOfWeek restrictions.
@@ -10,17 +10,10 @@ import { startSolverContainer, decodeAssignments } from "./helpers.js";
  * used on the specified days by the solver.
  */
 describe("ShiftPattern daysOfWeek restriction (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("uses correct shift pattern for Saturday (shorter day)", async () => {
@@ -83,7 +76,11 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
 
     // Resolve to get actual times
     const resolved = resolveAssignments(
-      rawAssignments.map((a) => ({ employeeId: a.employeeId!, shiftPatternId: a.shiftPatternId!, day: a.day! })),
+      rawAssignments.map((a) => ({
+        employeeId: a.employeeId!,
+        shiftPatternId: a.shiftPatternId!,
+        day: a.day!,
+      })),
       builder.shiftPatterns,
     );
 
@@ -201,9 +198,19 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
         },
       ],
       ruleConfigs: [
-        { name: "max-hours-week", config: { hours: 20, skillIds: ["student"], priority: "MANDATORY" } },
+        {
+          name: "max-hours-week",
+          config: { hours: 20, skillIds: ["student"], priority: "MANDATORY" },
+        },
         { name: "max-hours-week", config: { hours: 48, priority: "MANDATORY" } },
-        { name: "time-off", config: { priority: "MANDATORY", dayOfWeek: ["saturday", "sunday"], skillIds: ["no_weekends"] } },
+        {
+          name: "time-off",
+          config: {
+            priority: "MANDATORY",
+            dayOfWeek: ["saturday", "sunday"],
+            skillIds: ["no_weekends"],
+          },
+        },
       ],
     });
 
@@ -217,7 +224,11 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
 
     const rawAssignments = decodeAssignments(response.values);
     const resolved = resolveAssignments(
-      rawAssignments.map((a) => ({ employeeId: a.employeeId!, shiftPatternId: a.shiftPatternId!, day: a.day! })),
+      rawAssignments.map((a) => ({
+        employeeId: a.employeeId!,
+        shiftPatternId: a.shiftPatternId!,
+        day: a.day!,
+      })),
       builder.shiftPatterns,
     );
 
@@ -245,7 +256,11 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
       employees: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
         // Pattern available on any day
-        { id: "any_day_shift", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
+        {
+          id: "any_day_shift",
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 17, minutes: 0 },
+        },
       ],
       schedulingPeriod: {
         // Include weekend

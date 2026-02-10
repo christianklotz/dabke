@@ -13,7 +13,7 @@ describe("Overnight coverage bucket lookups", () => {
           roleIds: ["staff"],
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -43,7 +43,7 @@ describe("Overnight coverage bucket lookups", () => {
           roleIds: ["staff"],
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -73,7 +73,7 @@ describe("Overnight coverage bucket lookups", () => {
           roleIds: ["staff"],
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -112,7 +112,7 @@ describe("Overnight coverage bucket lookups", () => {
           roleIds: ["staff"],
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",

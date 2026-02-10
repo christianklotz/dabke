@@ -363,24 +363,14 @@ export function splitPoints([start, end]: [number, number], splitAt: number[]): 
 /**
  * Computes the list of day strings (YYYY-MM-DD) from a SchedulingPeriod.
  *
- * For date ranges, generates all days between start and end (inclusive),
- * optionally filtering to specific days of the week.
- *
- * For specific dates, returns the dates as-is (sorted).
+ * Generates all days between start and end (inclusive), applying optional
+ * daysOfWeek and dates filters. Filters compose: a day must pass all
+ * specified filters to be included.
  *
  * @param period - The scheduling period specification
  * @returns Array of day strings in YYYY-MM-DD format, sorted chronologically
  *
- * @example Date range with day-of-week filter
- * ```typescript
- * const days = resolveDaysFromPeriod({
- *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
- *   daysOfWeek: ['wednesday', 'friday'],
- * });
- * // Returns: ['2025-02-05', '2025-02-07'] (Wed and Fri only)
- * ```
- *
- * @example Date range without filter
+ * @example All days in range
  * ```typescript
  * const days = resolveDaysFromPeriod({
  *   dateRange: { start: '2025-02-03', end: '2025-02-05' },
@@ -388,39 +378,47 @@ export function splitPoints([start, end]: [number, number], splitAt: number[]): 
  * // Returns: ['2025-02-03', '2025-02-04', '2025-02-05']
  * ```
  *
- * @example Specific dates
+ * @example Day-of-week filter
  * ```typescript
  * const days = resolveDaysFromPeriod({
- *   specificDates: ['2025-02-07', '2025-02-03', '2025-02-10'],
+ *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
+ *   daysOfWeek: ['wednesday', 'friday'],
  * });
- * // Returns: ['2025-02-03', '2025-02-07', '2025-02-10'] (sorted)
+ * // Returns: ['2025-02-05', '2025-02-07']
+ * ```
+ *
+ * @example Specific dates filter
+ * ```typescript
+ * const days = resolveDaysFromPeriod({
+ *   dateRange: { start: '2025-02-03', end: '2025-02-10' },
+ *   dates: ['2025-02-05', '2025-02-07'],
+ * });
+ * // Returns: ['2025-02-05', '2025-02-07']
  * ```
  */
 export function resolveDaysFromPeriod(period: SchedulingPeriod): string[] {
-  if ("specificDates" in period && period.specificDates) {
-    return [...period.specificDates].toSorted();
-  }
+  const { dateRange, daysOfWeek, dates } = period;
+  const allowedDays = daysOfWeek ? new Set(daysOfWeek) : null;
+  const allowedDates = dates ? new Set(dates) : null;
 
-  const { dateRange, daysOfWeek } = period;
   const startDate = new Date(`${dateRange.start}T00:00:00Z`);
   const endDate = new Date(`${dateRange.end}T00:00:00Z`);
-
-  const allowedDays = daysOfWeek ? new Set(daysOfWeek) : null;
-  const days: string[] = [];
+  const result: string[] = [];
 
   const current = new Date(startDate);
   while (current <= endDate) {
-    const dayOfWeek = toDayOfWeekUTC(current);
+    const year = current.getUTCFullYear();
+    const month = (current.getUTCMonth() + 1).toString().padStart(2, "0");
+    const day = current.getUTCDate().toString().padStart(2, "0");
+    const iso = `${year}-${month}-${day}`;
+    const dow = toDayOfWeekUTC(current);
 
-    if (!allowedDays || allowedDays.has(dayOfWeek)) {
-      const year = current.getUTCFullYear();
-      const month = (current.getUTCMonth() + 1).toString().padStart(2, "0");
-      const day = current.getUTCDate().toString().padStart(2, "0");
-      days.push(`${year}-${month}-${day}`);
+    if ((!allowedDays || allowedDays.has(dow)) && (!allowedDates || allowedDates.has(iso))) {
+      result.push(iso);
     }
 
     current.setUTCDate(current.getUTCDate() + 1);
   }
 
-  return days;
+  return result;
 }

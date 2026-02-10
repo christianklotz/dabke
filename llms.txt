@@ -109,6 +109,47 @@ Used for checking overlaps and scheduling constraints.
 - `start: DateTimeWithUtcOffset | DateTimeWithTimeZone`
 - `end: DateTimeWithUtcOffset | DateTimeWithTimeZone`
 
+### SchedulingPeriod
+Defines a scheduling period as a date range with optional filters.
+
+The `dateRange` specifies the overall scheduling window. Use `daysOfWeek`
+and/or `dates` to narrow which days within the range are included.
+Filters compose: a day must pass all specified filters to be included.
+
+**Example:**
+All days in a week
+```typescript
+const period: SchedulingPeriod = {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+};
+```
+
+**Example:**
+Only specific days of the week (restaurant closed Mon/Tue)
+```typescript
+const period: SchedulingPeriod = {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+};
+```
+
+**Example:**
+Only specific dates within the range
+```typescript
+const period: SchedulingPeriod = {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+dates: ['2025-02-05', '2025-02-07'],
+};
+```
+
+**Properties:**
+- `dateRange: { start: string; end: string; }` - The overall scheduling window (start and end are inclusive).
+Dates should be in YYYY-MM-DD format.
+- `daysOfWeek?: DayOfWeek[] | undefined` - Include only these days of the week.
+If omitted, all days of the week are included.
+- `dates?: string[] | undefined` - Include only these specific dates (YYYY-MM-DD) within the range.
+If omitted, all dates in the range are included (subject to daysOfWeek filter).
+
 ### SolverClient
 **Properties:**
 - `solve: (request: SolverRequest, options?: { signal?: AbortSignal; }) => Promise<SolverResponse>`
@@ -134,8 +175,8 @@ daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
 **Properties:**
 - `employees: SchedulingEmployee[]`
 - `shiftPatterns: ShiftPattern[]`
-- `schedulingPeriod: { dateRange: { start: string; end: string; }; daysOfWeek?: DayOfWeek[]; specificDates?: never; } | { specificDates: string[]; dateRange?: never; daysOfWeek?: never; }` - Defines when scheduling should occur. Can specify either a date range
-(with optional day-of-week filtering) or a list of specific dates.
+- `schedulingPeriod: SchedulingPeriod` - Defines when scheduling should occur as a date range with optional
+`daysOfWeek` and `dates` filters that compose to narrow which days are included.
 - `coverage: CoverageRequirement[]`
 - `rules?: CompilationRule[] | undefined` - Pre-compiled rules; use this for custom rules that are not part of the registry.
 - `ruleConfigs?: CpsatRuleConfigEntry[] | undefined` - Named rule configurations that will be compiled using the provided rule factories.
@@ -483,42 +524,6 @@ Can be specified either with a UTC offset (e.g., "-08:00") or with a timezone ID
 
 ```typescript
 DateTimeWithUtcOffset | DateTimeWithTimeZone
-```
-
-
-### SchedulingPeriod
-Defines a scheduling period either as a date range or specific dates.
-
-Use this to specify when scheduling should occur. This is more expressive
-than a simple list of days because it can filter by day-of-week.
-
-**Example:**
-Date range with day-of-week filtering (restaurant closed Mon/Tue)
-```typescript
-const period: SchedulingPeriod = {
-dateRange: { start: '2025-02-03', end: '2025-02-09' },
-daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-};
-```
-
-**Example:**
-Date range for all days
-```typescript
-const period: SchedulingPeriod = {
-dateRange: { start: '2025-02-03', end: '2025-02-09' },
-};
-```
-
-**Example:**
-Specific dates (non-contiguous or custom selection)
-```typescript
-const period: SchedulingPeriod = {
-specificDates: ['2025-02-05', '2025-02-07', '2025-02-10'],
-};
-```
-
-```typescript
-{ dateRange: { start: string; end: string; }; daysOfWeek?: DayOfWeek[]; specificDates?: never; } | { specificDates: string[]; dateRange?: never; daysOfWeek?: never; }
 ```
 
 
@@ -1014,23 +1019,12 @@ daysBetween(new Date('2025-01-01'), new Date('2025-01-05')); // 4
 ### resolveDaysFromPeriod
 Computes the list of day strings (YYYY-MM-DD) from a SchedulingPeriod.
 
-For date ranges, generates all days between start and end (inclusive),
-optionally filtering to specific days of the week.
-
-For specific dates, returns the dates as-is (sorted).
-
-**Example:**
-Date range with day-of-week filter
-```typescript
-const days = resolveDaysFromPeriod({
-dateRange: { start: '2025-02-03', end: '2025-02-09' },
-daysOfWeek: ['wednesday', 'friday'],
-});
-// Returns: ['2025-02-05', '2025-02-07'] (Wed and Fri only)
-```
+Generates all days between start and end (inclusive), applying optional
+daysOfWeek and dates filters. Filters compose: a day must pass all
+specified filters to be included.
 
 **Example:**
-Date range without filter
+All days in range
 ```typescript
 const days = resolveDaysFromPeriod({
 dateRange: { start: '2025-02-03', end: '2025-02-05' },
@@ -1039,16 +1033,27 @@ dateRange: { start: '2025-02-03', end: '2025-02-05' },
 ```
 
 **Example:**
-Specific dates
+Day-of-week filter
 ```typescript
 const days = resolveDaysFromPeriod({
-specificDates: ['2025-02-07', '2025-02-03', '2025-02-10'],
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+daysOfWeek: ['wednesday', 'friday'],
 });
-// Returns: ['2025-02-03', '2025-02-07', '2025-02-10'] (sorted)
+// Returns: ['2025-02-05', '2025-02-07']
+```
+
+**Example:**
+Specific dates filter
+```typescript
+const days = resolveDaysFromPeriod({
+dateRange: { start: '2025-02-03', end: '2025-02-10' },
+dates: ['2025-02-05', '2025-02-07'],
+});
+// Returns: ['2025-02-05', '2025-02-07']
 ```
 
 **Parameters:**
-- `period: { dateRange: { start: string; end: string; }; daysOfWeek?: DayOfWeek[]; specificDates?: never; } | { specificDates: string[]; dateRange?: never; daysOfWeek?: never; }`
+- `period: SchedulingPeriod`
 
 **Returns:** `string[]`
 
@@ -1767,7 +1772,7 @@ Weight hierarchy (highest to lowest priority):
 **Example:**
 Using weights in a custom rule
 ```ts
-import { OBJECTIVE_WEIGHTS } from "feasible";
+import { OBJECTIVE_WEIGHTS } from "dabke";
 
 // Prefer senior staff with same weight as employee-assignment-priority
 b.addPenalty(assignment, -OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE);

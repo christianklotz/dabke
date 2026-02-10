@@ -1,19 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
-import { startSolverContainer, decodeAssignments } from "./helpers.js";
+import { getSolverClient, decodeAssignments } from "./helpers.js";
 
 describe("Role-based shift assignment (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("assigns any employee to shifts with no roleIds", async () => {
@@ -30,7 +23,7 @@ describe("Role-based shift assignment (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -69,7 +62,7 @@ describe("Role-based shift assignment (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -108,7 +101,7 @@ describe("Role-based shift assignment (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         // Need 1 server and 1 runner - both can work the floor_shift
         {
@@ -156,7 +149,7 @@ describe("Role-based shift assignment (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -190,7 +183,7 @@ describe("Role-based shift assignment (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
@@ -234,7 +227,7 @@ describe("Role-based shift assignment (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",

@@ -331,9 +331,35 @@ Or read the file directly:
 cat node_modules/dabke/llms.txt
 ```
 
-## Testing
+## Development
 
-dabke provides test utilities for running integration tests against the solver:
+### Running tests
+
+Unit tests have no external dependencies:
+
+```bash
+npm run test:unit
+```
+
+Integration tests require Docker to run the solver container:
+
+```bash
+# Ensure Docker is running, then:
+npm run test:integration
+```
+
+The integration test harness (`startSolverContainer`) builds and starts a Docker container from `solver/Dockerfile` automatically. It binds to port 18080 by default — make sure no other container is using that port.
+
+To run both unit and integration tests:
+
+```bash
+npm test          # runs typecheck + unit tests only
+npm run test:integration   # solver integration tests (requires Docker)
+```
+
+### Test utilities
+
+dabke exports test helpers for writing your own integration tests:
 
 ```typescript
 import { startSolverContainer } from "dabke/testing";
@@ -343,7 +369,7 @@ const response = await solver.client.solve(request);
 solver.stop();
 ```
 
-This starts a Docker container with the solver, waits for it to be healthy, and provides a pre-configured `HttpSolverClient`.
+This builds the solver Docker image, starts a container, waits for the health check, and returns a pre-configured `HttpSolverClient`.
 
 ## Contributing
 

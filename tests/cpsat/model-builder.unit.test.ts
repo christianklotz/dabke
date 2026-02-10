@@ -24,7 +24,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees: [],
       shiftPatterns: [],
-      schedulingPeriod: { specificDates: [] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       coverage: [],
       rules: [],
     });
@@ -46,7 +46,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       coverage: [
         {
           day: "2024-02-01",
@@ -96,7 +96,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage,
       rules: [],
     });
@@ -145,7 +145,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
       ruleConfigs: [
         {
@@ -183,7 +183,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         new ModelBuilder({
           employees: [{ id: "emp:1", roleIds: ["role"] }],
           shiftPatterns: [],
-          schedulingPeriod: { specificDates: [] },
+          schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
           coverage: [],
         }),
     ).toThrow('Employee ID "emp:1" cannot contain colons');
@@ -202,7 +202,7 @@ describe("ModelBuilder (CP-SAT)", () => {
               endTime: { hours: 17, minutes: 0 },
             },
           ],
-          schedulingPeriod: { specificDates: [] },
+          schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
           coverage: [],
         }),
     ).toThrow('Shift pattern ID "shift:morning" cannot contain colons');
@@ -226,7 +226,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
     });
 
@@ -257,7 +257,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
     });
 
@@ -288,7 +288,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
     });
 
@@ -318,7 +318,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
     });
 
@@ -348,7 +348,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
     });
 
@@ -384,7 +384,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const builder = new ModelBuilder({
       employees,
       shiftPatterns,
-      schedulingPeriod: { specificDates: ["2024-01-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
     });
 
@@ -415,7 +415,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -441,7 +441,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -467,7 +467,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -502,7 +502,7 @@ describe("ModelBuilder (CP-SAT)", () => {
               endTime: { hours: 17, minutes: 0 },
             },
           ],
-          schedulingPeriod: { specificDates: ["2024-01-01"] },
+          schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
           coverage: [
             {
               day: "2024-01-01",
@@ -619,7 +619,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -665,7 +665,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -718,7 +718,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       const builder = new ModelBuilder({
         employees: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: baseShiftPatterns,
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [baseCoverage({ roleIds: ["barista"] })],
         rules: [],
       });
@@ -735,7 +735,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       const builder = new ModelBuilder({
         employees: [{ id: "alice", roleIds: ["barista"] }],
         shiftPatterns: baseShiftPatterns,
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [baseCoverage()],
         ruleConfigs: [
           {
@@ -762,7 +762,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       const builder = new ModelBuilder({
         employees: [{ id: "alice", roleIds: ["barista"] }],
         shiftPatterns: baseShiftPatterns,
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [baseCoverage({ priority: "HIGH", targetCount: 2 })],
         rules: [],
       });
@@ -823,17 +823,18 @@ describe("ModelBuilder (CP-SAT)", () => {
       ]);
     });
 
-    it("accepts schedulingPeriod with specificDates", () => {
+    it("accepts schedulingPeriod with dates filter", () => {
       const builder = new ModelBuilder({
         employees: baseEmployees,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
-          specificDates: ["2025-02-10", "2025-02-05", "2025-02-07"],
+          dateRange: { start: "2025-02-05", end: "2025-02-10" },
+          dates: ["2025-02-10", "2025-02-05", "2025-02-07"],
         },
         coverage: [],
       });
 
-      // Sorted
+      // Only the specified dates within range, sorted
       expect(builder.days).toEqual(["2025-02-05", "2025-02-07", "2025-02-10"]);
     });
 
@@ -895,7 +896,8 @@ describe("ModelBuilder (CP-SAT)", () => {
         employees: baseEmployees,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
-          specificDates: [],
+          dateRange: { start: "2025-02-03", end: "2025-02-03" },
+          dates: [],
         },
         coverage: [],
       });

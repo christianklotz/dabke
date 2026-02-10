@@ -1,24 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: scope resolution", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   describe("role-based scoping", () => {
@@ -37,7 +25,7 @@ describe("CP-SAT: scope resolution", () => {
           endTime: { hours: 17, minutes: 0 }, // 8 hours
         },
         schedulingPeriod: {
-          specificDates: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"],
+          dateRange: { start: "2024-02-05", end: "2024-02-08" },
         }, // 4 days
         targetCount: 1, // Only need 1 employee per day
       });
@@ -98,7 +86,7 @@ describe("CP-SAT: scope resolution", () => {
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 }, // 8 hours
         },
-        schedulingPeriod: { specificDates: ["2024-02-05", "2024-02-06", "2024-02-07"] }, // 3 days
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } }, // 3 days
         targetCount: 1, // Only need 1 employee per day
       });
 
@@ -164,7 +152,7 @@ describe("CP-SAT: scope resolution", () => {
           endTime: { hours: 17, minutes: 0 },
         },
         schedulingPeriod: {
-          specificDates: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"],
+          dateRange: { start: "2024-02-05", end: "2024-02-08" },
         },
         targetCount: 1, // Only need 1 employee per day
       });
@@ -223,7 +211,7 @@ describe("CP-SAT: scope resolution", () => {
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
-        schedulingPeriod: { specificDates: ["2024-02-05", "2024-02-06", "2024-02-07"] }, // 3 days
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } }, // 3 days
         targetCount: 1, // Only need 1 employee per day
       });
 
@@ -283,7 +271,7 @@ describe("CP-SAT: scope resolution", () => {
           endTime: { hours: 17, minutes: 0 },
         },
         schedulingPeriod: {
-          specificDates: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"],
+          dateRange: { start: "2024-02-05", end: "2024-02-08" },
         },
         targetCount: 1, // Only need 1 employee per day
       });
