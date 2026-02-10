@@ -21,10 +21,22 @@ const builder = new ModelBuilder({
     { id: "evening", startTime: { hours: 16 }, endTime: { hours: 23 } },
   ],
   coverage: [
-    { day: "2026-02-09", startTime: { hours: 8 }, endTime: { hours: 16 },
-      roleIds: ["server"], targetCount: 1, priority: "MANDATORY" },
-    { day: "2026-02-09", startTime: { hours: 16 }, endTime: { hours: 23 },
-      roleIds: ["server"], targetCount: 1, priority: "MANDATORY" },
+    {
+      day: "2026-02-09",
+      startTime: { hours: 8 },
+      endTime: { hours: 16 },
+      roleIds: ["server"],
+      targetCount: 1,
+      priority: "MANDATORY",
+    },
+    {
+      day: "2026-02-09",
+      startTime: { hours: 16 },
+      endTime: { hours: 23 },
+      roleIds: ["server"],
+      targetCount: 1,
+      priority: "MANDATORY",
+    },
   ],
   schedulingPeriod: { specificDates: ["2026-02-09"] },
   ruleConfigs: [
@@ -83,12 +95,7 @@ docker run -p 8080:8080 dabke-solver
 ### 2. Build and solve a schedule
 
 ```typescript
-import {
-  ModelBuilder,
-  HttpSolverClient,
-  parseSolverResponse,
-  resolveAssignments,
-} from "dabke";
+import { ModelBuilder, HttpSolverClient, parseSolverResponse, resolveAssignments } from "dabke";
 
 // Define team
 const employees = [
@@ -152,7 +159,7 @@ if (result.status === "OPTIMAL" || result.status === "FEASIBLE") {
   const shifts = resolveAssignments(result.assignments, shiftPatterns);
   for (const shift of shifts) {
     console.log(
-      `${shift.employeeId}: ${shift.day} ${shift.startTime.hours}:00–${shift.endTime.hours}:00`
+      `${shift.employeeId}: ${shift.day} ${shift.startTime.hours}:00–${shift.endTime.hours}:00`,
     );
   }
 }
@@ -193,20 +200,20 @@ const resolved = times.resolve(coverage, days);
 
 ## Built-in Rules
 
-| Rule | Description |
-|------|-------------|
-| `max-hours-day` | Max hours per person per day |
-| `max-hours-week` | Max hours per person per week |
-| `min-hours-day` | Min hours per person per day |
-| `min-hours-week` | Min hours per person per week |
-| `max-shifts-day` | Max shift assignments per day |
-| `max-consecutive-days` | Max consecutive working days |
-| `min-consecutive-days` | Min consecutive working days |
-| `min-rest-between-shifts` | Min rest hours between shifts |
-| `time-off` | Block assignments during periods |
-| `employee-assignment-priority` | Prefer or avoid assigning team members |
-| `assign-together` | Keep team members on the same shifts |
-| `location-preference` | Prefer team members at specific locations |
+| Rule                           | Description                               |
+| ------------------------------ | ----------------------------------------- |
+| `max-hours-day`                | Max hours per person per day              |
+| `max-hours-week`               | Max hours per person per week             |
+| `min-hours-day`                | Min hours per person per day              |
+| `min-hours-week`               | Min hours per person per week             |
+| `max-shifts-day`               | Max shift assignments per day             |
+| `max-consecutive-days`         | Max consecutive working days              |
+| `min-consecutive-days`         | Min consecutive working days              |
+| `min-rest-between-shifts`      | Min rest hours between shifts             |
+| `time-off`                     | Block assignments during periods          |
+| `employee-assignment-priority` | Prefer or avoid assigning team members    |
+| `assign-together`              | Keep team members on the same shifts      |
+| `location-preference`          | Prefer team members at specific locations |
 
 All rules support scoping by person, role, skill, and time period (date ranges, days of week, recurring periods).
 
@@ -271,7 +278,9 @@ const results = reporter.getValidation();
 const summaries = summarizeValidation(results);
 
 for (const s of summaries) {
-  console.log(`${s.description}: ${s.status} (${s.passedCount}/${s.passedCount + s.violatedCount})`);
+  console.log(
+    `${s.description}: ${s.status} (${s.passedCount}/${s.passedCount + s.violatedCount})`,
+  );
 }
 ```
 
