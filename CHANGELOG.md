@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.79.0 (2026-02-10)
+
+### Breaking Changes
+
+- Replace `SchedulingPeriod` discriminated union with a flat interface: `dateRange` is always required, `daysOfWeek` and `dates` are optional composable filters
+- Rename `specificDates` to `dates` on `SchedulingPeriod`
+- `resolveDaysFromPeriod()` now composes filters with AND logic (a day must pass all specified filters)
+
+### Improvements
+
+- Remove `PatternPenaltyRule` test helper in favor of deterministic constraint assertions
+- Share single solver container across integration tests via vitest `globalSetup`
+- Expand README Development section with test commands and Docker requirements
+
 ## 0.78.2 (2026-02-08)
 
 - Fix solver Docker image to support both amd64 and arm64 (Apple Silicon)
