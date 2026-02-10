@@ -1,36 +1,19 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: time-off rule", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
-  let ensureHealthy: (() => Promise<void>) | undefined;
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-    ensureHealthy = started.ensureHealthy;
-  }, 120_000);
-
-  beforeEach(async () => {
-    await ensureHealthy?.();
-  });
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   describe("basic functionality", () => {
     it("honors time-off requests over assignment preferences", async () => {
-      const baseConfig = createBaseConfig({ roleId: "cashier",
+      const baseConfig = createBaseConfig({
+        roleId: "cashier",
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -72,9 +55,10 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("treats mandatory time off as infeasible when no alternative coverage exists", async () => {
-      const baseConfig = createBaseConfig({ roleId: "barista",
+      const baseConfig = createBaseConfig({
+        roleId: "barista",
         employeeIds: ["solo"],
-        schedulingPeriod: { specificDates: ["2024-02-04"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-04", end: "2024-02-04" } },
       });
 
       const response = await solveWithRules(client, baseConfig, [
@@ -92,7 +76,8 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("supports role-based time-off", async () => {
-      const baseConfig = createBaseConfig({ roleId: "cashier",
+      const baseConfig = createBaseConfig({
+        roleId: "cashier",
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -115,8 +100,9 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("supports date range time-off", async () => {
-      const baseConfig = createBaseConfig({ roleId: "cashier",
-        schedulingPeriod: { specificDates: ["2024-02-01", "2024-02-02", "2024-02-03"] },
+      const baseConfig = createBaseConfig({
+        roleId: "cashier",
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-03" } },
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -148,8 +134,9 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("supports day-of-week time-off", async () => {
-      const baseConfig = createBaseConfig({ roleId: "cashier",
-        schedulingPeriod: { specificDates: ["2024-02-05", "2024-02-06", "2024-02-07"] },
+      const baseConfig = createBaseConfig({
+        roleId: "cashier",
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } },
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -176,9 +163,10 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("supports soft time-off constraints", async () => {
-      const baseConfig = createBaseConfig({ roleId: "barista",
+      const baseConfig = createBaseConfig({
+        roleId: "barista",
         employeeIds: ["solo"],
-        schedulingPeriod: { specificDates: ["2024-02-04"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-04", end: "2024-02-04" } },
       });
 
       const response = await solveWithRules(client, baseConfig, [
@@ -200,8 +188,9 @@ describe("CP-SAT: time-off rule", () => {
 
   describe("partial day time-off", () => {
     it("blocks overlapping shifts", async () => {
-      const baseConfig = createBaseConfig({ roleId: "cashier",
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+      const baseConfig = createBaseConfig({
+        roleId: "cashier",
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         shifts: [
           {
             id: "morning",
@@ -237,9 +226,10 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("does not block shifts outside time-off window", async () => {
-      const baseConfig = createBaseConfig({ roleId: "cashier",
+      const baseConfig = createBaseConfig({
+        roleId: "cashier",
         employeeIds: ["alice"],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         shift: {
           id: "morning",
           startTime: { hours: 8, minutes: 0 },
@@ -268,14 +258,15 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("blocks shift that partially overlaps with time-off window", async () => {
-      const baseConfig = createBaseConfig({ roleId: "staff",
+      const baseConfig = createBaseConfig({
+        roleId: "staff",
         employeeIds: ["alice", "bob"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
 
@@ -299,14 +290,15 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("allows shift that does not overlap with time-off window", async () => {
-      const baseConfig = createBaseConfig({ roleId: "staff",
+      const baseConfig = createBaseConfig({
+        roleId: "staff",
         employeeIds: ["alice"],
         shift: {
           id: "morning",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 13, minutes: 0 },
         },
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
 
@@ -329,14 +321,15 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("blocks shift fully contained within time-off window", async () => {
-      const baseConfig = createBaseConfig({ roleId: "staff",
+      const baseConfig = createBaseConfig({
+        roleId: "staff",
         employeeIds: ["alice", "bob"],
         shift: {
           id: "short",
           startTime: { hours: 10, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
         },
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
 
@@ -361,9 +354,10 @@ describe("CP-SAT: time-off rule", () => {
 
   describe("priority behavior", () => {
     it("MANDATORY prevents assignment even when sole option", async () => {
-      const baseConfig = createBaseConfig({ roleId: "staff",
+      const baseConfig = createBaseConfig({
+        roleId: "staff",
         employeeIds: ["alice"],
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
 
@@ -382,9 +376,10 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("HIGH priority allows override when necessary", async () => {
-      const baseConfig = createBaseConfig({ roleId: "staff",
+      const baseConfig = createBaseConfig({
+        roleId: "staff",
         employeeIds: ["alice"],
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
 
@@ -405,9 +400,10 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("MEDIUM priority allows override when necessary", async () => {
-      const baseConfig = createBaseConfig({ roleId: "staff",
+      const baseConfig = createBaseConfig({
+        roleId: "staff",
         employeeIds: ["alice"],
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
 
@@ -442,7 +438,7 @@ describe("CP-SAT: time-off rule", () => {
             },
           },
         ] as CpsatRuleConfigEntry[]),
-      ).rejects.toThrow(/Invalid date/i);
+      ).rejects.toThrow(/Invalid.*date/i);
     });
 
     it("validates date string format in dateRange", async () => {
@@ -458,7 +454,7 @@ describe("CP-SAT: time-off rule", () => {
             },
           },
         ] as CpsatRuleConfigEntry[]),
-      ).rejects.toThrow(/Invalid date/i);
+      ).rejects.toThrow(/Invalid.*date/i);
     });
 
     it("requires time scoping", async () => {
@@ -515,13 +511,8 @@ describe("CP-SAT: time-off rule", () => {
           },
         ],
         schedulingPeriod: {
-          specificDates: [
-            "2024-02-05", // Monday
-            "2024-02-06", // Tuesday
-            "2024-02-07", // Wednesday
-            "2024-02-08", // Thursday
-            "2024-02-09", // Friday
-          ],
+          dateRange: { start: "2024-02-05", end: "2024-02-09" },
+          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         targetCount: 1,
       });
@@ -558,7 +549,8 @@ describe("CP-SAT: time-off rule", () => {
       expect(emp1Wednesday).toHaveLength(0);
 
       const emp2ThursdayMorning = assignments.filter(
-        (a) => a?.employeeId === "emp2" && a?.day === "2024-02-08" && a?.shiftPatternId === "morning",
+        (a) =>
+          a?.employeeId === "emp2" && a?.day === "2024-02-08" && a?.shiftPatternId === "morning",
       );
       expect(emp2ThursdayMorning).toHaveLength(0);
     }, 60_000);
@@ -584,7 +576,7 @@ describe("CP-SAT: time-off rule", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         coverage: [
           {
             day: "2024-02-05",
@@ -625,7 +617,8 @@ describe("CP-SAT: time-off rule", () => {
 
       const chefEveningAssignments = assignments.filter(
         (a) =>
-          (a?.employeeId === "chef1" || a?.employeeId === "chef2") && a?.shiftPatternId === "evening",
+          (a?.employeeId === "chef1" || a?.employeeId === "chef2") &&
+          a?.shiftPatternId === "evening",
       );
       expect(chefEveningAssignments).toHaveLength(0);
 
@@ -636,14 +629,16 @@ describe("CP-SAT: time-off rule", () => {
     }, 30_000);
 
     it("handles recurring time-off patterns (infeasible case)", async () => {
-      const baseConfig = createBaseConfig({ roleId: "waiter",
+      const baseConfig = createBaseConfig({
+        roleId: "waiter",
         shift: {
           id: "day",
           startTime: { hours: 10, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
         },
         schedulingPeriod: {
-          specificDates: [
+          dateRange: { start: "2024-02-04", end: "2024-02-11" },
+          dates: [
             "2024-02-04", // Sun
             "2024-02-05", // Mon
             "2024-02-06", // Tue
@@ -683,7 +678,7 @@ describe("CP-SAT: time-off rule", () => {
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 2,
       });
 
@@ -715,7 +710,7 @@ describe("CP-SAT: time-off rule", () => {
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
-        schedulingPeriod: { specificDates: ["2024-02-05"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 2,
       });
 
@@ -754,15 +749,7 @@ describe("CP-SAT: time-off rule", () => {
           endTime: { hours: 17, minutes: 0 },
         },
         schedulingPeriod: {
-          specificDates: [
-            "2024-02-05", // Mon
-            "2024-02-06", // Tue
-            "2024-02-07", // Wed
-            "2024-02-08", // Thu
-            "2024-02-09", // Fri
-            "2024-02-10", // Sat
-            "2024-02-11", // Sun
-          ],
+          dateRange: { start: "2024-02-05", end: "2024-02-11" },
         },
         targetCount: 1,
       });
@@ -818,7 +805,7 @@ describe("CP-SAT: time-off rule", () => {
             endTime: { hours: 7, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-05", "2024-02-06", "2024-02-07"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } },
         coverage: ["2024-02-05", "2024-02-06", "2024-02-07"].flatMap((day) => [
           {
             day,

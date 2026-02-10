@@ -1,26 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { HttpSolverClient } from "../../src/client.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT compilation integration", () => {
-  let stop: (() => void) | undefined;
-  let client: HttpSolverClient;
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("solves compiled models end-to-end", async () => {
@@ -55,7 +42,7 @@ describe("CP-SAT compilation integration", () => {
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
-      schedulingPeriod: { specificDates: ["2024-02-01", "2024-02-02", "2024-02-03"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-03" } },
     });
 
     const response = await solveWithRules(client, { ...baseConfig, weekStartsOn: "thursday" }, [
@@ -108,7 +95,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 18, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           // Early morning: only morning shift covers this
           {
@@ -176,7 +163,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 18, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -231,7 +218,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -274,7 +261,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 18, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -327,7 +314,7 @@ describe("CP-SAT compilation integration", () => {
               endTime: { hours: 18, minutes: 0 },
             },
           ],
-          schedulingPeriod: { specificDates: ["2024-02-01"] },
+          schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
           coverage: [
             {
               day: "2024-02-01",
@@ -392,7 +379,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 19, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -458,7 +445,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-06-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-06-01", end: "2024-06-01" } },
         coverage: [
           // Dinner: 5pm-10pm, need 2 waiters
           {
@@ -519,7 +506,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-06-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-06-01", end: "2024-06-01" } },
         coverage: [
           // Dinner servers: 5pm-10pm
           {
@@ -585,7 +572,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 20, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-06-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-06-01", end: "2024-06-01" } },
         coverage: [
           // All day: 8am-8pm
           {
@@ -651,7 +638,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-06-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-06-01", end: "2024-06-01" } },
         coverage: [
           // Lunch: 11am-2pm, need 2 servers
           {
@@ -705,7 +692,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 22, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-06-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-06-01", end: "2024-06-01" } },
         coverage: [
           {
             day: "2024-06-01",
@@ -735,17 +722,10 @@ describe("CP-SAT compilation integration", () => {
   });
 
   describe("weekStartsOn inheritance", () => {
-    let stop: (() => void) | undefined;
-    let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+    let client: ReturnType<typeof getSolverClient>;
 
-    beforeAll(async () => {
-      const started = await startSolverContainer();
-      client = started.client;
-      stop = started.stop;
-    }, 120_000);
-
-    afterAll(() => {
-      stop?.();
+    beforeAll(() => {
+      client = getSolverClient();
     });
 
     it("uses ModelBuilder.weekStartsOn when weekly rule omits weekStartsOn", async () => {
@@ -765,7 +745,7 @@ describe("CP-SAT compilation integration", () => {
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 }, // 8h
         },
-        schedulingPeriod: { specificDates: ["2024-02-09", "2024-02-10"] }, // Fri, Sat
+        schedulingPeriod: { dateRange: { start: "2024-02-09", end: "2024-02-10" } }, // Fri, Sat
         targetCount: 1,
       });
 
@@ -849,7 +829,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: days },
+        schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: weekdays.map((day) => ({
           day,
           roleIds: ["staff"],
@@ -886,7 +866,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-07"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-07", end: "2024-02-07" } },
         coverage: [
           {
             day: "2024-02-07",
@@ -928,7 +908,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 14, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -971,7 +951,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1014,7 +994,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 14, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1052,7 +1032,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 21, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1110,7 +1090,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 18, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1162,7 +1142,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 9, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01", "2024-01-02"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-02" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1221,7 +1201,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 9, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01", "2024-01-02"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-02" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1263,7 +1243,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 18, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1304,7 +1284,7 @@ describe("CP-SAT compilation integration", () => {
             endTime: { hours: 14, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-01-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
         coverage: [
           {
             day: "2024-01-01",
@@ -1331,7 +1311,7 @@ describe("CP-SAT compilation integration", () => {
       const builder = new ModelBuilder({
         employees: [],
         shiftPatterns: [],
-        schedulingPeriod: { specificDates: [] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [],
         coverageBucketMinutes: 7,
       });
@@ -1346,7 +1326,7 @@ describe("CP-SAT compilation integration", () => {
         const builder = new ModelBuilder({
           employees: [],
           shiftPatterns: [],
-          schedulingPeriod: { specificDates: [] },
+          schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
           coverage: [],
           coverageBucketMinutes: bucketSize,
         });

@@ -1,41 +1,38 @@
 {
   "name": "dabke",
-  "version": "0.78.2",
-  "license": "MIT",
+  "version": "0.79.0",
   "description": "Scheduling library powered by constraint programming (CP-SAT)",
-  "author": "Christian Klotz <hello@christianklotz.co.uk>",
+  "keywords": [
+    "constraint-programming",
+    "cp-sat",
+    "operations-research",
+    "optimization",
+    "or-tools",
+    "scheduling",
+    "staff-scheduling",
+    "workforce-management"
+  ],
   "homepage": "https://github.com/christianklotz/dabke#readme",
+  "bugs": {
+    "url": "https://github.com/christianklotz/dabke/issues"
+  },
+  "license": "MIT",
+  "author": "Christian Klotz <hello@christianklotz.co.uk>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/christianklotz/dabke.git"
   },
-  "bugs": {
-    "url": "https://github.com/christianklotz/dabke/issues"
-  },
-  "keywords": [
-    "scheduling",
-    "staff-scheduling",
-    "constraint-programming",
-    "cp-sat",
-    "workforce-management",
-    "optimization",
-    "operations-research",
-    "or-tools"
+  "files": [
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE",
+    "llms.txt",
+    "README.md",
+    "solver",
+    "src"
   ],
   "type": "module",
   "sideEffects": false,
-  "engines": {
-    "node": ">=20"
-  },
-  "files": [
-    "dist",
-    "src",
-    "solver",
-    "llms.txt",
-    "LICENSE",
-    "README.md",
-    "CHANGELOG.md"
-  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -72,5 +69,8 @@
     "commander": "^14.0.2",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

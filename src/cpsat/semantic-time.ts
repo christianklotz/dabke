@@ -50,8 +50,9 @@ interface SemanticCoverageRequirementBase<S extends string> {
 /**
  * Semantic coverage requiring specific roles, optionally filtered by skills.
  */
-interface RoleBasedSemanticCoverageRequirement<S extends string>
-  extends SemanticCoverageRequirementBase<S> {
+interface RoleBasedSemanticCoverageRequirement<
+  S extends string,
+> extends SemanticCoverageRequirementBase<S> {
   /**
    * Roles that satisfy this coverage (OR logic).
    * Must have at least one role.
@@ -66,8 +67,9 @@ interface RoleBasedSemanticCoverageRequirement<S extends string>
 /**
  * Semantic coverage requiring specific skills only (any role).
  */
-interface SkillBasedSemanticCoverageRequirement<S extends string>
-  extends SemanticCoverageRequirementBase<S> {
+interface SkillBasedSemanticCoverageRequirement<
+  S extends string,
+> extends SemanticCoverageRequirementBase<S> {
   roleIds?: never;
   /**
    * Skills required (ALL required, AND logic).
@@ -265,9 +267,7 @@ function buildCoverageRequirement(
 
   if (roleIds && roleIds.length > 0) {
     // Role-based (with optional skills)
-    return skillIds && skillIds.length > 0
-      ? { ...base, roleIds, skillIds }
-      : { ...base, roleIds };
+    return skillIds && skillIds.length > 0 ? { ...base, roleIds, skillIds } : { ...base, roleIds };
   } else if (skillIds && skillIds.length > 0) {
     // Skill-only
     return { ...base, skillIds };

@@ -1,24 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: max-consecutive-days rule", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("limits consecutive working days", async () => {
@@ -29,7 +17,7 @@ describe("CP-SAT: max-consecutive-days rule", () => {
         startTime: { hours: 7, minutes: 0 },
         endTime: { hours: 15, minutes: 0 },
       },
-      schedulingPeriod: { specificDates: ["2024-02-01", "2024-02-02", "2024-02-03"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-03" } },
     });
 
     const preference: CpsatRuleConfigEntry[] = [

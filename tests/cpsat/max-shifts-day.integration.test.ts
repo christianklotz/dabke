@@ -1,24 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: max-shifts-day rule (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("limits employee to one shift per day when maxShifts is 1", async () => {
@@ -37,7 +25,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       targetCount: 1,
     });
 
@@ -85,7 +73,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       targetCount: 1,
     });
 
@@ -131,7 +119,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
           endTime: { hours: 22, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       targetCount: 1,
     });
 
@@ -166,7 +154,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       targetCount: 1, // Both shifts need coverage
     });
 
@@ -208,7 +196,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
           endTime: { hours: 17, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       targetCount: 1,
     });
 

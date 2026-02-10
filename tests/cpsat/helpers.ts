@@ -1,6 +1,4 @@
-// Re-export solver container utilities from testing
-export { startSolverContainer } from "../../src/testing/solver-container.js";
-
+import { inject } from "vitest";
 import { HttpSolverClient } from "../../src/client.js";
 import type { CompilationRule, ModelBuilderConfig } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
@@ -11,6 +9,7 @@ import type {
   SchedulingEmployee,
 } from "../../src/cpsat/types.js";
 import type { TimeOfDay, SchedulingPeriod } from "../../src/types.js";
+import { resolveDaysFromPeriod } from "../../src/datetime.utils.js";
 
 export const decodeAssignments = (values: Record<string, number> = {}) =>
   Object.entries(values)
@@ -35,23 +34,14 @@ export const solveWithRules = async (
   return client.solve(request);
 };
 
-export class PatternPenaltyRule implements CompilationRule {
-  constructor(
-    private readonly patternId: string,
-    private readonly weight: number,
-  ) {}
-
-  compile(b: ModelBuilder): void {
-    const pattern = b.shiftPatterns.find((p) => p.id === this.patternId);
-    if (!pattern) return;
-
-    for (const emp of b.employees) {
-      if (!b.canAssign(emp, pattern)) continue;
-      for (const day of b.days) {
-        b.addPenalty(b.assignment(emp.id, pattern.id, day), this.weight);
-      }
-    }
-  }
+/**
+ * Get an HttpSolverClient connected to the shared solver container
+ * started by the global setup. Use this instead of startSolverContainer()
+ * in individual test files.
+ */
+export function getSolverClient(): HttpSolverClient {
+  const port = inject("solverPort");
+  return new HttpSolverClient(fetch, `http://localhost:${port}`);
 }
 
 /**
@@ -67,6 +57,11 @@ export type BaseScenarioConfig = Omit<
 // Simple Configuration Helpers
 // ============================================================================
 
+/** Default single-day scheduling period for tests. */
+const DEFAULT_PERIOD: SchedulingPeriod = {
+  dateRange: { start: "2024-02-01", end: "2024-02-01" },
+};
+
 /**
  * Creates a minimal single-role config for simple test scenarios.
  *
@@ -78,7 +73,7 @@ export type BaseScenarioConfig = Omit<
  * const config = createSimpleConfig({
  *   roleId: "waiter",
  *   employeeIds: ["alice", "bob"],
- *   schedulingPeriod: { specificDates: ["2024-02-01"] },
+ *   schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
  * });
  */
 export function createSimpleConfig(opts: {
@@ -90,11 +85,8 @@ export function createSimpleConfig(opts: {
   schedulingPeriod?: SchedulingPeriod;
   targetCount?: number;
 }): BaseScenarioConfig {
-  const schedulingPeriod = opts.schedulingPeriod ?? { specificDates: ["2024-02-01"] };
-  const days =
-    "specificDates" in schedulingPeriod
-      ? (schedulingPeriod.specificDates ?? ["2024-02-01"])
-      : ["2024-02-01"];
+  const schedulingPeriod = opts.schedulingPeriod ?? DEFAULT_PERIOD;
+  const days = resolveDaysFromPeriod(schedulingPeriod);
   const shiftStart = opts.shiftStart ?? { hours: 9, minutes: 0 };
   const shiftEnd = opts.shiftEnd ?? { hours: 17, minutes: 0 };
   const shiftId = opts.shiftId ?? "day";
@@ -169,8 +161,7 @@ type BaseConfigOverrides = {
  */
 export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScenarioConfig => {
   // Derive roleIds: explicit roleIds > roleId > from employees > default
-  const roleIds: [string, ...string[]] =
-    overrides.roleIds ??
+  const roleIds: [string, ...string[]] = overrides.roleIds ??
     (overrides.roleId ? [overrides.roleId] : null) ??
     (overrides.employees?.[0]?.roleIds as [string, ...string[]] | undefined) ?? ["role"];
 
@@ -206,11 +197,8 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     ];
   }
 
-  const schedulingPeriod = overrides.schedulingPeriod ?? { specificDates: ["2024-02-01"] };
-  const days =
-    "specificDates" in schedulingPeriod
-      ? (schedulingPeriod.specificDates ?? ["2024-02-01"])
-      : ["2024-02-01"];
+  const schedulingPeriod = overrides.schedulingPeriod ?? DEFAULT_PERIOD;
+  const days = resolveDaysFromPeriod(schedulingPeriod);
 
   const coverage: CoverageRequirement[] =
     overrides.coverage ??
@@ -247,7 +235,6 @@ export const fixtures = {
     createSimpleConfig({
       roleId: "staff",
       employeeIds: ["alice", "bob"],
-      schedulingPeriod: { specificDates: ["2024-02-01"] },
     }),
 
   /** Week of weekdays (Mon-Fri), single role */
@@ -256,13 +243,8 @@ export const fixtures = {
       roleId: opts.roleId ?? "staff",
       employeeIds: opts.employeeIds ?? ["alice", "bob", "charlie"],
       schedulingPeriod: {
-        specificDates: [
-          "2024-02-05", // Mon
-          "2024-02-06", // Tue
-          "2024-02-07", // Wed
-          "2024-02-08", // Thu
-          "2024-02-09", // Fri
-        ],
+        dateRange: { start: "2024-02-05", end: "2024-02-09" },
+        daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
       },
     }),
 
@@ -288,7 +270,7 @@ export const fixtures = {
         endTime: { hours: 22, minutes: 0 },
       },
     ],
-    schedulingPeriod: { specificDates: ["2024-02-01"] },
+    schedulingPeriod: DEFAULT_PERIOD,
     coverage: [
       {
         day: "2024-02-01",

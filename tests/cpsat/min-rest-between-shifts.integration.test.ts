@@ -1,28 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: min-rest-between-shifts rule", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("respects minimum rest between shifts across days", async () => {
-    const baseConfig = createBaseConfig({ roleId: "chef",
+    const baseConfig = createBaseConfig({
+      roleId: "chef",
       shiftPatterns: [
         {
           id: "late",
@@ -37,7 +26,7 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
           endTime: { hours: 14, minutes: 0 },
         },
       ],
-      schedulingPeriod: { specificDates: ["2024-02-01", "2024-02-02"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-02" } },
       coverage: [
         {
           day: "2024-02-01",

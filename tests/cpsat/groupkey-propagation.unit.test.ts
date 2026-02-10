@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { defineSemanticTimes } from "../../src/cpsat/semantic-time.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
-import { ValidationReporterImpl, summarizeValidation } from "../../src/cpsat/validation-reporter.js";
+import {
+  ValidationReporterImpl,
+  summarizeValidation,
+} from "../../src/cpsat/validation-reporter.js";
 import type { TimeOfDay } from "../../src/types.js";
 import type { SolverResponse } from "../../src/client.types.js";
 
@@ -14,7 +17,12 @@ describe("groupKey propagation", () => {
     });
 
     const coverage = times.coverage([
-      { semanticTime: "weekday_open", roleIds: ["staff"], targetCount: 2, days: ["monday", "tuesday"] },
+      {
+        semanticTime: "weekday_open",
+        roleIds: ["staff"],
+        targetCount: 2,
+        days: ["monday", "tuesday"],
+      },
     ]);
 
     // 2026-02-02 is Monday, 2026-02-03 is Tuesday

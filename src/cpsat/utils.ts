@@ -19,7 +19,7 @@ export const MINUTES_PER_DAY = 24 * 60;
  *
  * @example Using weights in a custom rule
  * ```ts
- * import { OBJECTIVE_WEIGHTS } from "feasible";
+ * import { OBJECTIVE_WEIGHTS } from "dabke";
  *
  * // Prefer senior staff with same weight as employee-assignment-priority
  * b.addPenalty(assignment, -OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE);

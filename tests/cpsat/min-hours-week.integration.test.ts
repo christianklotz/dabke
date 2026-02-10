@@ -1,35 +1,24 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import {
-  createBaseConfig,
-  decodeAssignments,
-  solveWithRules,
-  startSolverContainer,
-} from "./helpers.js";
+import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: min-hours-week rule", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   it("adds shifts to meet weekly minimum minutes", async () => {
-    const baseConfig = createBaseConfig({ roleId: "barista",
+    const baseConfig = createBaseConfig({
+      roleId: "barista",
       employeeIds: ["alice"],
       shift: {
         id: "day",
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 16, minutes: 0 },
       },
-      schedulingPeriod: { specificDates: ["2024-02-01", "2024-02-02", "2024-02-03"] },
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-03" } },
       coverage: [
         {
           day: "2024-02-01",

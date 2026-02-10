@@ -21,10 +21,22 @@ const builder = new ModelBuilder({
     { id: "evening", startTime: { hours: 16 }, endTime: { hours: 23 } },
   ],
   coverage: [
-    { day: "2026-02-09", startTime: { hours: 8 }, endTime: { hours: 16 },
-      roleIds: ["server"], targetCount: 1, priority: "MANDATORY" },
-    { day: "2026-02-09", startTime: { hours: 16 }, endTime: { hours: 23 },
-      roleIds: ["server"], targetCount: 1, priority: "MANDATORY" },
+    {
+      day: "2026-02-09",
+      startTime: { hours: 8 },
+      endTime: { hours: 16 },
+      roleIds: ["server"],
+      targetCount: 1,
+      priority: "MANDATORY",
+    },
+    {
+      day: "2026-02-09",
+      startTime: { hours: 16 },
+      endTime: { hours: 23 },
+      roleIds: ["server"],
+      targetCount: 1,
+      priority: "MANDATORY",
+    },
   ],
   schedulingPeriod: { specificDates: ["2026-02-09"] },
   ruleConfigs: [
@@ -83,12 +95,7 @@ docker run -p 8080:8080 dabke-solver
 ### 2. Build and solve a schedule
 
 ```typescript
-import {
-  ModelBuilder,
-  HttpSolverClient,
-  parseSolverResponse,
-  resolveAssignments,
-} from "dabke";
+import { ModelBuilder, HttpSolverClient, parseSolverResponse, resolveAssignments } from "dabke";
 
 // Define team
 const employees = [
@@ -152,7 +159,7 @@ if (result.status === "OPTIMAL" || result.status === "FEASIBLE") {
   const shifts = resolveAssignments(result.assignments, shiftPatterns);
   for (const shift of shifts) {
     console.log(
-      `${shift.employeeId}: ${shift.day} ${shift.startTime.hours}:00–${shift.endTime.hours}:00`
+      `${shift.employeeId}: ${shift.day} ${shift.startTime.hours}:00–${shift.endTime.hours}:00`,
     );
   }
 }
@@ -193,20 +200,20 @@ const resolved = times.resolve(coverage, days);
 
 ## Built-in Rules
 
-| Rule | Description |
-|------|-------------|
-| `max-hours-day` | Max hours per person per day |
-| `max-hours-week` | Max hours per person per week |
-| `min-hours-day` | Min hours per person per day |
-| `min-hours-week` | Min hours per person per week |
-| `max-shifts-day` | Max shift assignments per day |
-| `max-consecutive-days` | Max consecutive working days |
-| `min-consecutive-days` | Min consecutive working days |
-| `min-rest-between-shifts` | Min rest hours between shifts |
-| `time-off` | Block assignments during periods |
-| `employee-assignment-priority` | Prefer or avoid assigning team members |
-| `assign-together` | Keep team members on the same shifts |
-| `location-preference` | Prefer team members at specific locations |
+| Rule                           | Description                               |
+| ------------------------------ | ----------------------------------------- |
+| `max-hours-day`                | Max hours per person per day              |
+| `max-hours-week`               | Max hours per person per week             |
+| `min-hours-day`                | Min hours per person per day              |
+| `min-hours-week`               | Min hours per person per week             |
+| `max-shifts-day`               | Max shift assignments per day             |
+| `max-consecutive-days`         | Max consecutive working days              |
+| `min-consecutive-days`         | Min consecutive working days              |
+| `min-rest-between-shifts`      | Min rest hours between shifts             |
+| `time-off`                     | Block assignments during periods          |
+| `employee-assignment-priority` | Prefer or avoid assigning team members    |
+| `assign-together`              | Keep team members on the same shifts      |
+| `location-preference`          | Prefer team members at specific locations |
 
 All rules support scoping by person, role, skill, and time period (date ranges, days of week, recurring periods).
 
@@ -271,7 +278,9 @@ const results = reporter.getValidation();
 const summaries = summarizeValidation(results);
 
 for (const s of summaries) {
-  console.log(`${s.description}: ${s.status} (${s.passedCount}/${s.passedCount + s.violatedCount})`);
+  console.log(
+    `${s.description}: ${s.status} (${s.passedCount}/${s.passedCount + s.violatedCount})`,
+  );
 }
 ```
 
@@ -322,9 +331,35 @@ Or read the file directly:
 cat node_modules/dabke/llms.txt
 ```
 
-## Testing
+## Development
 
-dabke provides test utilities for running integration tests against the solver:
+### Running tests
+
+Unit tests have no external dependencies:
+
+```bash
+npm run test:unit
+```
+
+Integration tests require Docker to run the solver container:
+
+```bash
+# Ensure Docker is running, then:
+npm run test:integration
+```
+
+The integration test harness (`startSolverContainer`) builds and starts a Docker container from `solver/Dockerfile` automatically. It binds to port 18080 by default — make sure no other container is using that port.
+
+To run both unit and integration tests:
+
+```bash
+npm test          # runs typecheck + unit tests only
+npm run test:integration   # solver integration tests (requires Docker)
+```
+
+### Test utilities
+
+dabke exports test helpers for writing your own integration tests:
 
 ```typescript
 import { startSolverContainer } from "dabke/testing";
@@ -334,7 +369,7 @@ const response = await solver.client.solve(request);
 solver.stop();
 ```
 
-This starts a Docker container with the solver, waits for it to be healthy, and provides a pre-configured `HttpSolverClient`.
+This builds the solver Docker image, starts a container, waits for the health check, and returns a pre-configured `HttpSolverClient`.
 
 ## Contributing
 

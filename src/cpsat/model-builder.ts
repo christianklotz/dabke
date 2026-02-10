@@ -72,8 +72,8 @@ export interface ModelBuilderConfig extends ModelBuilderOptions {
   employees: SchedulingEmployee[];
   shiftPatterns: ShiftPattern[];
   /**
-   * Defines when scheduling should occur. Can specify either a date range
-   * (with optional day-of-week filtering) or a list of specific dates.
+   * Defines when scheduling should occur as a date range with optional
+   * `daysOfWeek` and `dates` filters that compose to narrow which days are included.
    */
   schedulingPeriod: SchedulingPeriod;
   coverage: CoverageRequirement[];
@@ -448,11 +448,12 @@ export class ModelBuilder {
       const covStart = timeOfDayToMinutes(cov.startTime);
       const covEnd = normalizeEndMinutes(covStart, timeOfDayToMinutes(cov.endTime));
       const covKey = cov.roleIds?.join(",") ?? cov.skillIds?.join(",") ?? "unknown";
-      const coverageLabel = cov.roleIds && cov.roleIds.length > 0
-        ? cov.roleIds.length === 1
-          ? `role "${cov.roleIds[0]}"`
-          : `role "${cov.roleIds.join(" or ")}"`
-        : `skills [${cov.skillIds?.join(", ")}]`;
+      const coverageLabel =
+        cov.roleIds && cov.roleIds.length > 0
+          ? cov.roleIds.length === 1
+            ? `role "${cov.roleIds[0]}"`
+            : `role "${cov.roleIds.join(" or ")}"`
+          : `skills [${cov.skillIds?.join(", ")}]`;
       const coverageWindow = formatTimeRange(covStart, covEnd);
 
       const eligibleEmployees = this.employeesForCoverage(cov);

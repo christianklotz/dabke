@@ -9,6 +9,7 @@ If the user did not give you a concrete task, read README.md, then ask what to w
 dabke is a TypeScript scheduling library that compiles staff scheduling problems into CP-SAT constraint models. The solver is a separate Python service (in `solver/`).
 
 Key concepts:
+
 - `ModelBuilder` compiles employees, shift patterns, coverage, and rules into a `SolverRequest`
 - Rules implement `CompilationRule` with a `compile(builder)` method
 - The solver is stateless — it receives a JSON model and returns assignments

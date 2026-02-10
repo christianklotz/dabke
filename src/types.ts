@@ -139,12 +139,20 @@ export interface DateTimeRange {
 // ============================================================================
 
 /**
- * Defines a scheduling period either as a date range or specific dates.
+ * Defines a scheduling period as a date range with optional filters.
  *
- * Use this to specify when scheduling should occur. This is more expressive
- * than a simple list of days because it can filter by day-of-week.
+ * The `dateRange` specifies the overall scheduling window. Use `daysOfWeek`
+ * and/or `dates` to narrow which days within the range are included.
+ * Filters compose: a day must pass all specified filters to be included.
  *
- * @example Date range with day-of-week filtering (restaurant closed Mon/Tue)
+ * @example All days in a week
+ * ```typescript
+ * const period: SchedulingPeriod = {
+ *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
+ * };
+ * ```
+ *
+ * @example Only specific days of the week (restaurant closed Mon/Tue)
  * ```typescript
  * const period: SchedulingPeriod = {
  *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
@@ -152,40 +160,28 @@ export interface DateTimeRange {
  * };
  * ```
  *
- * @example Date range for all days
+ * @example Only specific dates within the range
  * ```typescript
  * const period: SchedulingPeriod = {
  *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
- * };
- * ```
- *
- * @example Specific dates (non-contiguous or custom selection)
- * ```typescript
- * const period: SchedulingPeriod = {
- *   specificDates: ['2025-02-05', '2025-02-07', '2025-02-10'],
+ *   dates: ['2025-02-05', '2025-02-07'],
  * };
  * ```
  */
-export type SchedulingPeriod =
-  | {
-      /**
-       * A contiguous date range (start and end are inclusive).
-       * Dates should be in YYYY-MM-DD format.
-       */
-      dateRange: { start: string; end: string };
-      /**
-       * Optional filter to include only specific days of the week.
-       * If omitted, all days in the range are included.
-       */
-      daysOfWeek?: DayOfWeek[];
-      specificDates?: never;
-    }
-  | {
-      /**
-       * A list of specific dates to schedule.
-       * Dates should be in YYYY-MM-DD format.
-       */
-      specificDates: string[];
-      dateRange?: never;
-      daysOfWeek?: never;
-    };
+export interface SchedulingPeriod {
+  /**
+   * The overall scheduling window (start and end are inclusive).
+   * Dates should be in YYYY-MM-DD format.
+   */
+  dateRange: { start: string; end: string };
+  /**
+   * Include only these days of the week.
+   * If omitted, all days of the week are included.
+   */
+  daysOfWeek?: DayOfWeek[];
+  /**
+   * Include only these specific dates (YYYY-MM-DD) within the range.
+   * If omitted, all dates in the range are included (subject to daysOfWeek filter).
+   */
+  dates?: string[];
+}

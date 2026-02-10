@@ -155,11 +155,7 @@ export type {
 
 export { parseSolverResponse, resolveAssignments } from "./cpsat/response.js";
 
-export type {
-  ShiftAssignment,
-  ResolvedShiftAssignment,
-  SolverResult,
-} from "./cpsat/response.js";
+export type { ShiftAssignment, ResolvedShiftAssignment, SolverResult } from "./cpsat/response.js";
 
 // ============================================================================
 // Rules

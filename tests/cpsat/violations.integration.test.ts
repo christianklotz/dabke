@@ -1,20 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import { parseSolverResponse, resolveAssignments } from "../../src/cpsat/response.js";
-import { startSolverContainer } from "./helpers.js";
+import { getSolverClient } from "./helpers.js";
 
 describe("Validation diagnostics (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   describe("Compile-time errors", () => {
@@ -29,7 +22,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -61,7 +54,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -106,7 +99,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -150,7 +143,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -195,7 +188,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -260,7 +253,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -329,7 +322,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 13, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",
@@ -404,7 +397,7 @@ describe("Validation diagnostics (integration)", () => {
             endTime: { hours: 18, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: ["2024-02-01"] },
+        schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [
           {
             day: "2024-02-01",

@@ -29,8 +29,22 @@ describe("ShiftPattern daysOfWeek restriction", () => {
         dateRange: { start: "2026-02-06", end: "2026-02-07" },
       },
       coverage: [
-        { day: "2026-02-06", startTime: t(9), endTime: t(18), roleIds: ["staff"], targetCount: 1, priority: "MANDATORY" },
-        { day: "2026-02-07", startTime: t(9), endTime: t(14), roleIds: ["staff"], targetCount: 1, priority: "MANDATORY" },
+        {
+          day: "2026-02-06",
+          startTime: t(9),
+          endTime: t(18),
+          roleIds: ["staff"],
+          targetCount: 1,
+          priority: "MANDATORY",
+        },
+        {
+          day: "2026-02-07",
+          startTime: t(9),
+          endTime: t(14),
+          roleIds: ["staff"],
+          targetCount: 1,
+          priority: "MANDATORY",
+        },
       ],
     });
 
@@ -70,7 +84,14 @@ describe("ShiftPattern daysOfWeek restriction", () => {
         dateRange: { start: "2026-02-07", end: "2026-02-07" },
       },
       coverage: [
-        { day: "2026-02-07", startTime: t(9), endTime: t(14), roleIds: ["staff"], targetCount: 1, priority: "MANDATORY" },
+        {
+          day: "2026-02-07",
+          startTime: t(9),
+          endTime: t(14),
+          roleIds: ["staff"],
+          targetCount: 1,
+          priority: "MANDATORY",
+        },
       ],
     });
 
@@ -92,8 +113,22 @@ describe("ShiftPattern daysOfWeek restriction", () => {
         dateRange: { start: "2026-02-02", end: "2026-02-08" },
       },
       coverage: [
-        { day: "2026-02-02", startTime: t(9), endTime: t(17), roleIds: ["staff"], targetCount: 1, priority: "MANDATORY" }, // Monday
-        { day: "2026-02-07", startTime: t(9), endTime: t(17), roleIds: ["staff"], targetCount: 1, priority: "MANDATORY" }, // Saturday
+        {
+          day: "2026-02-02",
+          startTime: t(9),
+          endTime: t(17),
+          roleIds: ["staff"],
+          targetCount: 1,
+          priority: "MANDATORY",
+        }, // Monday
+        {
+          day: "2026-02-07",
+          startTime: t(9),
+          endTime: t(17),
+          roleIds: ["staff"],
+          targetCount: 1,
+          priority: "MANDATORY",
+        }, // Saturday
       ],
     });
 
@@ -142,7 +177,14 @@ describe("ShiftPattern daysOfWeek restriction", () => {
       },
       coverage: [
         // Coverage 8:30-14:30 on Saturday
-        { day: "2026-02-07", startTime: t(8, 30), endTime: t(14, 30), roleIds: ["staff"], targetCount: 2, priority: "MANDATORY" },
+        {
+          day: "2026-02-07",
+          startTime: t(8, 30),
+          endTime: t(14, 30),
+          roleIds: ["staff"],
+          targetCount: 2,
+          priority: "MANDATORY",
+        },
       ],
     });
 

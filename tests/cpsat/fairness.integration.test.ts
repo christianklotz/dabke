@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
-import { startSolverContainer, decodeAssignments, solveWithRules } from "./helpers.js";
+import { getSolverClient, decodeAssignments, solveWithRules } from "./helpers.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
 
 /**
@@ -10,17 +10,10 @@ import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
  * rather than assigning all work to a single person.
  */
 describe("Fair distribution (integration)", () => {
-  let stop: (() => void) | undefined;
-  let client: Awaited<ReturnType<typeof startSolverContainer>>["client"];
+  let client: ReturnType<typeof getSolverClient>;
 
-  beforeAll(async () => {
-    const started = await startSolverContainer();
-    client = started.client;
-    stop = started.stop;
-  }, 120_000);
-
-  afterAll(() => {
-    stop?.();
+  beforeAll(() => {
+    client = getSolverClient();
   });
 
   describe("Two employees, one shift per day for a week", () => {
@@ -51,7 +44,7 @@ describe("Fair distribution (integration)", () => {
             endTime: { hours: 17, minutes: 30 },
           },
         ],
-        schedulingPeriod: { specificDates: days },
+        schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
           roleIds: ["staff"] as [string, ...string[]],
@@ -119,7 +112,7 @@ describe("Fair distribution (integration)", () => {
             endTime: { hours: 17, minutes: 30 },
           },
         ],
-        schedulingPeriod: { specificDates: days },
+        schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
           roleIds: ["staff"] as [string, ...string[]],
@@ -162,8 +155,6 @@ describe("Fair distribution (integration)", () => {
     it("employee-assignment-priority can override fairness when needed", async () => {
       // Scenario: Prefer permanent staff (Anne) over temp staff (John)
       // Fairness should still apply but preference should win
-      const days = ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"];
-
       const baseConfig = {
         employees: [
           { id: "anne", roleIds: ["staff"] },
@@ -177,8 +168,8 @@ describe("Fair distribution (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: days },
-        coverage: days.map((day) => ({
+        schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-08" } },
+        coverage: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"].map((day) => ({
           day,
           roleIds: ["staff"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
@@ -230,7 +221,7 @@ describe("Fair distribution (integration)", () => {
             endTime: { hours: 17, minutes: 0 },
           },
         ],
-        schedulingPeriod: { specificDates: days },
+        schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
           roleIds: ["staff"] as [string, ...string[]],
