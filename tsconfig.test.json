@@ -7,5 +7,5 @@
     "module": "ES2022",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"]
 }
