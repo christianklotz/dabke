@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { TimeOfDay } from "../../src/types.js";
 
-describe("ShiftPattern daysOfWeek restriction", () => {
-  const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
+const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 
+describe("ShiftPattern daysOfWeek restriction", () => {
   it("should only create assignment variables for patterns available on that day", () => {
     const builder = new ModelBuilder({
       employees: [{ id: "alice", roleIds: ["staff"] }],

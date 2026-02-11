@@ -327,7 +327,7 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
       groupKey: key,
       type: group.type,
       description: inferDescription(key, group.items),
-      days: [...group.days].sort(),
+      days: [...group.days].toSorted(),
       status,
       passedCount: group.passedCount,
       violatedCount: group.violatedCount,

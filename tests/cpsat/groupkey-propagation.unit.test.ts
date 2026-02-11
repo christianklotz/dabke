@@ -8,9 +8,9 @@ import {
 import type { TimeOfDay } from "../../src/types.js";
 import type { SolverResponse } from "../../src/client.types.js";
 
-describe("groupKey propagation", () => {
-  const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
+const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 
+describe("groupKey propagation", () => {
   it("should propagate groupKey from coverage through to validation passed items", () => {
     const times = defineSemanticTimes({
       weekday_open: { startTime: t(9), endTime: t(18) },

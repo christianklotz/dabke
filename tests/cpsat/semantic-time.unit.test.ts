@@ -6,9 +6,9 @@ import {
 } from "../../src/cpsat/semantic-time.js";
 import type { TimeOfDay } from "../../src/types.js";
 
-describe("defineSemanticTimes", () => {
-  const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
+const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 
+describe("defineSemanticTimes", () => {
   describe("basic usage", () => {
     it("should create a semantic time context with type-safe names", () => {
       const times = defineSemanticTimes({

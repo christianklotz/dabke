@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
@@ -1182,7 +1183,9 @@ describe("CP-SAT compilation integration", () => {
       expect(earlyAssignment).toBeDefined();
 
       // They should be to different employees (due to NoOverlap)
-      expect(nightAssignment!.employeeId).not.toBe(earlyAssignment!.employeeId);
+      assert(nightAssignment);
+      assert(earlyAssignment);
+      expect(nightAssignment.employeeId).not.toBe(earlyAssignment.employeeId);
     }, 30_000);
 
     it("returns infeasible when single employee must cover overlapping cross-midnight shifts", async () => {

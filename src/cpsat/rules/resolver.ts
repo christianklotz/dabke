@@ -110,18 +110,13 @@ export function resolveRuleScopes(
 
   for (const group of grouped.values()) {
     // Sort by specificity (descending), then by insertion order (descending, later wins)
-    const sorted = group
-      .map((g) => ({
-        ...g,
-        specificity: specificity(g.scope.entity),
-      }))
-      .toSorted((a, b) => {
-        if (b.specificity !== a.specificity) {
-          return b.specificity - a.specificity;
-        }
-        // Later insertion wins (higher index first)
-        return b.index - a.index;
-      });
+    const sorted = group.toSorted((a, b) => {
+      const specA = specificity(a.scope.entity);
+      const specB = specificity(b.scope.entity);
+      if (specB !== specA) return specB - specA;
+      // Later insertion wins (higher index first)
+      return b.index - a.index;
+    });
 
     // Track assigned IDs - all scope types participate in claiming
     const assignedEmployees = new Set<string>();
