@@ -134,7 +134,7 @@ export type {
 
 export { SOLVER_STATUS } from "./client.types.js";
 
-export { SolverRequestSchema, SolverResponseSchema } from "./client.schemas.js";
+export { SolverRequestSchema, SolverResponseSchema, SolverStatusSchema } from "./client.schemas.js";
 
 // ============================================================================
 // Model builder

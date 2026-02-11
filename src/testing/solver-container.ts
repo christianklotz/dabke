@@ -163,9 +163,9 @@ export const startSolverContainer = async (
       try {
         await client.health?.();
       } catch (err) {
-        throw new Error(
-          `Solver container health check failed. Container may have crashed. Error: ${err}`,
-        );
+        throw new Error("Solver container health check failed. Container may have crashed.", {
+          cause: err,
+        });
       }
     },
   };

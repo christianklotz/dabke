@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { describe, expect, it, vi } from "vitest";
 import type { CompilationRule } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry, CpsatRuleFactories } from "../../src/cpsat/rules.js";
@@ -36,10 +37,13 @@ describe("CP-SAT rule scoping resolver", () => {
 
     expect(resolved).toHaveLength(2);
 
-    const specific = resolved.find((r) => (r.config as any).employeeIds?.includes("alice"));
+    const specific = resolved.find((r) =>
+      (r.config as Record<string, unknown>).employeeIds?.includes("alice"),
+    );
     const globalRemainder = resolved.find(
       (r) =>
-        (r.config as any).employeeIds?.length === 1 && (r.config as any).employeeIds?.[0] === "bob",
+        (r.config as Record<string, unknown>).employeeIds?.length === 1 &&
+        (r.config as Record<string, unknown>).employeeIds?.[0] === "bob",
     );
 
     expect(specific?.config).toMatchObject({
@@ -70,8 +74,8 @@ describe("CP-SAT rule scoping resolver", () => {
 
     const rule = resolved[0]!;
     // The second (later) rule should win
-    expect((rule.config as any).hours).toBe(6);
-    expect((rule.config as any).priority).toBe("LOW");
+    expect((rule.config as Record<string, unknown>).hours).toBe(6);
+    expect((rule.config as Record<string, unknown>).priority).toBe("LOW");
   });
 
   it("later global rule overrides earlier global rule", () => {
@@ -91,8 +95,8 @@ describe("CP-SAT rule scoping resolver", () => {
 
     const rule = resolved[0]!;
     // The second (later) rule should win
-    expect((rule.config as any).hours).toBe(48);
-    expect((rule.config as any).priority).toBe("HIGH");
+    expect((rule.config as Record<string, unknown>).hours).toBe(48);
+    expect((rule.config as Record<string, unknown>).priority).toBe("HIGH");
   });
 
   it("builds compilation rules via factories using resolved scopes", () => {
@@ -134,8 +138,8 @@ describe("CP-SAT rule scoping resolver", () => {
 
     const rule = resolved[0]!;
     // Role scope is expanded to concrete employee IDs
-    expect((rule.config as any).employeeIds).toEqual(["alice", "bob"]);
-    expect((rule.config as any).hours).toBe(7);
+    expect((rule.config as Record<string, unknown>).employeeIds).toEqual(["alice", "bob"]);
+    expect((rule.config as Record<string, unknown>).hours).toBe(7);
   });
 
   it("expands skill-scoped rules to employee IDs", () => {
@@ -157,7 +161,7 @@ describe("CP-SAT rule scoping resolver", () => {
 
     const rule = resolved[0]!;
     // Skill scope is expanded to employees with that skill
-    expect((rule.config as any).employeeIds).toEqual(["alice", "charlie"]);
+    expect((rule.config as Record<string, unknown>).employeeIds).toEqual(["alice", "charlie"]);
   });
 
   it("drops rules that match no employees", () => {
@@ -225,8 +229,10 @@ describe("CP-SAT rule scoping resolver", () => {
 
     // Should only have the global rule, not the specific one that matched no one
     expect(resolved).toHaveLength(1);
-    expect((resolved[0]?.config as any).hours).toBe(8);
-    expect((resolved[0]?.config as any).employeeIds).toEqual(["alice", "bob"]);
+    const entry = resolved[0];
+    assert(entry);
+    expect((entry.config as Record<string, unknown>).hours).toBe(8);
+    expect((entry.config as Record<string, unknown>).employeeIds).toEqual(["alice", "bob"]);
   });
 
   it("role-scoped rules claim employees before global rules", () => {
@@ -257,14 +263,17 @@ describe("CP-SAT rule scoping resolver", () => {
     expect(resolved).toHaveLength(2);
 
     // Student rule claims alice and charlie
-    const studentRule = resolved.find((r) => (r.config as any).hours === 20);
-    expect(studentRule).toBeDefined();
-    expect((studentRule!.config as any).employeeIds).toEqual(["alice", "charlie"]);
+    const studentRule = resolved.find((r) => (r.config as Record<string, unknown>).hours === 20);
+    assert(studentRule);
+    expect((studentRule.config as Record<string, unknown>).employeeIds).toEqual([
+      "alice",
+      "charlie",
+    ]);
 
     // Global rule gets only bob (the remainder)
-    const globalRule = resolved.find((r) => (r.config as any).hours === 48);
-    expect(globalRule).toBeDefined();
-    expect((globalRule!.config as any).employeeIds).toEqual(["bob"]);
+    const globalRule = resolved.find((r) => (r.config as Record<string, unknown>).hours === 48);
+    assert(globalRule);
+    expect((globalRule.config as Record<string, unknown>).employeeIds).toEqual(["bob"]);
   });
 
   it("preserves time scopes such as date ranges and days of week", () => {
@@ -288,8 +297,12 @@ describe("CP-SAT rule scoping resolver", () => {
     ];
 
     const resolved = resolveRuleScopes(entries, employees);
-    expect(resolved.some((r) => (r.config as any).dayOfWeek?.includes("monday"))).toBe(true);
-    expect(resolved.some((r) => (r.config as any).dateRange?.start === "2024-02-01")).toBe(true);
+    expect(
+      resolved.some((r) => (r.config as Record<string, unknown>).dayOfWeek?.includes("monday")),
+    ).toBe(true);
+    expect(
+      resolved.some((r) => (r.config as Record<string, unknown>).dateRange?.start === "2024-02-01"),
+    ).toBe(true);
   });
 
   it("passes through non-scoped rules unchanged", () => {
@@ -316,20 +329,22 @@ describe("CP-SAT rule scoping resolver", () => {
     expect(resolved).toHaveLength(2);
 
     const [first, second] = resolved;
+    assert(first);
+    assert(second);
 
     // First rule unchanged
-    expect(first!.name).toBe("assign-together");
-    expect((first!.config as any).groupEmployeeIds).toEqual(["alice", "bob"]);
-    expect((first!.config as any).priority).toBe("MANDATORY");
+    expect(first.name).toBe("assign-together");
+    expect((first.config as Record<string, unknown>).groupEmployeeIds).toEqual(["alice", "bob"]);
+    expect((first.config as Record<string, unknown>).priority).toBe("MANDATORY");
 
     // Second rule unchanged
-    expect(second!.name).toBe("assign-together");
-    expect((second!.config as any).groupEmployeeIds).toEqual(["bob", "charlie"]);
-    expect((second!.config as any).priority).toBe("HIGH");
+    expect(second.name).toBe("assign-together");
+    expect((second.config as Record<string, unknown>).groupEmployeeIds).toEqual(["bob", "charlie"]);
+    expect((second.config as Record<string, unknown>).priority).toBe("HIGH");
 
     // Neither should have employeeIds added (not scoped)
-    expect((first!.config as any).employeeIds).toBeUndefined();
-    expect((second!.config as any).employeeIds).toBeUndefined();
+    expect((first.config as Record<string, unknown>).employeeIds).toBeUndefined();
+    expect((second.config as Record<string, unknown>).employeeIds).toBeUndefined();
   });
 
   it("mixes non-scoped and scoped rules correctly", () => {
@@ -362,13 +377,28 @@ describe("CP-SAT rule scoping resolver", () => {
     // Non-scoped rules pass through as-is
     const assignTogetherRules = resolved.filter((r) => r.name === "assign-together");
     expect(assignTogetherRules).toHaveLength(2);
-    expect((assignTogetherRules[0]?.config as any).groupEmployeeIds).toEqual(["alice", "bob"]);
-    expect((assignTogetherRules[1]?.config as any).groupEmployeeIds).toEqual(["charlie", "diana"]);
+    const together0 = assignTogetherRules[0];
+    const together1 = assignTogetherRules[1];
+    assert(together0);
+    assert(together1);
+    expect((together0.config as Record<string, unknown>).groupEmployeeIds).toEqual([
+      "alice",
+      "bob",
+    ]);
+    expect((together1.config as Record<string, unknown>).groupEmployeeIds).toEqual([
+      "charlie",
+      "diana",
+    ]);
 
     // Scoped rule gets all employees (global scope)
     const maxHoursRule = resolved.find((r) => r.name === "max-hours-day");
-    expect(maxHoursRule).toBeDefined();
-    expect((maxHoursRule!.config as any).employeeIds).toEqual(["alice", "bob", "charlie", "diana"]);
+    assert(maxHoursRule);
+    expect((maxHoursRule.config as Record<string, unknown>).employeeIds).toEqual([
+      "alice",
+      "bob",
+      "charlie",
+      "diana",
+    ]);
   });
 });
 
@@ -380,7 +410,7 @@ describe("CP-SAT rule validation", () => {
         priority: "MANDATORY",
         employeeIds: ["alice"],
         roleIds: ["role"],
-      } as any),
+      } as Record<string, unknown>),
     ).toThrow(/Only one of employeeIds\/roleIds\/skillIds is allowed/);
   });
 });

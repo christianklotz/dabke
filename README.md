@@ -38,7 +38,9 @@ const builder = new ModelBuilder({
       priority: "MANDATORY",
     },
   ],
-  schedulingPeriod: { specificDates: ["2026-02-09"] },
+  schedulingPeriod: {
+    dateRange: { start: "2026-02-09", end: "2026-02-09" },
+  },
   ruleConfigs: [
     { name: "max-hours-day", config: { hours: 8, priority: "MANDATORY" } },
     { name: "min-rest-between-shifts", config: { hours: 10, priority: "MANDATORY" } },
@@ -135,7 +137,7 @@ const builder = new ModelBuilder({
   shiftPatterns,
   coverage,
   schedulingPeriod: {
-    specificDates: ["2026-02-09"],
+    dateRange: { start: "2026-02-09", end: "2026-02-09" },
   },
   ruleConfigs: [
     { name: "max-hours-day", config: { hours: 8, priority: "MANDATORY" } },

@@ -382,7 +382,7 @@ function formatDaysScope(days: DayOfWeek[]): string {
   const weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
   const weekend = ["saturday", "sunday"];
 
-  const sorted = [...days].sort((a, b) => weekdays.indexOf(a) - weekdays.indexOf(b));
+  const sorted = days.toSorted((a, b) => weekdays.indexOf(a) - weekdays.indexOf(b));
 
   if (sorted.length === 5 && weekdays.every((d) => sorted.includes(d as DayOfWeek))) {
     return "weekdays";

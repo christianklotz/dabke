@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
@@ -642,8 +643,8 @@ describe("ModelBuilder (CP-SAT)", () => {
           c.rhs === 1 &&
           c.terms.some((t) => t.var.includes("alice")),
       );
-      expect(coverageConstraint).toBeDefined();
-      expect(coverageConstraint!.type).toBe("linear");
+      assert(coverageConstraint);
+      expect(coverageConstraint.type).toBe("linear");
 
       // Bob should not be in the coverage constraint (doesn't have keyholder skill)
       const constraint = coverageConstraint as { type: "linear"; terms: { var: string }[] };
@@ -689,8 +690,8 @@ describe("ModelBuilder (CP-SAT)", () => {
           c.rhs === 1 &&
           c.terms.some((t) => t.var.includes("alice")),
       );
-      expect(coverageConstraint).toBeDefined();
-      expect(coverageConstraint!.type).toBe("linear");
+      assert(coverageConstraint);
+      expect(coverageConstraint.type).toBe("linear");
 
       const constraint = coverageConstraint as { type: "linear"; terms: { var: string }[] };
 
