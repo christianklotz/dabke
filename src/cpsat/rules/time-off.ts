@@ -58,6 +58,15 @@ const TimeOffSchema = withScopes(
     },
   );
 
+/**
+ * Configuration for {@link createTimeOffRule}.
+ *
+ * - `priority` (required): how strictly the solver enforces this rule
+ * - `startTime` (optional): start of the time-off window within each day; must be paired with `endTime`
+ * - `endTime` (optional): end of the time-off window within each day; must be paired with `startTime`
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+ */
 export type TimeOffConfig = z.infer<typeof TimeOffSchema>;
 
 /**
@@ -67,6 +76,7 @@ export type TimeOffConfig = z.infer<typeof TimeOffSchema>;
  * (date ranges, specific dates, days of week, recurring periods).
  * Optionally supports partial-day time-off with startTime/endTime.
  *
+ * @param config - See {@link TimeOffConfig}
  * @example Full day vacation
  * ```ts
  * createTimeOffRule({

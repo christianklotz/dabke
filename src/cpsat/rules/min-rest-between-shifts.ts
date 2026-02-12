@@ -3,6 +3,14 @@ import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
 import { withScopes } from "./scoping.js";
 
+/**
+ * Configuration for {@link createMinRestBetweenShiftsRule}.
+ *
+ * - `hours` (required): minimum rest hours required between consecutive shifts
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ */
 export type MinRestBetweenShiftsConfig = z.infer<typeof MinRestBetweenShiftsSchema>;
 
 const MinRestBetweenShiftsSchema = withScopes(
@@ -21,6 +29,7 @@ const MinRestBetweenShiftsSchema = withScopes(
 /**
  * Enforces a minimum rest period between any two shifts a person works.
  *
+ * @param config - See {@link MinRestBetweenShiftsConfig}
  * @example
  * ```ts
  * const rule = createMinRestBetweenShiftsRule({

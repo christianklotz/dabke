@@ -23,6 +23,15 @@ const MaxHoursWeekSchema = withScopes(
   },
 );
 
+/**
+ * Configuration for {@link createMaxHoursWeekRule}.
+ *
+ * - `hours` (required): maximum hours allowed per scheduling week
+ * - `priority` (required): how strictly the solver enforces this rule
+ * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+ */
 export type MaxHoursWeekConfig = z.infer<typeof MaxHoursWeekSchema>;
 
 /**
@@ -32,6 +41,7 @@ export type MaxHoursWeekConfig = z.infer<typeof MaxHoursWeekSchema>;
  * (date ranges, specific dates, days of week, recurring periods).
  * Time scoping filters which days within each week count toward the limit.
  *
+ * @param config - See {@link MaxHoursWeekConfig}
  * @example Limit everyone to 40 hours per week
  * ```ts
  * createMaxHoursWeekRule({

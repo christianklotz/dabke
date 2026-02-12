@@ -8,7 +8,9 @@ import { groupKey, type GroupKey } from "./validation.types.js";
  * Base definition for a semantic time period.
  */
 export interface SemanticTimeDef {
+  /** When this time period starts. */
   startTime: TimeOfDay;
+  /** When this time period ends. */
   endTime: TimeOfDay;
 }
 

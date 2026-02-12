@@ -37,8 +37,17 @@ export interface RuleValidationContext {
   readonly shiftPatterns: ShiftPattern[];
 }
 
+/**
+ * A rule that adds constraints or objectives to the solver model.
+ *
+ * Rules implement `compile` to emit solver constraints during model building,
+ * and optionally `validate` to check the solution after solving.
+ * Use the `create*Rule` functions to create built-in rules.
+ */
 export interface CompilationRule {
+  /** Emit constraints and objectives into the model builder. */
   compile(builder: ModelBuilder): void;
+  /** Validate the solved schedule and report violations. */
   validate?(
     assignments: ResolvedShiftAssignment[],
     reporter: ValidationReporter,
@@ -69,7 +78,9 @@ export interface CompilationResult {
  * ```
  */
 export interface ModelBuilderConfig extends ModelBuilderOptions {
+  /** Team members available for scheduling. */
   employees: SchedulingEmployee[];
+  /** Available shift patterns (time slots) that employees can be assigned to. */
   shiftPatterns: ShiftPattern[];
   /**
    * Defines when scheduling should occur as a date range with optional

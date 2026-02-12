@@ -3,7 +3,7 @@
  *
  * Provides helpers for integration testing against a CP-SAT solver.
  * The solver implementation is injectable via the SolverClient interface
- * from the main package — bring your own Docker container, hosted service, or mock.
+ * from the main package. Bring your own Docker container, hosted service, or mock.
  *
  * @packageDocumentation
  */

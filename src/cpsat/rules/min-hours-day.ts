@@ -17,11 +17,20 @@ const MinHoursDaySchema = withScopes(
   { entities: ["employees", "roles", "skills"], times: [] },
 );
 
+/**
+ * Configuration for {@link createMinHoursDayRule}.
+ *
+ * - `hours` (required): minimum hours required per day when scheduled
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ */
 export type MinHoursDayConfig = z.infer<typeof MinHoursDaySchema>;
 
 /**
  * Ensures a person works at least a minimum number of hours per day.
  *
+ * @param config - See {@link MinHoursDayConfig}
  * @example
  * ```ts
  * const rule = createMinHoursDayRule({
