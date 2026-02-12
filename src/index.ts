@@ -1,7 +1,7 @@
 /**
  * Scheduling library powered by constraint programming (CP-SAT).
  *
- * Define teams, shifts, coverage, and rules — dabke turns them
+ * Define teams, shifts, coverage, and rules. dabke turns them
  * into an optimized schedule.
  *
  * @remarks
@@ -176,6 +176,7 @@ export {
   createTimeOffRule,
 } from "./cpsat/rules/index.js";
 
+export type { ScopeConfig } from "./cpsat/rules/scoping.js";
 export type { AssignTogetherConfig } from "./cpsat/rules/assign-together.js";
 export type { EmployeeAssignmentPriorityConfig } from "./cpsat/rules/employee-assignment-priority.js";
 export type { LocationPreferenceConfig } from "./cpsat/rules/location-preference.js";

@@ -2,11 +2,26 @@ import type { TimeOfDay, DayOfWeek } from "../types.js";
 import type { SolverRequest, SolverTerm } from "../client.types.js";
 import type { GroupKey } from "./validation.types.js";
 
+/**
+ * How strictly the solver enforces a rule.
+ *
+ * - `"LOW"`, `"MEDIUM"`, `"HIGH"`: soft constraints with increasing penalty for violations
+ * - `"MANDATORY"`: hard constraint; the solver will not produce a solution that violates it
+ */
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 
+/**
+ * A team member available for scheduling.
+ *
+ * Employees are assigned to shift patterns by the solver based on
+ * coverage requirements, rules, and constraints.
+ */
 export interface SchedulingEmployee {
+  /** Unique identifier for this employee. Must not contain colons. */
   id: string;
+  /** Roles this employee can fill (e.g. "waiter", "chef"). */
   roleIds: string[];
+  /** Skills this employee has (e.g. "senior", "trainer"). */
   skillIds?: string[];
 }
 
@@ -16,7 +31,7 @@ export interface SchedulingEmployee {
 export type Employee = SchedulingEmployee;
 
 /**
- * A shift pattern defines WHEN people can work — the time slots available for assignment.
+ * A shift pattern defines WHEN people can work: the time slots available for assignment.
  *
  * Shift patterns are templates that repeat across all scheduling days. The solver assigns
  * team members to these patterns based on coverage requirements and constraints.
@@ -76,10 +91,10 @@ export interface ShiftPattern {
    */
   locationId?: string;
 
-  /** When the shift starts (e.g., { hours: 9, minutes: 0 } for 9:00 AM) */
+  /** When the shift starts (e.g., `{ hours: 9, minutes: 0 }` for 9:00 AM) */
   startTime: TimeOfDay;
 
-  /** When the shift ends (e.g., { hours: 17, minutes: 30 } for 5:30 PM) */
+  /** When the shift ends (e.g., `{ hours: 17, minutes: 30 }` for 5:30 PM) */
   endTime: TimeOfDay;
 }
 
@@ -168,8 +183,11 @@ interface SkillBasedCoverageRequirement extends CoverageRequirementBase {
  */
 export type CoverageRequirement = RoleBasedCoverageRequirement | SkillBasedCoverageRequirement;
 
+/** Optional settings for the model builder. */
 export interface ModelBuilderOptions {
+  /** Which day starts the week for weekly rules. Defaults to "monday". */
   weekStartsOn?: DayOfWeek;
+  /** Solver-level options (time limit, solution limit). */
   solverOptions?: SolverRequest["options"];
   /**
    * Bucket size used when translating coverage requirements into time-indexed constraints.
@@ -184,9 +202,7 @@ export interface ModelBuilderOptions {
    * works between floor(total/n) and ceil(total/n) shifts.
    *
    * Disable this if you want other rules (like employee-assignment-priority)
-   * to have full control over shift distribution.
-   *
-   * @default true
+   * to have full control over shift distribution. Defaults to true.
    */
   fairDistribution?: boolean;
 }

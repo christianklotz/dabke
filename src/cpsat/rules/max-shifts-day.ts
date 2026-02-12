@@ -21,6 +21,14 @@ const MaxShiftsDaySchema = withScopes(
   },
 );
 
+/**
+ * Configuration for {@link createMaxShiftsDayRule}.
+ *
+ * - `shifts` (required): maximum number of shifts per day (at least 1)
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+ */
 export type MaxShiftsDayConfig = z.infer<typeof MaxShiftsDaySchema>;
 
 /**
@@ -32,6 +40,7 @@ export type MaxShiftsDayConfig = z.infer<typeof MaxShiftsDaySchema>;
  * Supports entity scoping (people, roles, skills) and time scoping
  * (date ranges, specific dates, days of week, recurring periods).
  *
+ * @param config - See {@link MaxShiftsDayConfig}
  * @example Limit to one shift per day (common for most schedules)
  * ```ts
  * createMaxShiftsDayRule({

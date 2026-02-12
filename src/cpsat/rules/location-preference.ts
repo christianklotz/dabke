@@ -17,6 +17,14 @@ const LocationPreferenceSchema = withScopes(
   { entities: ["employees", "roles", "skills"], times: [] },
 );
 
+/**
+ * Configuration for {@link createLocationPreferenceRule}.
+ *
+ * - `locationId` (required): the location ID to prefer for matching shift patterns
+ * - `priority` (required): how strongly to prefer this location
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ */
 export type LocationPreferenceConfig = z.infer<typeof LocationPreferenceSchema>;
 
 const PRIORITY_WEIGHTS: Record<Priority, number> = {
@@ -29,6 +37,7 @@ const PRIORITY_WEIGHTS: Record<Priority, number> = {
 /**
  * Prefers assigning a person to shift patterns matching a specific location.
  *
+ * @param config - See {@link LocationPreferenceConfig}
  * @example
  * ```ts
  * const rule = createLocationPreferenceRule({

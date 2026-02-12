@@ -29,13 +29,32 @@ export interface RuleScope {
   time?: TimeScope;
 }
 
+/**
+ * Fields for scoping a rule to specific people and time periods.
+ *
+ * Entity scoping narrows which people a rule applies to.
+ * Only one entity scope is allowed per rule (mutually exclusive).
+ *
+ * Time scoping narrows which dates within the schedule the rule covers.
+ * Only one time scope is allowed per rule (mutually exclusive).
+ *
+ * When no scope is specified, the rule applies globally to all people
+ * and all dates in the schedule.
+ */
 export interface ScopeConfig {
+  /** Restrict to specific employees by ID. */
   employeeIds?: string[];
+  /** Restrict to employees with any of these roles. */
   roleIds?: string[];
+  /** Restrict to employees with any of these skills. */
   skillIds?: string[];
+  /** Restrict to a contiguous date range (ISO 8601 date strings). */
   dateRange?: { start: string; end: string };
+  /** Restrict to specific dates (ISO 8601 date strings). */
   specificDates?: string[];
+  /** Restrict to specific days of the week. */
   dayOfWeek?: DayOfWeek[];
+  /** Restrict to recurring calendar periods (e.g. semesters, seasons). */
   recurringPeriods?: {
     name: string;
     startMonth: number;

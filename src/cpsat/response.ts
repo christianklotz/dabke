@@ -2,12 +2,13 @@ import type { SolverResponse } from "../client.types.js";
 import type { ShiftPattern } from "./types.js";
 import type { TimeOfDay } from "../types.js";
 
-/**
- * A shift assignment extracted from the solver response.
- */
+/** A raw assignment from the solver: which employee works which shift on which day. */
 export interface ShiftAssignment {
+  /** The assigned employee's ID. */
   employeeId: string;
+  /** The shift pattern this employee is assigned to. */
   shiftPatternId: string;
+  /** The date of the assignment (YYYY-MM-DD). */
   day: string;
 }
 
@@ -15,9 +16,13 @@ export interface ShiftAssignment {
  * A shift assignment with resolved times.
  */
 export interface ResolvedShiftAssignment {
+  /** The assigned employee's ID. */
   employeeId: string;
+  /** The date of the assignment (YYYY-MM-DD). */
   day: string;
+  /** When the shift starts. */
   startTime: TimeOfDay;
+  /** When the shift ends. */
   endTime: TimeOfDay;
 }
 
@@ -25,9 +30,13 @@ export interface ResolvedShiftAssignment {
  * Parsed solver result with assignments and metadata.
  */
 export interface SolverResult {
+  /** The solver outcome: OPTIMAL, FEASIBLE, INFEASIBLE, TIMEOUT, or ERROR. */
   status: SolverResponse["status"];
+  /** The shift assignments extracted from the solution. */
   assignments: ShiftAssignment[];
+  /** Solver performance statistics (branches, conflicts, solve time). */
   statistics?: SolverResponse["statistics"];
+  /** Error message if the solver returned an error status. */
   error?: string;
 }
 

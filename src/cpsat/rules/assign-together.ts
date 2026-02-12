@@ -17,12 +17,19 @@ const AssignTogetherSchema = z.object({
   ]),
 });
 
+/**
+ * Configuration for {@link createAssignTogetherRule}.
+ *
+ * - `groupEmployeeIds` (required): employee IDs to assign together (at least two, must be unique)
+ * - `priority` (required): how strictly the solver enforces this rule
+ */
 export type AssignTogetherConfig = z.infer<typeof AssignTogetherSchema>;
 
 /**
  * Encourages or enforces that team members in the group work the same shift patterns on a day.
  * For each pair of team members in the group, ensures they are assigned to the same shifts.
  *
+ * @param config - See {@link AssignTogetherConfig}
  * @example
  * ```ts
  * const rule = createAssignTogetherRule({

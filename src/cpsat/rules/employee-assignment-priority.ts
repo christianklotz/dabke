@@ -14,6 +14,13 @@ const EmployeeAssignmentPrioritySchema = withScopes(
   },
 );
 
+/**
+ * Configuration for {@link createEmployeeAssignmentPriorityRule}.
+ *
+ * - `preference` (required): `"high"` to prefer assigning or `"low"` to avoid assigning
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+ */
 export type EmployeeAssignmentPriorityConfig = z.infer<typeof EmployeeAssignmentPrioritySchema>;
 
 /**
@@ -22,6 +29,7 @@ export type EmployeeAssignmentPriorityConfig = z.infer<typeof EmployeeAssignment
  * Supports entity scoping (people, roles, skills) and time scoping
  * (date ranges, specific dates, days of week, recurring periods).
  *
+ * @param config - See {@link EmployeeAssignmentPriorityConfig}
  * @example Prefer specific team members
  * ```ts
  * createEmployeeAssignmentPriorityRule({

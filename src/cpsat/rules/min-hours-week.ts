@@ -20,11 +20,21 @@ const MinHoursWeekSchema = withScopes(
   { entities: ["employees", "roles", "skills"], times: [] },
 );
 
+/**
+ * Configuration for {@link createMinHoursWeekRule}.
+ *
+ * - `hours` (required): minimum hours required per scheduling week
+ * - `priority` (required): how strictly the solver enforces this rule
+ * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ */
 export type MinHoursWeekConfig = z.infer<typeof MinHoursWeekSchema>;
 
 /**
  * Enforces a minimum total number of hours per scheduling week.
  *
+ * @param config - See {@link MinHoursWeekConfig}
  * @example
  * ```ts
  * const rule = createMinHoursWeekRule({

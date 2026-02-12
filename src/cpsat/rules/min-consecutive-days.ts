@@ -16,12 +16,21 @@ const MinConsecutiveDaysSchema = withScopes(
   { entities: ["employees", "roles", "skills"], times: [] },
 );
 
+/**
+ * Configuration for {@link createMinConsecutiveDaysRule}.
+ *
+ * - `days` (required): minimum consecutive days required once a person starts working
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ */
 export type MinConsecutiveDaysConfig = z.infer<typeof MinConsecutiveDaysSchema>;
 
 /**
  * Requires that once a person starts working, they continue for a minimum
  * number of consecutive days.
  *
+ * @param config - See {@link MinConsecutiveDaysConfig}
  * @example
  * ```ts
  * const rule = createMinConsecutiveDaysRule({

@@ -16,11 +16,20 @@ const MaxConsecutiveDaysSchema = withScopes(
   { entities: ["employees", "roles", "skills"], times: [] },
 );
 
+/**
+ * Configuration for {@link createMaxConsecutiveDaysRule}.
+ *
+ * - `days` (required): maximum consecutive days allowed
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ */
 export type MaxConsecutiveDaysConfig = z.infer<typeof MaxConsecutiveDaysSchema>;
 
 /**
  * Limits how many consecutive days a person can be assigned.
  *
+ * @param config - See {@link MaxConsecutiveDaysConfig}
  * @example
  * ```ts
  * const rule = createMaxConsecutiveDaysRule({

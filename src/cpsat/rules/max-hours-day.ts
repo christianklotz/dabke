@@ -21,6 +21,14 @@ const MaxHoursDaySchema = withScopes(
   },
 );
 
+/**
+ * Configuration for {@link createMaxHoursDayRule}.
+ *
+ * - `hours` (required): maximum hours allowed per day
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+ */
 export type MaxHoursDayConfig = z.infer<typeof MaxHoursDaySchema>;
 
 /**
@@ -29,6 +37,7 @@ export type MaxHoursDayConfig = z.infer<typeof MaxHoursDaySchema>;
  * Supports entity scoping (people, roles, skills) and time scoping
  * (date ranges, specific dates, days of week, recurring periods).
  *
+ * @param config - See {@link MaxHoursDayConfig}
  * @example Limit everyone to 8 hours per day
  * ```ts
  * createMaxHoursDayRule({
