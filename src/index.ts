@@ -176,7 +176,14 @@ export {
   createTimeOffRule,
 } from "./cpsat/rules/index.js";
 
-export type { ScopeConfig } from "./cpsat/rules/scoping.js";
+export type {
+  EntityScopeType,
+  OptionalTimeScopeType,
+  RequiredTimeScopeType,
+  ParsedEntityScope,
+  ParsedTimeScope,
+  RecurringPeriod,
+} from "./cpsat/rules/scope.types.js";
 export type { AssignTogetherConfig } from "./cpsat/rules/assign-together.js";
 export type { EmployeeAssignmentPriorityConfig } from "./cpsat/rules/employee-assignment-priority.js";
 export type { LocationPreferenceConfig } from "./cpsat/rules/location-preference.js";

@@ -79,6 +79,9 @@ class TSDocExtractor {
     const statements = indexSource.statements;
     if (statements.length > 0) {
       const firstStatement = statements[0];
+      if (!firstStatement) {
+        return;
+      }
       const jsDoc = ts.getJSDocCommentsAndTags(firstStatement);
       for (const comment of jsDoc) {
         if (ts.isJSDoc(comment)) {
@@ -309,34 +312,35 @@ class TSDocExtractor {
     if (jsDoc.length === 0) return "";
 
     const comment = jsDoc[0];
-    if (ts.isJSDoc(comment)) {
-      let result = comment.comment ? ts.getTextOfJSDocComment(comment.comment) || "" : "";
-
-      // Extract @remarks tag
-      const remarksTags = comment.tags?.filter((tag) => tag.tagName.text === "remarks");
-      if (remarksTags && remarksTags.length > 0) {
-        remarksTags.forEach((tag) => {
-          const remarksText = tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "";
-          if (remarksText) {
-            result += `\n\n${remarksText}`;
-          }
-        });
-      }
-
-      // Extract @example tag
-      const exampleTags = comment.tags?.filter((tag) => tag.tagName.text === "example");
-      if (exampleTags && exampleTags.length > 0) {
-        exampleTags.forEach((tag) => {
-          const exampleText = tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "";
-          if (exampleText) {
-            result += `\n\n**Example:**\n${exampleText}`;
-          }
-        });
-      }
-
-      return result;
+    if (!comment || !ts.isJSDoc(comment)) {
+      return "";
     }
-    return "";
+
+    let result = comment.comment ? ts.getTextOfJSDocComment(comment.comment) || "" : "";
+
+    // Extract @remarks tag
+    const remarksTags = comment.tags?.filter((tag) => tag.tagName.text === "remarks");
+    if (remarksTags && remarksTags.length > 0) {
+      remarksTags.forEach((tag) => {
+        const remarksText = tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "";
+        if (remarksText) {
+          result += `\n\n${remarksText}`;
+        }
+      });
+    }
+
+    // Extract @example tag
+    const exampleTags = comment.tags?.filter((tag) => tag.tagName.text === "example");
+    if (exampleTags && exampleTags.length > 0) {
+      exampleTags.forEach((tag) => {
+        const exampleText = tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "";
+        if (exampleText) {
+          result += `\n\n**Example:**\n${exampleText}`;
+        }
+      });
+    }
+
+    return result;
   }
 
   private getTypeString(node: ts.Node, maxLength: number = 2000): string {
@@ -590,6 +594,9 @@ class TSDocExtractor {
     const statements = sourceFile.statements;
     if (statements.length > 0) {
       const firstStatement = statements[0];
+      if (!firstStatement) {
+        return "";
+      }
       const jsDoc = ts.getJSDocCommentsAndTags(firstStatement);
       for (const comment of jsDoc) {
         if (ts.isJSDoc(comment)) {
@@ -803,8 +810,8 @@ function generateDocsSection(docs: ExtractedDoc[]): string {
   // Group by type
   const grouped = docs.reduce(
     (acc, doc) => {
-      if (!acc[doc.type]) acc[doc.type] = [];
-      acc[doc.type].push(doc);
+      const bucket = acc[doc.type] ?? (acc[doc.type] = []);
+      bucket.push(doc);
       return acc;
     },
     {} as Record<string, ExtractedDoc[]>,

@@ -1,12 +1,10 @@
 import type { SchedulingEmployee } from "../types.js";
 import {
-  normalizeScope,
-  specificity,
-  subtractIds,
-  timeScopeKey,
-  type EntityScope,
-  type RuleScope,
-} from "./scoping.js";
+  parseEntityScope,
+  parseTimeScope,
+  type ParsedEntityScope,
+  type ParsedTimeScope,
+} from "./scope.types.js";
 import { builtInCpsatRuleFactories } from "./registry.js";
 import type {
   CpsatRuleConfigEntry,
@@ -25,7 +23,8 @@ type InternalEntry = {
   index: number;
   name: CpsatRuleName;
   config: CpsatRuleRegistry[CpsatRuleName];
-  scope: RuleScope;
+  entityScope: ParsedEntityScope;
+  timeScope: ParsedTimeScope;
 };
 
 /**
@@ -33,30 +32,64 @@ type InternalEntry = {
  * All scope types are expanded to concrete IDs.
  */
 export function getEmployeeIdsForScope(
-  entity: EntityScope,
+  entity: ParsedEntityScope,
   employees: SchedulingEmployee[],
 ): string[] {
   switch (entity.type) {
-    case "employees":
-      // Filter to only IDs that exist in the team
+    case "employees": {
       const validIds = new Set(employees.map((e) => e.id));
       return entity.employeeIds.filter((id) => validIds.has(id));
-
+    }
     case "roles":
-      // Find team members that have any of the specified roles
       return employees
         .filter((e) => e.roleIds.some((r) => entity.roleIds.includes(r)))
         .map((e) => e.id);
-
     case "skills":
-      // Find team members that have any of the specified skills
       return employees
         .filter((e) => e.skillIds?.some((s) => entity.skillIds.includes(s)))
         .map((e) => e.id);
-
     case "global":
     default:
       return employees.map((e) => e.id);
+  }
+}
+
+/** Specificity ranking for entity scopes (higher = more specific). */
+function specificity(entity: ParsedEntityScope): number {
+  switch (entity.type) {
+    case "employees":
+      return 4;
+    case "roles":
+      return 3;
+    case "skills":
+      return 2;
+    case "global":
+    default:
+      return 1;
+  }
+}
+
+/** Filter out IDs already claimed by more specific scopes. */
+function subtractIds(ids: string[], assigned: Set<string>): string[] {
+  return ids.filter((id) => !assigned.has(id));
+}
+
+/**
+ * Creates a stable key for a time scope to use in grouping.
+ * Rules with different time scope keys don't compete for deduplication.
+ */
+function timeScopeKey(time: ParsedTimeScope): string {
+  switch (time.type) {
+    case "none":
+      return "always";
+    case "dateRange":
+      return `dateRange:${time.start}:${time.end}`;
+    case "specificDates":
+      return `specificDates:${[...time.dates].toSorted().join(",")}`;
+    case "dayOfWeek":
+      return `dayOfWeek:${[...time.days].toSorted().join(",")}`;
+    case "recurring":
+      return `recurring:${time.periods.map((p) => `${p.startMonth}-${p.startDay}:${p.endMonth}-${p.endDay}`).join(";")}`;
   }
 }
 
@@ -83,10 +116,8 @@ export function resolveRuleScopes(
   const resolved: ResolvedRuleConfigEntry[] = [];
   const scopedEntries: Array<{ entry: CpsatRuleConfigEntry; index: number }> = [];
 
-  // Separate rules that use scoping from those that don't
   entries.forEach((entry, index) => {
     if (NON_SCOPED_RULES.has(entry.name)) {
-      // Pass through unchanged
       resolved.push({ name: entry.name, config: entry.config });
     } else {
       scopedEntries.push({ entry, index });
@@ -97,45 +128,40 @@ export function resolveRuleScopes(
     return resolved;
   }
 
-  // Group scoped entries by (ruleName, timeScopeKey) - different time scopes don't compete
   const grouped = new Map<string, InternalEntry[]>();
   scopedEntries.forEach(({ entry, index }) => {
-    const scope = normalizeScope(entry.config as Parameters<typeof normalizeScope>[0], employees);
-    const timeKey = timeScopeKey(scope.time);
+    const entity = parseEntityScope(entry.config);
+    const time = parseTimeScope(entry.config);
+    const timeKey = timeScopeKey(time);
     const groupKey = `${entry.name}::${timeKey}`;
     const list = grouped.get(groupKey) ?? [];
-    list.push({ index, name: entry.name, config: entry.config, scope });
+    list.push({
+      index,
+      name: entry.name,
+      config: entry.config,
+      entityScope: entity,
+      timeScope: time,
+    });
     grouped.set(groupKey, list);
   });
 
   for (const group of grouped.values()) {
-    // Sort by specificity (descending), then by insertion order (descending, later wins)
     const sorted = group.toSorted((a, b) => {
-      const specA = specificity(a.scope.entity);
-      const specB = specificity(b.scope.entity);
+      const specA = specificity(a.entityScope);
+      const specB = specificity(b.entityScope);
       if (specB !== specA) return specB - specA;
-      // Later insertion wins (higher index first)
       return b.index - a.index;
     });
 
-    // Track assigned IDs - all scope types participate in claiming
     const assignedEmployees = new Set<string>();
 
     for (const entry of sorted) {
-      const { entity } = entry.scope;
-
-      // Get IDs for this scope (expands role/skill to concrete IDs)
-      const targetIds = getEmployeeIdsForScope(entity, employees);
-
-      // Only claim IDs not already assigned to a more specific rule
+      const targetIds = getEmployeeIdsForScope(entry.entityScope, employees);
       const remaining = subtractIds(targetIds, assignedEmployees);
       if (remaining.length === 0) continue;
 
-      // Claim these IDs
       remaining.forEach((id) => assignedEmployees.add(id));
 
-      // Emit resolved config with explicit IDs
-      // Remove roleIds/skillIds since we've expanded them to employeeIds
       const {
         roleIds: _roleIds,
         skillIds: _skillIds,

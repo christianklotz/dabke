@@ -1,20 +1,10 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { withScopes } from "./scoping.js";
+import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
 
-/**
- * Configuration for {@link createMinRestBetweenShiftsRule}.
- *
- * - `hours` (required): minimum rest hours required between consecutive shifts
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Also accepts all fields from {@link ScopeConfig} for entity scoping.
- */
-export type MinRestBetweenShiftsConfig = z.infer<typeof MinRestBetweenShiftsSchema>;
-
-const MinRestBetweenShiftsSchema = withScopes(
-  z.object({
+const MinRestBetweenShiftsSchema = z
+  .object({
     hours: z.number().min(0),
     priority: z.union([
       z.literal("LOW"),
@@ -22,9 +12,18 @@ const MinRestBetweenShiftsSchema = withScopes(
       z.literal("HIGH"),
       z.literal("MANDATORY"),
     ]),
-  }),
-  { entities: ["employees", "roles", "skills"], times: [] },
-);
+  })
+  .and(entityScope(["employees", "roles", "skills"]));
+
+/**
+ * Configuration for {@link createMinRestBetweenShiftsRule}.
+ *
+ * - `hours` (required): minimum rest hours required between consecutive shifts
+ * - `priority` (required): how strictly the solver enforces this rule
+ *
+ * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ */
+export type MinRestBetweenShiftsConfig = z.infer<typeof MinRestBetweenShiftsSchema>;
 
 /**
  * Enforces a minimum rest period between any two shifts a person works.
@@ -32,24 +31,20 @@ const MinRestBetweenShiftsSchema = withScopes(
  * @param config - See {@link MinRestBetweenShiftsConfig}
  * @example
  * ```ts
- * const rule = createMinRestBetweenShiftsRule({
- *   hours: 10,
- *   priority: "MANDATORY",
- * });
- * builder = new ModelBuilder({ ...config, rules: [rule] });
+ * createMinRestBetweenShiftsRule({ hours: 10, priority: "MANDATORY" });
  * ```
  */
 export function createMinRestBetweenShiftsRule(
   config: MinRestBetweenShiftsConfig,
 ): CompilationRule {
-  const { hours, priority, employeeIds } = MinRestBetweenShiftsSchema.parse(config);
+  const parsed = MinRestBetweenShiftsSchema.parse(config);
+  const scope = parseEntityScope(parsed);
+  const { hours, priority } = parsed;
   const minMinutes = hours * 60;
 
   return {
     compile(b) {
-      const employees = employeeIds
-        ? b.employees.filter((e) => employeeIds.includes(e.id))
-        : b.employees;
+      const employees = resolveEmployeesFromScope(scope, b.employees);
 
       for (const emp of employees) {
         for (let i = 0; i < b.days.length; i++) {

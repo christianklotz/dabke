@@ -463,12 +463,13 @@ describe("CP-SAT: time-off rule", () => {
         solveWithRules(client, baseConfig, [
           {
             name: "time-off",
+            // @ts-expect-error: deliberately missing time scope to test runtime validation
             config: {
               employeeIds: ["alice"],
               priority: "MANDATORY",
             },
           },
-        ] as CpsatRuleConfigEntry[]),
+        ]),
       ).rejects.toThrow(/Must provide time scoping/i);
     });
 

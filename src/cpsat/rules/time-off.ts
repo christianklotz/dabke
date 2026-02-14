@@ -2,37 +2,37 @@ import * as z from "zod";
 import type { TimeOfDay } from "../../types.js";
 import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
 import type { ResolvedShiftAssignment } from "../response.js";
-import type { SchedulingEmployee } from "../types.js";
-import {
-  normalizeEndMinutes,
-  parseDayString,
-  priorityToPenalty,
-  timeOfDayToMinutes,
-} from "../utils.js";
+import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
 import type { ValidationReporter } from "../validation-reporter.js";
-import { normalizeScope, withScopes, type RuleScope } from "./scoping.js";
+import {
+  entityScope,
+  requiredTimeScope,
+  parseEntityScope,
+  parseTimeScope,
+  resolveEmployeesFromScope,
+  resolveActiveDaysFromScope,
+} from "./scope.types.js";
 
 const timeOfDaySchema = z.object({
   hours: z.number().int().min(0).max(23),
   minutes: z.number().int().min(0).max(59),
 });
 
-const TimeOffSchema = withScopes(
-  z.object({
-    priority: z.union([
-      z.literal("LOW"),
-      z.literal("MEDIUM"),
-      z.literal("HIGH"),
-      z.literal("MANDATORY"),
-    ]),
+const PrioritySchema = z.union([
+  z.literal("LOW"),
+  z.literal("MEDIUM"),
+  z.literal("HIGH"),
+  z.literal("MANDATORY"),
+]);
+
+const TimeOffSchema = z
+  .object({
+    priority: PrioritySchema,
     startTime: timeOfDaySchema.optional(),
     endTime: timeOfDaySchema.optional(),
-  }),
-  {
-    entities: ["employees", "roles", "skills"],
-    times: ["dateRange", "specificDates", "dayOfWeek", "recurring"],
-  },
-)
+  })
+  .and(entityScope(["employees", "roles", "skills"]))
+  .and(requiredTimeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]))
   .refine(
     (config) => {
       const hasStartTime = config.startTime !== undefined;
@@ -41,20 +41,6 @@ const TimeOffSchema = withScopes(
     },
     {
       message: "Both startTime and endTime must be provided together for partial day time-off",
-    },
-  )
-  .refine(
-    (config) => {
-      return !!(
-        config.dateRange ||
-        (config.specificDates && config.specificDates.length > 0) ||
-        (config.dayOfWeek && config.dayOfWeek.length > 0) ||
-        (config.recurringPeriods && config.recurringPeriods.length > 0)
-      );
-    },
-    {
-      message:
-        "Must provide time scoping (dateRange, specificDates, dayOfWeek, or recurringPeriods)",
     },
   );
 
@@ -65,7 +51,16 @@ const TimeOffSchema = withScopes(
  * - `startTime` (optional): start of the time-off window within each day; must be paired with `endTime`
  * - `endTime` (optional): end of the time-off window within each day; must be paired with `startTime`
  *
- * Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+ * Entity scoping (at most one):
+ * - `employeeIds`: restrict to specific employees
+ * - `roleIds`: restrict to employees with matching roles
+ * - `skillIds`: restrict to employees with matching skills
+ *
+ * Time scoping (exactly one required):
+ * - `dateRange`: contiguous date range
+ * - `specificDates`: specific dates
+ * - `dayOfWeek`: days of the week
+ * - `recurringPeriods`: recurring calendar periods
  */
 export type TimeOffConfig = z.infer<typeof TimeOffSchema>;
 
@@ -117,13 +112,15 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
   const timeWindowStart = startTime ?? fullDayStart;
   const timeWindowEnd = endTime ?? fullDayEnd;
 
+  const entityScopeValue = parseEntityScope(parsed);
+  const timeScopeValue = parseTimeScope(parsed);
+
   return {
     compile(builder) {
-      const scope = normalizeScope(parsed, builder.employees);
-      const targetEmployees = resolveEmployees(scope, builder.employees);
+      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, builder.employees);
       if (targetEmployees.length === 0) return;
 
-      const activeDays = resolveActiveDays(scope, builder.days);
+      const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
       if (activeDays.length === 0) return;
 
       for (const emp of targetEmployees) {
@@ -173,15 +170,12 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
       // MANDATORY time-off is a hard constraint - can't be violated
       if (priority === "MANDATORY") return;
 
-      // Re-resolve scoping using context
-      const scope = normalizeScope(parsed, context.employees);
-      const targetEmployees = resolveEmployees(scope, context.employees);
+      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, context.employees);
       if (targetEmployees.length === 0) return;
 
-      const activeDays = resolveActiveDays(scope, context.days);
+      const activeDays = resolveActiveDaysFromScope(timeScopeValue, context.days);
       if (activeDays.length === 0) return;
 
-      // Check each employee/day combination
       for (const emp of targetEmployees) {
         for (const day of activeDays) {
           const violated = assignments.some(
@@ -214,107 +208,6 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
       }
     },
   };
-}
-
-function resolveEmployees(scope: RuleScope, employees: SchedulingEmployee[]): SchedulingEmployee[] {
-  const entity = scope.entity;
-  switch (entity.type) {
-    case "employees":
-      return employees.filter((e) => entity.employeeIds.includes(e.id));
-    case "roles":
-      return employees.filter((e) => e.roleIds.some((r) => entity.roleIds.includes(r)));
-    case "skills":
-      return employees.filter((e) => e.skillIds?.some((s) => entity.skillIds.includes(s)));
-    case "global":
-    default:
-      return employees;
-  }
-}
-
-function resolveActiveDays(scope: RuleScope, allDays: string[]): string[] {
-  const timeScope = scope.time;
-
-  if (!timeScope) {
-    return allDays;
-  }
-
-  switch (timeScope.type) {
-    case "always":
-      return allDays;
-
-    case "dateRange": {
-      const start = timeScope.start;
-      const end = timeScope.end;
-      return allDays.filter((day) => day >= start && day <= end);
-    }
-
-    case "specificDates":
-      return allDays.filter((day) => timeScope.dates.includes(day));
-
-    case "dayOfWeek": {
-      const targetDays = new Set(timeScope.days);
-      return allDays.filter((day) => {
-        const date = parseDayString(day);
-        const dayName = getDayOfWeekName(date.getUTCDay());
-        return targetDays.has(dayName);
-      });
-    }
-
-    case "recurring": {
-      return allDays.filter((day) => {
-        const date = parseDayString(day);
-        const month = date.getUTCMonth() + 1;
-        const dayOfMonth = date.getUTCDate();
-
-        return timeScope.periods.some((period) =>
-          isDateInRecurringPeriod(month, dayOfMonth, period),
-        );
-      });
-    }
-
-    default:
-      return allDays;
-  }
-}
-
-type DayName = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
-
-function getDayOfWeekName(dayIndex: number): DayName {
-  const names: Record<number, DayName> = {
-    0: "sunday",
-    1: "monday",
-    2: "tuesday",
-    3: "wednesday",
-    4: "thursday",
-    5: "friday",
-    6: "saturday",
-  };
-  return names[dayIndex % 7] ?? "sunday";
-}
-
-function isDateInRecurringPeriod(
-  month: number,
-  dayOfMonth: number,
-  period: {
-    startMonth: number;
-    startDay: number;
-    endMonth: number;
-    endDay: number;
-  },
-): boolean {
-  const { startMonth, startDay, endMonth, endDay } = period;
-
-  if (startMonth <= endMonth) {
-    if (month < startMonth || month > endMonth) return false;
-    if (month === startMonth && dayOfMonth < startDay) return false;
-    if (month === endMonth && dayOfMonth > endDay) return false;
-    return true;
-  } else {
-    if (month > endMonth && month < startMonth) return false;
-    if (month === startMonth && dayOfMonth < startDay) return false;
-    if (month === endMonth && dayOfMonth > endDay) return false;
-    return true;
-  }
 }
 
 function shiftOverlapsTimeWindow(
