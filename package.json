@@ -1,6 +1,6 @@
 {
   "name": "dabke",
-  "version": "0.79.0",
+  "version": "0.80.0",
   "description": "Scheduling library powered by constraint programming (CP-SAT)",
   "keywords": [
     "constraint-programming",

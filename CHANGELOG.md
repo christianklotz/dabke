@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.80.0 (2026-02-14)
+
+### Breaking Changes
+
+- Overhaul rule scoping types: replace `withScopes()` / `normalizeScope()` with
+  `entityScope()`, `timeScope()`, and `requiredTimeScope()` builder functions
+- Remove exported types `EntityScope`, `TimeScope`, `RuleScope`, `ScopeConfig`
+  and functions `withScopes`, `normalizeScope`, `specificity`, `effectiveEmployeeIds`,
+  `subtractIds`, `timeScopeKey`, `entityScopeTypeKey`
+- Scope fields (`employeeIds`, `roleIds`, `skillIds`, `specificDates`, `dayOfWeek`,
+  `recurringPeriods`) now require non-empty arrays; empty arrays are rejected at parse time
+- Enforce mutual exclusivity of scope fields at compile time via `?: never` pattern
+
+### Improvements
+
+- Export `SolverStatusSchema` from main entry point
+- Export new scoping types: `EntityScopeType`, `OptionalTimeScopeType`,
+  `RequiredTimeScopeType`, `ParsedEntityScope`, `ParsedTimeScope`, `RecurringPeriod`
+- Add TSDoc to all solver wire types, rule config types, and model builder interfaces
+
 ## 0.79.0 (2026-02-10)
 
 ### Breaking Changes
