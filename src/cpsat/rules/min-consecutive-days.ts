@@ -1,10 +1,10 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { withScopes } from "./scoping.js";
+import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
 
-const MinConsecutiveDaysSchema = withScopes(
-  z.object({
+const MinConsecutiveDaysSchema = z
+  .object({
     days: z.number().min(0),
     priority: z.union([
       z.literal("LOW"),
@@ -12,9 +12,8 @@ const MinConsecutiveDaysSchema = withScopes(
       z.literal("HIGH"),
       z.literal("MANDATORY"),
     ]),
-  }),
-  { entities: ["employees", "roles", "skills"], times: [] },
-);
+  })
+  .and(entityScope(["employees", "roles", "skills"]));
 
 /**
  * Configuration for {@link createMinConsecutiveDaysRule}.
@@ -22,7 +21,7 @@ const MinConsecutiveDaysSchema = withScopes(
  * - `days` (required): minimum consecutive days required once a person starts working
  * - `priority` (required): how strictly the solver enforces this rule
  *
- * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
  */
 export type MinConsecutiveDaysConfig = z.infer<typeof MinConsecutiveDaysSchema>;
 
@@ -33,23 +32,19 @@ export type MinConsecutiveDaysConfig = z.infer<typeof MinConsecutiveDaysSchema>;
  * @param config - See {@link MinConsecutiveDaysConfig}
  * @example
  * ```ts
- * const rule = createMinConsecutiveDaysRule({
- *   days: 3,
- *   priority: "MANDATORY",
- * });
- * builder = new ModelBuilder({ ...config, rules: [rule] });
+ * createMinConsecutiveDaysRule({ days: 3, priority: "MANDATORY" });
  * ```
  */
 export function createMinConsecutiveDaysRule(config: MinConsecutiveDaysConfig): CompilationRule {
-  const { days, priority, employeeIds } = MinConsecutiveDaysSchema.parse(config);
+  const parsed = MinConsecutiveDaysSchema.parse(config);
+  const scope = parseEntityScope(parsed);
+  const { days, priority } = parsed;
 
   return {
     compile(b) {
       if (days <= 1) return;
 
-      const employees = employeeIds
-        ? b.employees.filter((e) => employeeIds.includes(e.id))
-        : b.employees;
+      const employees = resolveEmployeesFromScope(scope, b.employees);
 
       for (const emp of employees) {
         const worksByDay: string[] = [];

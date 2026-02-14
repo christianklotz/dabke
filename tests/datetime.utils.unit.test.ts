@@ -5,7 +5,7 @@ import {
   resolveDaysFromPeriod,
   splitPeriodIntoDays,
   splitPeriodIntoWeeks,
-} from "../src/datetime.utils";
+} from "../src/datetime.utils.js";
 
 describe("splitPeriodIntoDays", () => {
   it("should split a 3-day period into daily ranges", () => {

@@ -3,22 +3,20 @@ import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
-import { withScopes } from "./scoping.js";
+import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
 
-const MinHoursWeekSchema = withScopes(
-  z.object({
-    hours: z.number().min(0),
-    priority: z.union([
-      z.literal("LOW"),
-      z.literal("MEDIUM"),
-      z.literal("HIGH"),
-      z.literal("MANDATORY"),
-    ]),
-    // Optional override; defaults to ModelBuilder.weekStartsOn
-    weekStartsOn: DayOfWeekSchema.optional(),
-  }),
-  { entities: ["employees", "roles", "skills"], times: [] },
-);
+const MinHoursWeekBase = z.object({
+  hours: z.number().min(0),
+  priority: z.union([
+    z.literal("LOW"),
+    z.literal("MEDIUM"),
+    z.literal("HIGH"),
+    z.literal("MANDATORY"),
+  ]),
+  weekStartsOn: DayOfWeekSchema.optional(),
+});
+
+const MinHoursWeekSchema = MinHoursWeekBase.and(entityScope(["employees", "roles", "skills"]));
 
 /**
  * Configuration for {@link createMinHoursWeekRule}.
@@ -27,7 +25,7 @@ const MinHoursWeekSchema = withScopes(
  * - `priority` (required): how strictly the solver enforces this rule
  * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
  *
- * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
  */
 export type MinHoursWeekConfig = z.infer<typeof MinHoursWeekSchema>;
 
@@ -37,27 +35,21 @@ export type MinHoursWeekConfig = z.infer<typeof MinHoursWeekSchema>;
  * @param config - See {@link MinHoursWeekConfig}
  * @example
  * ```ts
- * const rule = createMinHoursWeekRule({
- *   hours: 30,
- *   priority: "HIGH",
- * });
- * builder = new ModelBuilder({ ...config, rules: [rule] });
+ * createMinHoursWeekRule({ hours: 30, priority: "HIGH" });
  * ```
  */
 export function createMinHoursWeekRule(config: MinHoursWeekConfig): CompilationRule {
   const parsed = MinHoursWeekSchema.parse(config);
-  const { hours, priority, employeeIds } = parsed;
+  const scope = parseEntityScope(parsed);
+  const { hours, priority, weekStartsOn } = parsed;
   const minMinutes = hours * 60;
 
   return {
     compile(b) {
       if (hours <= 0) return;
 
-      const employees = employeeIds
-        ? b.employees.filter((e) => employeeIds.includes(e.id))
-        : b.employees;
-
-      const weeks = splitIntoWeeks(b.days, parsed.weekStartsOn ?? b.weekStartsOn);
+      const employees = resolveEmployeesFromScope(scope, b.employees);
+      const weeks = splitIntoWeeks(b.days, weekStartsOn ?? b.weekStartsOn);
 
       for (const emp of employees) {
         for (const weekDays of weeks) {

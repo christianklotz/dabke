@@ -241,6 +241,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
 
     it("rejects multiple entity scopes", () => {
       expect(() =>
+        // @ts-expect-error: deliberately passing both employeeIds and roleIds to test runtime validation
         createTimeOffRule({
           employeeIds: ["alice"],
           roleIds: ["student"],

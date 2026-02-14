@@ -1,10 +1,10 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { withScopes } from "./scoping.js";
+import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
 
-const MaxConsecutiveDaysSchema = withScopes(
-  z.object({
+const MaxConsecutiveDaysSchema = z
+  .object({
     days: z.number().min(0),
     priority: z.union([
       z.literal("LOW"),
@@ -12,9 +12,8 @@ const MaxConsecutiveDaysSchema = withScopes(
       z.literal("HIGH"),
       z.literal("MANDATORY"),
     ]),
-  }),
-  { entities: ["employees", "roles", "skills"], times: [] },
-);
+  })
+  .and(entityScope(["employees", "roles", "skills"]));
 
 /**
  * Configuration for {@link createMaxConsecutiveDaysRule}.
@@ -22,7 +21,7 @@ const MaxConsecutiveDaysSchema = withScopes(
  * - `days` (required): maximum consecutive days allowed
  * - `priority` (required): how strictly the solver enforces this rule
  *
- * Also accepts all fields from {@link ScopeConfig} for entity scoping.
+ * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
  */
 export type MaxConsecutiveDaysConfig = z.infer<typeof MaxConsecutiveDaysSchema>;
 
@@ -32,22 +31,18 @@ export type MaxConsecutiveDaysConfig = z.infer<typeof MaxConsecutiveDaysSchema>;
  * @param config - See {@link MaxConsecutiveDaysConfig}
  * @example
  * ```ts
- * const rule = createMaxConsecutiveDaysRule({
- *   days: 5,
- *   priority: "MANDATORY",
- * });
- * builder = new ModelBuilder({ ...config, rules: [rule] });
+ * createMaxConsecutiveDaysRule({ days: 5, priority: "MANDATORY" });
  * ```
  */
 export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): CompilationRule {
-  const { days, priority, employeeIds } = MaxConsecutiveDaysSchema.parse(config);
+  const parsed = MaxConsecutiveDaysSchema.parse(config);
+  const scope = parseEntityScope(parsed);
+  const { days, priority } = parsed;
   const windowSize = days + 1;
 
   return {
     compile(b) {
-      const employees = employeeIds
-        ? b.employees.filter((e) => employeeIds.includes(e.id))
-        : b.employees;
+      const employees = resolveEmployeesFromScope(scope, b.employees);
 
       for (const emp of employees) {
         for (let i = 0; i <= b.days.length - windowSize; i++) {
