@@ -234,41 +234,30 @@ Parsed solver result with assignments and metadata.
 - `statistics?: { solveTimeMs?: number | undefined; conflicts?: number | undefined; branches?: number | undefined; } | undefined` - Solver performance statistics (branches, conflicts, solve time).
 - `error?: string | undefined` - Error message if the solver returned an error status.
 
-### ScopeConfig
-Fields for scoping a rule to specific people and time periods.
-
-Entity scoping narrows which people a rule applies to.
-Only one entity scope is allowed per rule (mutually exclusive).
-
-Time scoping narrows which dates within the schedule the rule covers.
-Only one time scope is allowed per rule (mutually exclusive).
-
-When no scope is specified, the rule applies globally to all people
-and all dates in the schedule.
+### RecurringPeriod
+Recurring calendar period for time scoping.
 
 **Properties:**
-- `employeeIds?: string[] | undefined` - Restrict to specific employees by ID.
-- `roleIds?: string[] | undefined` - Restrict to employees with any of these roles.
-- `skillIds?: string[] | undefined` - Restrict to employees with any of these skills.
-- `dateRange?: { start: string; end: string; } | undefined` - Restrict to a contiguous date range (ISO 8601 date strings).
-- `specificDates?: string[] | undefined` - Restrict to specific dates (ISO 8601 date strings).
-- `dayOfWeek?: DayOfWeek[] | undefined` - Restrict to specific days of the week.
-- `recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined` - Restrict to recurring calendar periods (e.g. semesters, seasons).
+- `name: string`
+- `startMonth: number`
+- `startDay: number`
+- `endMonth: number`
+- `endDay: number`
 
 ### CpsatRuleRegistry
 **Properties:**
 - `"assign-together": { groupEmployeeIds: [string, string, ...string[]]; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; }`
-- `"employee-assignment-priority": { preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
-- `"location-preference": { locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
-- `"max-consecutive-days": { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
-- `"max-hours-day": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
-- `"max-hours-week": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
-- `"max-shifts-day": { shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
-- `"min-consecutive-days": { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
-- `"min-hours-day": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
-- `"min-hours-week": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
-- `"min-rest-between-shifts": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
-- `"time-off": { priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `"employee-assignment-priority": ({ preference: "high" | "low"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
+- `"location-preference": { locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
+- `"max-consecutive-days": { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
+- `"max-hours-day": ({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
+- `"max-hours-week": ({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
+- `"max-shifts-day": ({ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
+- `"min-consecutive-days": { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
+- `"min-hours-day": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
+- `"min-hours-week": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">`
+- `"min-rest-between-shifts": { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
+- `"time-off": ({ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & RequiredTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 ### SemanticTimeDef
 Base definition for a semantic time period.
@@ -542,10 +531,24 @@ Combined validation result for coverage requirements.
 - `skills: SkillValidationResult`
 - `errors: string[]` - Human-readable error messages
 
-### RuleScope
+### EntityScopeInput
+Input shape accepted by {@link parseEntityScope}.
+
 **Properties:**
-- `entity: { type: "global"; } | { type: "employees"; employeeIds: string[]; } | { type: "roles"; roleIds: string[]; } | { type: "skills"; skillIds: string[]; }`
-- `time?: TimeScope | undefined`
+- `employeeIds?: string[] | undefined`
+- `roleIds?: string[] | undefined`
+- `skillIds?: string[] | undefined`
+- `unknown: any`
+
+### TimeScopeInput
+Input shape accepted by {@link parseTimeScope}.
+
+**Properties:**
+- `dateRange?: { start: string; end: string; } | undefined`
+- `specificDates?: string[] | undefined`
+- `dayOfWeek?: DayOfWeek[] | undefined`
+- `recurringPeriods?: RecurringPeriod[] | undefined`
+- `unknown: any`
 
 ## Type Aliases
 
@@ -567,48 +570,98 @@ DateTimeWithUtcOffset | DateTimeWithTimeZone
 
 
 ### SolverRequest
+The full request payload sent to the CP-SAT solver service.
+
+- `variables` (required): all decision variables
+- `constraints` (required): all constraints
+- `objective` (optional): optimization objective
+- `timeoutSeconds` (optional): solver time limit
+
 ```typescript
 { variables: ({ type: "bool"; name: string; } | { type: "int"; name: string; min: number; max: number; } | { type: "interval"; name: string; start: number; end: number; size: number; presenceVar?: string | undefined; })[]; constraints: ({ type: "linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">=" | "=="; rhs: number; } | { type: "soft_linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">="; rhs: number; penalty: number; id?: string | undefined; } | { type: "exactly_one"; vars: string[]; } | { type: "at_most_one"; vars: string[]; } | { type: "implication"; if: string; then: string; } | { type: "bool_or"; vars: string[]; } | { type: "bool_and"; vars: string[]; } | { type: "no_overlap"; intervals: string[]; })[]; objective?: { sense: "minimize" | "maximize"; terms: { var: string; coeff: number; }[]; } | undefined; options?: { timeLimitSeconds?: number | undefined; solutionLimit?: number | undefined; } | undefined; }
 ```
 
 
 ### SolverResponse
+The response payload returned by the CP-SAT solver service.
+
+- `status` (required): solve outcome (see {@link SolverStatus})
+- `values` (optional): variable assignments when a solution is found
+- `statistics` (optional): solve time, conflicts, branches
+- `softViolations` (optional): which soft constraints were violated
+- `error` (optional): error message on failure
+- `solutionInfo` (optional): solver diagnostic info
+
 ```typescript
 { status: "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT" | "ERROR"; values?: Record<string, number> | undefined; statistics?: { solveTimeMs?: number | undefined; conflicts?: number | undefined; branches?: number | undefined; } | undefined; error?: string | undefined; solutionInfo?: string | undefined; softViolations?: { constraintId: string; violationAmount: number; targetValue: number; actualValue: number; }[] | undefined; }
 ```
 
 
 ### SolverVariable
+A decision variable in the CP-SAT model.
+
+- `name` (required): unique variable identifier
+- `lb` (required): lower bound
+- `ub` (required): upper bound
+- `isBoolean` (optional): whether this is a boolean variable
+- `isInterval` (optional): whether this is an interval variable
+- `start`, `end`, `size`, `presenceVar` (optional): interval variable fields
+
 ```typescript
 { type: "bool"; name: string; } | { type: "int"; name: string; min: number; max: number; } | { type: "interval"; name: string; start: number; end: number; size: number; presenceVar?: string | undefined; }
 ```
 
 
 ### SolverConstraint
+A constraint in the CP-SAT model.
+
+- `name` (required): constraint identifier
+- `type` (required): constraint kind (e.g. "linear", "bool_and", "no_overlap")
+- Additional fields vary by constraint type
+
 ```typescript
 { type: "linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">=" | "=="; rhs: number; } | { type: "soft_linear"; terms: { var: string; coeff: number; }[]; op: "<=" | ">="; rhs: number; penalty: number; id?: string | undefined; } | { type: "exactly_one"; vars: string[]; } | { type: "at_most_one"; vars: string[]; } | { type: "implication"; if: string; then: string; } | { type: "bool_or"; vars: string[]; } | { type: "bool_and"; vars: string[]; } | { type: "no_overlap"; intervals: string[]; }
 ```
 
 
 ### SolverTerm
+A single linear term in a constraint or objective.
+
+- `var` (required): variable name
+- `coeff` (required): integer coefficient
+
 ```typescript
 { var: string; coeff: number; }
 ```
 
 
 ### SolverObjective
+An optimization objective for the solver.
+
+- `terms` (required): linear terms to minimize/maximize
+- `minimize` (required): whether to minimize (true) or maximize (false)
+
 ```typescript
 { sense: "minimize" | "maximize"; terms: { var: string; coeff: number; }[]; }
 ```
 
 
 ### SolverStatus
+Solver outcome status.
+
+One of `"OPTIMAL"`, `"FEASIBLE"`, `"INFEASIBLE"`, `"TIMEOUT"`, or `"ERROR"`.
+
 ```typescript
 "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT" | "ERROR"
 ```
 
 
 ### SoftConstraintViolation
+A soft constraint violation reported by the solver.
+
+- `constraintId` (required): which soft constraint was violated
+- `violationAmount` (required): magnitude of the violation
+
 ```typescript
 { constraintId: string; violationAmount: number; targetValue: number; actualValue: number; }
 ```
@@ -617,6 +670,48 @@ DateTimeWithUtcOffset | DateTimeWithTimeZone
 ### FetcherLike
 ```typescript
 ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | { fetch: typeof fetch; }
+```
+
+
+### EntityScopeType
+Entity scope type for a subset of entity keys (at most one).
+
+```typescript
+ExclusiveOne<ActiveEntityFields, InactiveEntityFields, K> | MergeValues<Pick<InactiveEntityFields, K>>
+```
+
+
+### OptionalTimeScopeType
+Time scope type for a subset of time keys (at most one, optional).
+
+```typescript
+ExclusiveOne<ActiveTimeFields, InactiveTimeFields, K> | MergeValues<Pick<InactiveTimeFields, K>>
+```
+
+
+### RequiredTimeScopeType
+Time scope type for a subset of time keys (exactly one, required).
+
+```typescript
+{ [K in K]: ActiveTimeFields[K] & MergeValues<Pick<InactiveTimeFields, Exclude<K, K>>>; }[K]
+```
+
+
+### ParsedEntityScope
+Parsed entity scope from a flat config.
+Used internally by scope resolution functions.
+
+```typescript
+{ type: "global"; } | { type: "employees"; employeeIds: string[]; } | { type: "roles"; roleIds: string[]; } | { type: "skills"; skillIds: string[]; }
+```
+
+
+### ParsedTimeScope
+Parsed time scope from a flat config.
+Used internally by scope resolution functions.
+
+```typescript
+{ type: "none"; } | { type: "dateRange"; start: string; end: string; } | { type: "specificDates"; dates: string[]; } | { type: "dayOfWeek"; days: DayOfWeek[]; } | { type: "recurring"; periods: RecurringPeriod[]; }
 ```
 
 
@@ -636,10 +731,11 @@ Configuration for {@link createEmployeeAssignmentPriorityRule}.
 
 - `preference` (required): `"high"` to prefer assigning or `"low"` to avoid assigning
 
-Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
 
 ```typescript
-{ preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+({ preference: "high" | "low"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">
 ```
 
 
@@ -649,10 +745,10 @@ Configuration for {@link createLocationPreferenceRule}.
 - `locationId` (required): the location ID to prefer for matching shift patterns
 - `priority` (required): how strongly to prefer this location
 
-Also accepts all fields from {@link ScopeConfig} for entity scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
 
 ```typescript
-{ locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+{ locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">
 ```
 
 
@@ -662,10 +758,10 @@ Configuration for {@link createMaxConsecutiveDaysRule}.
 - `days` (required): maximum consecutive days allowed
 - `priority` (required): how strictly the solver enforces this rule
 
-Also accepts all fields from {@link ScopeConfig} for entity scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
 
 ```typescript
-{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">
 ```
 
 
@@ -675,10 +771,11 @@ Configuration for {@link createMaxHoursDayRule}.
 - `hours` (required): maximum hours allowed per day
 - `priority` (required): how strictly the solver enforces this rule
 
-Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
 
 ```typescript
-{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">
 ```
 
 
@@ -689,10 +786,11 @@ Configuration for {@link createMaxHoursWeekRule}.
 - `priority` (required): how strictly the solver enforces this rule
 - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
 
-Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
 
 ```typescript
-{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">
 ```
 
 
@@ -702,10 +800,11 @@ Configuration for {@link createMaxShiftsDayRule}.
 - `shifts` (required): maximum number of shifts per day (at least 1)
 - `priority` (required): how strictly the solver enforces this rule
 
-Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
 
 ```typescript
-{ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+({ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">
 ```
 
 
@@ -715,10 +814,10 @@ Configuration for {@link createMinConsecutiveDaysRule}.
 - `days` (required): minimum consecutive days required once a person starts working
 - `priority` (required): how strictly the solver enforces this rule
 
-Also accepts all fields from {@link ScopeConfig} for entity scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
 
 ```typescript
-{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">
 ```
 
 
@@ -728,10 +827,10 @@ Configuration for {@link createMinHoursDayRule}.
 - `hours` (required): minimum hours required per day when scheduled
 - `priority` (required): how strictly the solver enforces this rule
 
-Also accepts all fields from {@link ScopeConfig} for entity scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
 
 ```typescript
-{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">
 ```
 
 
@@ -742,10 +841,10 @@ Configuration for {@link createMinHoursWeekRule}.
 - `priority` (required): how strictly the solver enforces this rule
 - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
 
-Also accepts all fields from {@link ScopeConfig} for entity scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
 
 ```typescript
-{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">
 ```
 
 
@@ -755,10 +854,10 @@ Configuration for {@link createMinRestBetweenShiftsRule}.
 - `hours` (required): minimum rest hours required between consecutive shifts
 - `priority` (required): how strictly the solver enforces this rule
 
-Also accepts all fields from {@link ScopeConfig} for entity scoping.
+Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
 
 ```typescript
-{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }
+{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">
 ```
 
 
@@ -769,10 +868,19 @@ Configuration for {@link createTimeOffRule}.
 - `startTime` (optional): start of the time-off window within each day; must be paired with `endTime`
 - `endTime` (optional): end of the time-off window within each day; must be paired with `startTime`
 
-Also accepts all fields from {@link ScopeConfig} for entity and time scoping.
+Entity scoping (at most one):
+- `employeeIds`: restrict to specific employees
+- `roleIds`: restrict to employees with matching roles
+- `skillIds`: restrict to employees with matching skills
+
+Time scoping (exactly one required):
+- `dateRange`: contiguous date range
+- `specificDates`: specific dates
+- `dayOfWeek`: days of the week
+- `recurringPeriods`: recurring calendar periods
 
 ```typescript
-{ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }
+({ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & RequiredTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">
 ```
 
 
@@ -928,15 +1036,39 @@ string & { readonly [GroupKeyBrand]: never; }
 ```
 
 
-### EntityScope
+### EntityKey
 ```typescript
-{ type: "global"; } | { type: "employees"; employeeIds: string[]; } | { type: "roles"; roleIds: string[]; } | { type: "skills"; skillIds: string[]; }
+"employees" | "roles" | "skills"
 ```
 
 
-### TimeScope
+### TimeKey
 ```typescript
-{ type: "always"; } | { type: "dateRange"; start: string; end: string; } | { type: "specificDates"; dates: string[]; } | { type: "dayOfWeek"; days: DayOfWeek[]; } | { type: "recurring"; periods: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[]; }
+"dateRange" | "specificDates" | "dayOfWeek" | "recurring"
+```
+
+
+### ExclusiveOne
+Exactly one of the specified keys must be present.
+The active key's field is required; all others are `?: never`.
+
+**Example:**
+ExclusiveOne<ActiveEntityFields, InactiveEntityFields, "employees" | "roles">
+=
+  | { employeeIds: [string, ...string[]]; roleIds?: never }
+  | { roleIds: [string, ...string[]]; employeeIds?: never }
+
+```typescript
+{ [K in Keys]: Active[K] & MergeValues<Pick<Inactive, Exclude<Keys, K>>>; }[Keys]
+```
+
+
+### MaybeOne
+At most one of the specified keys may be present (or none).
+Same as {@link ExclusiveOne} plus the case where all fields are `?: never`.
+
+```typescript
+ExclusiveOne<Active, Inactive, Keys> | MergeValues<Pick<Inactive, Keys>>
 ```
 
 
@@ -1267,9 +1399,6 @@ builder = new ModelBuilder({ ...config, rules: [rule] });
 ### createEmployeeAssignmentPriorityRule
 Adds objective weight to prefer or avoid assigning team members.
 
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
-
 **Example:**
 Prefer specific team members
 ```ts
@@ -1289,18 +1418,8 @@ preference: "low",
 });
 ```
 
-**Example:**
-Prefer experienced staff on weekends
-```ts
-createEmployeeAssignmentPriorityRule({
-skillIds: ["senior"],
-dayOfWeek: ["saturday", "sunday"],
-preference: "high",
-});
-```
-
 **Parameters:**
-- `config: { preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `config: ({ preference: "high" | "low"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 **Returns:** `CompilationRule`
 
@@ -1310,16 +1429,15 @@ Prefers assigning a person to shift patterns matching a specific location.
 
 **Example:**
 ```ts
-const rule = createLocationPreferenceRule({
+createLocationPreferenceRule({
   locationId: "terrace",
   priority: "HIGH",
   employeeIds: ["alice"],
 });
-builder = new ModelBuilder({ ...config, rules: [rule] });
 ```
 
 **Parameters:**
-- `config: { locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `config: { locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 **Returns:** `CompilationRule`
 
@@ -1329,24 +1447,17 @@ Limits how many consecutive days a person can be assigned.
 
 **Example:**
 ```ts
-const rule = createMaxConsecutiveDaysRule({
-  days: 5,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMaxConsecutiveDaysRule({ days: 5, priority: "MANDATORY" });
 ```
 
 **Parameters:**
-- `config: { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `config: { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 **Returns:** `CompilationRule`
 
 
 ### createMaxHoursDayRule
 Limits how many hours a person can work in a single day.
-
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
 
 **Example:**
 Limit everyone to 8 hours per day
@@ -1369,7 +1480,7 @@ priority: "MANDATORY",
 ```
 
 **Parameters:**
-- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `config: ({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 **Returns:** `CompilationRule`
 
@@ -1377,17 +1488,10 @@ priority: "MANDATORY",
 ### createMaxHoursWeekRule
 Caps total hours a person can work within each scheduling week.
 
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
-Time scoping filters which days within each week count toward the limit.
-
 **Example:**
 Limit everyone to 40 hours per week
 ```ts
-createMaxHoursWeekRule({
-hours: 40,
-priority: "HIGH",
-});
+createMaxHoursWeekRule({ hours: 40, priority: "HIGH" });
 ```
 
 **Example:**
@@ -1398,14 +1502,13 @@ roleIds: ["student"],
 hours: 20,
 recurringPeriods: [
 { name: "fall-term", startMonth: 9, startDay: 1, endMonth: 12, endDay: 15 },
-{ name: "spring-term", startMonth: 1, startDay: 15, endMonth: 5, endDay: 31 },
 ],
 priority: "MANDATORY",
 });
 ```
 
 **Parameters:**
-- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `config: ({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 **Returns:** `CompilationRule`
 
@@ -1413,28 +1516,15 @@ priority: "MANDATORY",
 ### createMaxShiftsDayRule
 Limits how many shifts a person can work in a single day.
 
-This rule controls the maximum number of distinct shift assignments per day,
+Controls the maximum number of distinct shift assignments per day,
 regardless of shift duration. For limiting total hours worked, use `max-hours-day`.
 
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
-
 **Example:**
-Limit to one shift per day (common for most schedules)
+Limit to one shift per day
 ```ts
 createMaxShiftsDayRule({
 shifts: 1,
 priority: "MANDATORY",
-});
-```
-
-**Example:**
-Allow up to two shifts per day for part-time workers
-```ts
-createMaxShiftsDayRule({
-roleIds: ["part-time"],
-shifts: 2,
-priority: "HIGH",
 });
 ```
 
@@ -1450,7 +1540,7 @@ priority: "MANDATORY",
 ```
 
 **Parameters:**
-- `config: { shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `config: ({ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 **Returns:** `CompilationRule`
 
@@ -1461,15 +1551,11 @@ number of consecutive days.
 
 **Example:**
 ```ts
-const rule = createMinConsecutiveDaysRule({
-  days: 3,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinConsecutiveDaysRule({ days: 3, priority: "MANDATORY" });
 ```
 
 **Parameters:**
-- `config: { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `config: { days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 **Returns:** `CompilationRule`
 
@@ -1479,15 +1565,11 @@ Ensures a person works at least a minimum number of hours per day.
 
 **Example:**
 ```ts
-const rule = createMinHoursDayRule({
-  hours: 6,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinHoursDayRule({ hours: 6, priority: "MANDATORY" });
 ```
 
 **Parameters:**
-- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 **Returns:** `CompilationRule`
 
@@ -1497,15 +1579,11 @@ Enforces a minimum total number of hours per scheduling week.
 
 **Example:**
 ```ts
-const rule = createMinHoursWeekRule({
-  hours: 30,
-  priority: "HIGH",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinHoursWeekRule({ hours: 30, priority: "HIGH" });
 ```
 
 **Parameters:**
-- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 **Returns:** `CompilationRule`
 
@@ -1515,15 +1593,11 @@ Enforces a minimum rest period between any two shifts a person works.
 
 **Example:**
 ```ts
-const rule = createMinRestBetweenShiftsRule({
-  hours: 10,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinRestBetweenShiftsRule({ hours: 10, priority: "MANDATORY" });
 ```
 
 **Parameters:**
-- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+- `config: { hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 **Returns:** `CompilationRule`
 
@@ -1570,7 +1644,7 @@ priority: "MANDATORY",
 ```
 
 **Parameters:**
-- `config: { priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+- `config: ({ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & RequiredTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 **Returns:** `CompilationRule`
 
@@ -1811,6 +1885,98 @@ Always includes range start. Sorted ascending.
 **Returns:** `number[]`
 
 
+### entityScope
+Creates a Zod schema for optional entity scoping (at most one of the
+specified entity variants).
+
+The returned schema accepts flat fields (`employeeIds`, `roleIds`, `skillIds`)
+but the TypeScript type enforces mutual exclusivity via `?: never`.
+
+**Example:**
+```ts
+// Supports all entity scopes
+entityScope(["employees", "roles", "skills"])
+
+// Only employee scoping
+entityScope(["employees"])
+```
+
+**Parameters:**
+- `keys: K`
+
+**Returns:** `z.ZodType<EntityScopeType<K[number]>, unknown, z.core.$ZodTypeInternals<EntityScopeType<K[number]>, unknown>>`
+
+
+### timeScope
+Creates a Zod schema for optional time scoping (at most one of the
+specified time variants, or none).
+
+**Example:**
+```ts
+// Supports all time scopes, all optional
+timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"])
+```
+
+**Parameters:**
+- `keys: K`
+
+**Returns:** `z.ZodType<OptionalTimeScopeType<K[number]>, unknown, z.core.$ZodTypeInternals<OptionalTimeScopeType<K[number]>, unknown>>`
+
+
+### requiredTimeScope
+Creates a Zod schema for required time scoping (exactly one of the
+specified time variants must be present).
+
+**Example:**
+```ts
+// Exactly one time scope required (for time-off)
+requiredTimeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"])
+```
+
+**Parameters:**
+- `keys: K`
+
+**Returns:** `z.ZodType<RequiredTimeScopeType<K[number]>, unknown, z.core.$ZodTypeInternals<RequiredTimeScopeType<K[number]>, unknown>>`
+
+
+### parseEntityScope
+Extracts the entity scope from a parsed flat config.
+
+**Parameters:**
+- `config: EntityScopeInput`
+
+**Returns:** `{ type: "global"; } | { type: "employees"; employeeIds: string[]; } | { type: "roles"; roleIds: string[]; } | { type: "skills"; skillIds: string[]; }`
+
+
+### parseTimeScope
+Extracts the time scope from a parsed flat config.
+
+**Parameters:**
+- `config: TimeScopeInput`
+
+**Returns:** `{ type: "none"; } | { type: "dateRange"; start: string; end: string; } | { type: "specificDates"; dates: string[]; } | { type: "dayOfWeek"; days: DayOfWeek[]; } | { type: "recurring"; periods: RecurringPeriod[]; }`
+
+
+### resolveEmployeesFromScope
+Resolves which employees a rule applies to based on entity scope.
+
+**Parameters:**
+- `scope: { type: "global"; } | { type: "employees"; employeeIds: string[]; } | { type: "roles"; roleIds: string[]; } | { type: "skills"; skillIds: string[]; }`
+- `employees: SchedulingEmployee[]`
+
+**Returns:** `SchedulingEmployee[]`
+
+
+### resolveActiveDaysFromScope
+Resolves which days a rule applies to based on time scope.
+
+**Parameters:**
+- `scope: { type: "none"; } | { type: "dateRange"; start: string; end: string; } | { type: "specificDates"; dates: string[]; } | { type: "dayOfWeek"; days: DayOfWeek[]; } | { type: "recurring"; periods: RecurringPeriod[]; }`
+- `allDays: string[]`
+
+**Returns:** `string[]`
+
+
 ### parseDayString
 Parse a day string (YYYY-MM-DD) to a UTC Date.
 Used internally for day-of-week calculations and date comparisons.
@@ -2004,40 +2170,6 @@ b.addPenalty(assignment, -2 * OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE);
 **Type:** `z.ZodObject<{ constraintId: z.ZodString; violationAmount: z.ZodNumber; targetValue: z.ZodNumber; actualValue: z.ZodNumber; }, z.core.$strip>`
 
 
-### withScopes
-**Type:** `<T extends z.ZodRawShape, TEntities extends SupportedEntities, TTimes extends SupportedTimes>(base: z.ZodObject<T>, opts: { entities: TEntities; times: TTimes; }) => ScopedSchemaWithRefinement<T, TEntities, TTimes>`
-
-
-### normalizeScope
-**Type:** `(raw: { employeeIds?: string[]; roleIds?: string[]; skillIds?: string[]; dateRange?: { start: string; end: string; }; specificDates?: string[]; dayOfWeek?: DayOfWeek[]; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[]; }, employees: SchedulingEmployee[]) => RuleScope`
-
-
-### specificity
-**Type:** `(scope: EntityScope) => number`
-
-
-### effectiveEmployeeIds
-**Type:** `(scope: EntityScope, employees: SchedulingEmployee[]) => string[]`
-
-
-### subtractIds
-**Type:** `(ids: string[], assigned: Set<string>) => string[]`
-
-
-### timeScopeKey
-Creates a stable key for a time scope to use in grouping.
-Rules with different time scope keys don't compete for deduplication.
-
-**Type:** `(time: TimeScope | undefined) => string`
-
-
-### entityScopeTypeKey
-Creates a stable key for an entity scope type.
-Used to prevent merging different scope types during resolution.
-
-**Type:** `(entity: EntityScope) => string`
-
-
 ### MINUTES_PER_DAY
 **Type:** `number`
 
@@ -2071,9 +2203,6 @@ builder = new ModelBuilder({ ...config, rules: [rule] });
 
 Adds objective weight to prefer or avoid assigning team members.
 
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
-
 **Example:**
 Prefer specific team members
 ```ts
@@ -2093,17 +2222,7 @@ preference: "low",
 });
 ```
 
-**Example:**
-Prefer experienced staff on weekends
-```ts
-createEmployeeAssignmentPriorityRule({
-skillIds: ["senior"],
-dayOfWeek: ["saturday", "sunday"],
-preference: "high",
-});
-```
-
-**Config:** `{ preference: "high" | "low"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+**Config:** `({ preference: "high" | "low"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 ### location-preference
 
@@ -2113,15 +2232,14 @@ Prefers assigning a person to shift patterns matching a specific location.
 
 **Example:**
 ```ts
-const rule = createLocationPreferenceRule({
+createLocationPreferenceRule({
   locationId: "terrace",
   priority: "HIGH",
   employeeIds: ["alice"],
 });
-builder = new ModelBuilder({ ...config, rules: [rule] });
 ```
 
-**Config:** `{ locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+**Config:** `{ locationId: string; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 ### max-consecutive-days
 
@@ -2131,23 +2249,16 @@ Limits how many consecutive days a person can be assigned.
 
 **Example:**
 ```ts
-const rule = createMaxConsecutiveDaysRule({
-  days: 5,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMaxConsecutiveDaysRule({ days: 5, priority: "MANDATORY" });
 ```
 
-**Config:** `{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+**Config:** `{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 ### max-hours-day
 
 
 
 Limits how many hours a person can work in a single day.
-
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
 
 **Example:**
 Limit everyone to 8 hours per day
@@ -2169,7 +2280,7 @@ priority: "MANDATORY",
 });
 ```
 
-**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+**Config:** `({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 ### max-hours-week
 
@@ -2177,17 +2288,10 @@ priority: "MANDATORY",
 
 Caps total hours a person can work within each scheduling week.
 
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
-Time scoping filters which days within each week count toward the limit.
-
 **Example:**
 Limit everyone to 40 hours per week
 ```ts
-createMaxHoursWeekRule({
-hours: 40,
-priority: "HIGH",
-});
+createMaxHoursWeekRule({ hours: 40, priority: "HIGH" });
 ```
 
 **Example:**
@@ -2198,13 +2302,12 @@ roleIds: ["student"],
 hours: 20,
 recurringPeriods: [
 { name: "fall-term", startMonth: 9, startDay: 1, endMonth: 12, endDay: 15 },
-{ name: "spring-term", startMonth: 1, startDay: 15, endMonth: 5, endDay: 31 },
 ],
 priority: "MANDATORY",
 });
 ```
 
-**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+**Config:** `({ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 ### max-shifts-day
 
@@ -2212,28 +2315,15 @@ priority: "MANDATORY",
 
 Limits how many shifts a person can work in a single day.
 
-This rule controls the maximum number of distinct shift assignments per day,
+Controls the maximum number of distinct shift assignments per day,
 regardless of shift duration. For limiting total hours worked, use `max-hours-day`.
 
-Supports entity scoping (people, roles, skills) and time scoping
-(date ranges, specific dates, days of week, recurring periods).
-
 **Example:**
-Limit to one shift per day (common for most schedules)
+Limit to one shift per day
 ```ts
 createMaxShiftsDayRule({
 shifts: 1,
 priority: "MANDATORY",
-});
-```
-
-**Example:**
-Allow up to two shifts per day for part-time workers
-```ts
-createMaxShiftsDayRule({
-roleIds: ["part-time"],
-shifts: 2,
-priority: "HIGH",
 });
 ```
 
@@ -2248,7 +2338,7 @@ priority: "MANDATORY",
 });
 ```
 
-**Config:** `{ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+**Config:** `({ shifts: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">) & OptionalTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
 ### min-consecutive-days
 
@@ -2259,14 +2349,10 @@ number of consecutive days.
 
 **Example:**
 ```ts
-const rule = createMinConsecutiveDaysRule({
-  days: 3,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinConsecutiveDaysRule({ days: 3, priority: "MANDATORY" });
 ```
 
-**Config:** `{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+**Config:** `{ days: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 ### min-hours-day
 
@@ -2276,14 +2362,10 @@ Ensures a person works at least a minimum number of hours per day.
 
 **Example:**
 ```ts
-const rule = createMinHoursDayRule({
-  hours: 6,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinHoursDayRule({ hours: 6, priority: "MANDATORY" });
 ```
 
-**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 ### min-hours-week
 
@@ -2293,14 +2375,10 @@ Enforces a minimum total number of hours per scheduling week.
 
 **Example:**
 ```ts
-const rule = createMinHoursWeekRule({
-  hours: 30,
-  priority: "HIGH",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinHoursWeekRule({ hours: 30, priority: "HIGH" });
 ```
 
-**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; weekStartsOn?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | undefined; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 ### min-rest-between-shifts
 
@@ -2310,14 +2388,10 @@ Enforces a minimum rest period between any two shifts a person works.
 
 **Example:**
 ```ts
-const rule = createMinRestBetweenShiftsRule({
-  hours: 10,
-  priority: "MANDATORY",
-});
-builder = new ModelBuilder({ ...config, rules: [rule] });
+createMinRestBetweenShiftsRule({ hours: 10, priority: "MANDATORY" });
 ```
 
-**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; }`
+**Config:** `{ hours: number; priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; } & EntityScopeType<"employees" | "roles" | "skills">`
 
 ### time-off
 
@@ -2363,5 +2437,5 @@ priority: "MANDATORY",
 });
 ```
 
-**Config:** `{ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; employeeIds?: string[] | undefined; roleIds?: string[] | undefined; skillIds?: string[] | undefined; dateRange?: { start: string; end: string; } | undefined; specificDates?: string[] | undefined; dayOfWeek?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[] | undefined; recurringPeriods?: { name: string; startMonth: number; startDay: number; endMonth: number; endDay: number; }[] | undefined; }`
+**Config:** `({ priority: "LOW" | "MEDIUM" | "HIGH" | "MANDATORY"; startTime?: { hours: number; minutes: number; } | undefined; endTime?: { hours: number; minutes: number; } | undefined; } & EntityScopeType<"employees" | "roles" | "skills">) & RequiredTimeScopeType<"dateRange" | "specificDates" | "dayOfWeek" | "recurring">`
 
