@@ -22,11 +22,13 @@ describe("CP-SAT: employee-assignment-priority rule", () => {
     const response = await solveWithRules(client, baseConfig, [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "high" },
+        employeeIds: ["bob"],
+        preference: "high",
       },
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "low" },
+        employeeIds: ["alice"],
+        preference: "low",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(response.status).toBe("OPTIMAL");
@@ -52,7 +54,8 @@ describe("CP-SAT: employee-assignment-priority rule", () => {
     const response = await solveWithRules(client, baseConfig, [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "low" },
+        employeeIds: ["alice"],
+        preference: "low",
       },
     ] satisfies CpsatRuleConfigEntry[]);
 
@@ -79,7 +82,8 @@ describe("CP-SAT: employee-assignment-priority rule", () => {
     const response = await solveWithRules(client, baseConfig, [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "high" },
+        employeeIds: ["bob"],
+        preference: "high",
       },
     ] satisfies CpsatRuleConfigEntry[]);
 

@@ -41,7 +41,8 @@ const _valid5: TimeOffConfig = {
 
 const _validEntry: CpsatRuleConfigEntry = {
   name: "time-off",
-  config: { priority: "MANDATORY", dayOfWeek: ["sunday"] },
+  priority: "MANDATORY",
+  dayOfWeek: ["sunday"],
 };
 
 // ============================================================================

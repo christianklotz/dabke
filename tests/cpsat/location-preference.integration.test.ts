@@ -68,11 +68,10 @@ describe("CP-SAT: location-preference rule", () => {
       [
         {
           name: "location-preference",
-          config: {
-            locationId: "terrace",
-            priority: "HIGH",
-            employeeIds: ["victoria"],
-          },
+
+          locationId: "terrace",
+          priority: "HIGH",
+          employeeIds: ["victoria"],
         },
       ] satisfies CpsatRuleConfigEntry[],
     );

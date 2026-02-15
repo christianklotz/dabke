@@ -126,7 +126,7 @@ export function generateDays(horizon: { start: Date; end: Date }): string[] {
  * @param start - The start date of the period (inclusive)
  * @param end - The end date of the period (exclusive)
  * @returns An array of [startDate, endDate] tuples, where each tuple represents
- *          a single day. The last range's end date will be the provided end date.
+ * a single day. The last range's end date will be the provided end date.
  *
  * @example
  * ```typescript
@@ -180,7 +180,7 @@ export function splitPeriodIntoDays({ start, end }: { start: Date; end: Date }):
  * @param end - The end date of the period (exclusive)
  * @param weekStartsOn - The day of the week that weeks start on (e.g., "monday", "sunday")
  * @returns An array of [startDate, endDate] tuples, where each tuple represents
- *          a week period aligned to the specified week start day.
+ * a week period aligned to the specified week start day.
  *
  * @example
  * ```typescript
@@ -364,7 +364,7 @@ export function splitPoints([start, end]: [number, number], splitAt: number[]): 
  * Computes the list of day strings (YYYY-MM-DD) from a SchedulingPeriod.
  *
  * Generates all days between start and end (inclusive), applying optional
- * daysOfWeek and dates filters. Filters compose: a day must pass all
+ * dayOfWeek and dates filters. Filters compose: a day must pass all
  * specified filters to be included.
  *
  * @param period - The scheduling period specification
@@ -382,7 +382,7 @@ export function splitPoints([start, end]: [number, number], splitAt: number[]): 
  * ```typescript
  * const days = resolveDaysFromPeriod({
  *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
- *   daysOfWeek: ['wednesday', 'friday'],
+ *   dayOfWeek: ['wednesday', 'friday'],
  * });
  * // Returns: ['2025-02-05', '2025-02-07']
  * ```
@@ -397,8 +397,8 @@ export function splitPoints([start, end]: [number, number], splitAt: number[]): 
  * ```
  */
 export function resolveDaysFromPeriod(period: SchedulingPeriod): string[] {
-  const { dateRange, daysOfWeek, dates } = period;
-  const allowedDays = daysOfWeek ? new Set(daysOfWeek) : null;
+  const { dateRange, dayOfWeek, dates } = period;
+  const allowedDays = dayOfWeek ? new Set(dayOfWeek) : null;
   const allowedDates = dates ? new Set(dates) : null;
 
   const startDate = new Date(`${dateRange.start}T00:00:00Z`);

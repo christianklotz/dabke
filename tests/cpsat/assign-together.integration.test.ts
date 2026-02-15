@@ -24,11 +24,13 @@ describe("CP-SAT: assign-together rule", () => {
     const preferenceRules: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "high" },
+        employeeIds: ["alice"],
+        preference: "high",
       },
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "low" },
+        employeeIds: ["bob"],
+        preference: "low",
       },
     ];
 
@@ -42,7 +44,8 @@ describe("CP-SAT: assign-together rule", () => {
       ...preferenceRules,
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["alice", "bob"], priority: "HIGH" },
+        groupEmployeeIds: ["alice", "bob"],
+        priority: "HIGH",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withPairing.status).toBe("OPTIMAL");
@@ -83,11 +86,13 @@ describe("CP-SAT: assign-together rule", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["one", "two"], priority: "MANDATORY" },
+        groupEmployeeIds: ["one", "two"],
+        priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["two", "three"], priority: "MANDATORY" },
+        groupEmployeeIds: ["two", "three"],
+        priority: "MANDATORY",
       },
     ];
 
@@ -145,11 +150,13 @@ describe("CP-SAT: assign-together rule", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["one", "two"], priority: "MANDATORY" },
+        groupEmployeeIds: ["one", "two"],
+        priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["two", "three"], priority: "MANDATORY" },
+        groupEmployeeIds: ["two", "three"],
+        priority: "MANDATORY",
       },
     ];
 
@@ -190,11 +197,13 @@ describe("CP-SAT: assign-together rule", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["one", "two"], priority: "MANDATORY" },
+        groupEmployeeIds: ["one", "two"],
+        priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        config: { groupEmployeeIds: ["four", "five"], priority: "MANDATORY" },
+        groupEmployeeIds: ["four", "five"],
+        priority: "MANDATORY",
       },
     ];
 

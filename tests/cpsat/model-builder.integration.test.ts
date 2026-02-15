@@ -49,17 +49,15 @@ describe("CP-SAT compilation integration", () => {
     const response = await solveWithRules(client, { ...baseConfig, weekStartsOn: "thursday" }, [
       {
         name: "min-hours-week",
-        config: {
-          hours: 24,
-          priority: "MANDATORY",
-        },
+
+        hours: 24,
+        priority: "MANDATORY",
       },
       {
         name: "max-hours-week",
-        config: {
-          hours: 8,
-          priority: "MANDATORY",
-        },
+
+        hours: 8,
+        priority: "MANDATORY",
       },
     ] satisfies CpsatRuleConfigEntry[]);
 
@@ -338,10 +336,9 @@ describe("CP-SAT compilation integration", () => {
         [
           {
             name: "max-shifts-day",
-            config: {
-              shifts: 1,
-              priority: "MANDATORY",
-            },
+
+            shifts: 1,
+            priority: "MANDATORY",
           },
         ],
       );
@@ -753,11 +750,10 @@ describe("CP-SAT compilation integration", () => {
       const rule: CpsatRuleConfigEntry[] = [
         {
           name: "max-hours-week",
-          config: {
-            hours: 8,
-            priority: "MANDATORY",
-            // Intentionally omitted: weekStartsOn
-          },
+
+          hours: 8,
+          priority: "MANDATORY",
+          // Intentionally omitted: weekStartsOn,
         },
       ];
 
@@ -1055,7 +1051,8 @@ describe("CP-SAT compilation integration", () => {
         ruleConfigs: [
           {
             name: "max-shifts-day",
-            config: { shifts: 2, priority: "MANDATORY" },
+            shifts: 2,
+            priority: "MANDATORY",
           },
         ],
       });
@@ -1105,7 +1102,8 @@ describe("CP-SAT compilation integration", () => {
         ruleConfigs: [
           {
             name: "max-shifts-day",
-            config: { shifts: 2, priority: "MANDATORY" },
+            shifts: 2,
+            priority: "MANDATORY",
           },
         ],
       });

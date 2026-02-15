@@ -76,7 +76,7 @@ describe("defineSemanticTimes", () => {
           semanticTime: "lunch",
           roleIds: ["server"],
           targetCount: 4,
-          days: ["saturday", "sunday"],
+          dayOfWeek: ["saturday", "sunday"],
         },
       ]);
 
@@ -200,9 +200,9 @@ describe("defineSemanticTimes", () => {
           {
             startTime: t(11, 30),
             endTime: t(14),
-            days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
           },
-          { startTime: t(12), endTime: t(15), days: ["saturday", "sunday"] },
+          { startTime: t(12), endTime: t(15), dayOfWeek: ["saturday", "sunday"] },
         ],
       });
 
@@ -259,7 +259,7 @@ describe("defineSemanticTimes", () => {
           {
             startTime: t(9),
             endTime: t(17),
-            days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
           },
         ],
       });
@@ -279,7 +279,7 @@ describe("defineSemanticTimes", () => {
       const times = defineSemanticTimes({
         lunch: [
           { startTime: t(11), endTime: t(14) }, // default
-          { startTime: t(12), endTime: t(15), days: ["saturday"] },
+          { startTime: t(12), endTime: t(15), dayOfWeek: ["saturday"] },
         ],
       });
 

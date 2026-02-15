@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.81.0 (2026-02-14)
+
+### Breaking Changes
+
+- Flatten `CpsatRuleConfigEntry` from `{ name, config: { ... } }` to `{ name, ...config }`.
+  Rule config fields are now at the top level alongside `name` instead of nested under `config`.
+- `CpsatRuleConfigEntry` is now a distributive mapped type (discriminated union over rule names),
+  preventing mismatched `name`/config pairings at compile time.
+- `resolveRuleScopes` returns flat entries matching the new `CpsatRuleConfigEntry` shape.
+
+### Fixes
+
+- Strip all entity-scope fields (`employeeIds`, `roleIds`, `skillIds`) consistently
+  during scope resolution. Previously `employeeIds` was not explicitly removed before
+  being overridden via object spread ordering.
+
 ## 0.80.0 (2026-02-14)
 
 ### Breaking Changes

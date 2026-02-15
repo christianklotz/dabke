@@ -34,11 +34,13 @@ describe("CP-SAT: scope resolution", () => {
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["alice"], preference: "high" },
+          employeeIds: ["alice"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["bob"], preference: "low" },
+          employeeIds: ["bob"],
+          preference: "low",
         },
       ];
 
@@ -54,11 +56,10 @@ describe("CP-SAT: scope resolution", () => {
         ...preferenceRules,
         {
           name: "max-hours-week",
-          config: {
-            hours: 16, // 16 hours = 2 shifts max
-            priority: "MANDATORY",
-            roleIds: ["student"],
-          },
+
+          hours: 16, // 16 hours = 2 shifts max
+          priority: "MANDATORY",
+          roleIds: ["student"],
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -93,11 +94,13 @@ describe("CP-SAT: scope resolution", () => {
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["alice"], preference: "high" },
+          employeeIds: ["alice"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["bob"], preference: "low" },
+          employeeIds: ["bob"],
+          preference: "low",
         },
       ];
 
@@ -107,18 +110,16 @@ describe("CP-SAT: scope resolution", () => {
         ...preferenceRules,
         {
           name: "max-hours-week",
-          config: {
-            hours: 24,
-            priority: "MANDATORY",
-          },
+
+          hours: 24,
+          priority: "MANDATORY",
         },
         {
           name: "max-hours-week",
-          config: {
-            hours: 8, // Only 1 shift
-            priority: "MANDATORY",
-            roleIds: ["student"],
-          },
+
+          hours: 8, // Only 1 shift
+          priority: "MANDATORY",
+          roleIds: ["student"],
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -161,15 +162,18 @@ describe("CP-SAT: scope resolution", () => {
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["alice"], preference: "high" },
+          employeeIds: ["alice"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["charlie"], preference: "high" },
+          employeeIds: ["charlie"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["bob"], preference: "low" },
+          employeeIds: ["bob"],
+          preference: "low",
         },
       ];
 
@@ -178,11 +182,10 @@ describe("CP-SAT: scope resolution", () => {
         ...preferenceRules,
         {
           name: "max-hours-week",
-          config: {
-            hours: 8, // 1 shift max per certified employee
-            priority: "MANDATORY",
-            skillIds: ["certified"],
-          },
+
+          hours: 8, // 1 shift max per certified employee
+          priority: "MANDATORY",
+          skillIds: ["certified"],
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -218,11 +221,13 @@ describe("CP-SAT: scope resolution", () => {
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["alice"], preference: "high" },
+          employeeIds: ["alice"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["bob"], preference: "low" },
+          employeeIds: ["bob"],
+          preference: "low",
         },
       ];
 
@@ -232,19 +237,17 @@ describe("CP-SAT: scope resolution", () => {
         ...preferenceRules,
         {
           name: "max-hours-week",
-          config: {
-            hours: 16,
-            priority: "MANDATORY",
-            roleIds: ["student"],
-          },
+
+          hours: 16,
+          priority: "MANDATORY",
+          roleIds: ["student"],
         },
         {
           name: "max-hours-week",
-          config: {
-            hours: 8,
-            priority: "MANDATORY",
-            employeeIds: ["alice"],
-          },
+
+          hours: 8,
+          priority: "MANDATORY",
+          employeeIds: ["alice"],
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -279,11 +282,13 @@ describe("CP-SAT: scope resolution", () => {
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["alice"], preference: "high" },
+          employeeIds: ["alice"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["bob"], preference: "low" },
+          employeeIds: ["bob"],
+          preference: "low",
         },
       ];
 
@@ -293,18 +298,16 @@ describe("CP-SAT: scope resolution", () => {
         ...preferenceRules,
         {
           name: "max-hours-week",
-          config: {
-            hours: 32,
-            priority: "MANDATORY",
-          },
+
+          hours: 32,
+          priority: "MANDATORY",
         },
         {
           name: "max-hours-week",
-          config: {
-            hours: 16,
-            priority: "MANDATORY",
-            roleIds: ["intern"],
-          },
+
+          hours: 16,
+          priority: "MANDATORY",
+          roleIds: ["intern"],
         },
       ] satisfies CpsatRuleConfigEntry[]);
 

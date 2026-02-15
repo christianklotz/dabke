@@ -53,7 +53,7 @@
  *   },
  *   coverage: times.resolve(coverage, ["2026-02-09", "2026-02-10"]),
  *   ruleConfigs: [
- *     { name: "max-hours-week", config: { hours: 40, priority: "MANDATORY" } },
+ *     { name: "max-hours-week", hours: 40, priority: "MANDATORY" },
  *   ],
  * });
  *

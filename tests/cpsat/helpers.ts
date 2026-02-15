@@ -244,7 +244,7 @@ export const fixtures = {
       employeeIds: opts.employeeIds ?? ["alice", "bob", "charlie"],
       schedulingPeriod: {
         dateRange: { start: "2024-02-05", end: "2024-02-09" },
-        daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
       },
     }),
 

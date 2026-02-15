@@ -451,10 +451,10 @@ describe("resolveDaysFromPeriod", () => {
       expect(days).toEqual(["2025-02-04"]);
     });
 
-    it("should compose with daysOfWeek filter", () => {
+    it("should compose with dayOfWeek filter", () => {
       const days = resolveDaysFromPeriod({
         dateRange: { start: "2025-02-03", end: "2025-02-09" },
-        daysOfWeek: ["wednesday", "friday"],
+        dayOfWeek: ["wednesday", "friday"],
         dates: ["2025-02-05", "2025-02-06"], // Wed and Thu
       });
       // Only 2025-02-05 (Wed) passes both filters
@@ -495,12 +495,12 @@ describe("resolveDaysFromPeriod", () => {
     });
   });
 
-  describe("with dateRange and daysOfWeek filter", () => {
+  describe("with dateRange and dayOfWeek filter", () => {
     it("should filter to specific days of week", () => {
       // 2025-02-03 is Monday, 2025-02-09 is Sunday
       const days = resolveDaysFromPeriod({
         dateRange: { start: "2025-02-03", end: "2025-02-09" },
-        daysOfWeek: ["wednesday", "friday"],
+        dayOfWeek: ["wednesday", "friday"],
       });
       // Wednesday is 2025-02-05, Friday is 2025-02-07
       expect(days).toEqual(["2025-02-05", "2025-02-07"]);
@@ -510,7 +510,7 @@ describe("resolveDaysFromPeriod", () => {
       // 2025-02-03 is Monday, 2025-02-09 is Sunday
       const days = resolveDaysFromPeriod({
         dateRange: { start: "2025-02-03", end: "2025-02-09" },
-        daysOfWeek: ["wednesday", "thursday", "friday", "saturday", "sunday"],
+        dayOfWeek: ["wednesday", "thursday", "friday", "saturday", "sunday"],
       });
       expect(days).toHaveLength(5);
       expect(days).toEqual([
@@ -526,7 +526,7 @@ describe("resolveDaysFromPeriod", () => {
       // 2025-02-03 to 2025-02-04 is Monday to Tuesday
       const days = resolveDaysFromPeriod({
         dateRange: { start: "2025-02-03", end: "2025-02-04" },
-        daysOfWeek: ["saturday", "sunday"],
+        dayOfWeek: ["saturday", "sunday"],
       });
       expect(days).toEqual([]);
     });
@@ -535,18 +535,18 @@ describe("resolveDaysFromPeriod", () => {
       // 2025-02-03 is Monday, 2025-02-16 is Sunday (two weeks)
       const days = resolveDaysFromPeriod({
         dateRange: { start: "2025-02-03", end: "2025-02-16" },
-        daysOfWeek: ["saturday"],
+        dayOfWeek: ["saturday"],
       });
       expect(days).toEqual(["2025-02-08", "2025-02-15"]);
     });
 
-    it("should treat empty daysOfWeek as empty whitelist (no days)", () => {
+    it("should treat empty dayOfWeek as empty whitelist (no days)", () => {
       const days = resolveDaysFromPeriod({
         dateRange: { start: "2025-02-03", end: "2025-02-05" },
-        daysOfWeek: [],
+        dayOfWeek: [],
       });
       // Empty array = empty whitelist = no days match
-      // Use undefined/omit daysOfWeek to include all days
+      // Use undefined/omit dayOfWeek to include all days
       expect(days).toEqual([]);
     });
   });

@@ -6,6 +6,8 @@ import { groupKey, type GroupKey } from "./validation.types.js";
 
 /**
  * Base definition for a semantic time period.
+ *
+ * @category Semantic Times
  */
 export interface SemanticTimeDef {
   /** When this time period starts. */
@@ -16,10 +18,12 @@ export interface SemanticTimeDef {
 
 /**
  * Variant of a semantic time that applies to specific days or dates.
+ *
+ * @category Semantic Times
  */
 export interface SemanticTimeVariant extends SemanticTimeDef {
   /** Apply this variant only on these days of the week */
-  days?: DayOfWeek[];
+  dayOfWeek?: DayOfWeek[];
   /** Apply this variant only on these specific dates (YYYY-MM-DD) */
   dates?: string[];
 }
@@ -27,6 +31,8 @@ export interface SemanticTimeVariant extends SemanticTimeDef {
 /**
  * A semantic time can be a simple definition (applies every day)
  * or an array of variants with different times for different days/dates.
+ *
+ * @category Semantic Times
  */
 export type SemanticTimeEntry = SemanticTimeDef | SemanticTimeVariant[];
 
@@ -38,7 +44,7 @@ interface SemanticCoverageRequirementBase<S extends string> {
   targetCount: number;
   priority?: Priority;
   /** Scope this requirement to specific days of the week */
-  days?: DayOfWeek[];
+  dayOfWeek?: DayOfWeek[];
   /** Scope this requirement to specific dates (YYYY-MM-DD) */
   dates?: string[];
   /**
@@ -86,6 +92,34 @@ interface SkillBasedSemanticCoverageRequirement<
  *
  * This is a discriminated union enforcing at compile time that at least
  * one of `roleIds` or `skillIds` must be provided.
+ *
+ * @remarks
+ * **Fields:**
+ * - `semanticTime` (required) — name of a defined semantic time
+ * - `targetCount` (required) — how many people are needed
+ * - `roleIds` — roles that satisfy this (OR logic); at least one of `roleIds`/`skillIds` required
+ * - `skillIds` — skills required (AND logic); at least one of `roleIds`/`skillIds` required
+ * - `dayOfWeek` — scope to specific days of the week (e.g. `["monday", "tuesday"]`)
+ * - `dates` — scope to specific dates (`"YYYY-MM-DD"` strings)
+ * - `priority` — `"MANDATORY"` | `"HIGH"` | `"MEDIUM"` | `"LOW"`
+ *
+ * **IMPORTANT: Coverage entries for the same semantic time STACK additively.**
+ * For weekday vs weekend staffing, use mutually exclusive `dayOfWeek` on BOTH entries:
+ *
+ * @example Weekday vs weekend (mutually exclusive dayOfWeek)
+ * ```typescript
+ * { semanticTime: "lunch", roleIds: ["waiter"], targetCount: 2,
+ *   dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
+ * { semanticTime: "lunch", roleIds: ["waiter"], targetCount: 3,
+ *   dayOfWeek: ["saturday", "sunday"] },
+ * ```
+ *
+ * @example Skill-based coverage (any role with the skill)
+ * ```typescript
+ * { semanticTime: "opening", skillIds: ["keyholder"], targetCount: 1 },
+ * ```
+ *
+ * @category Semantic Times
  */
 export type SemanticCoverageRequirement<S extends string> =
   | RoleBasedSemanticCoverageRequirement<S>
@@ -141,6 +175,8 @@ interface SkillBasedConcreteCoverageRequirement extends ConcreteCoverageRequirem
  *
  * This is a discriminated union enforcing at compile time that at least
  * one of `roleIds` or `skillIds` must be provided.
+ *
+ * @category Semantic Times
  */
 export type ConcreteCoverageRequirement =
   | RoleBasedConcreteCoverageRequirement
@@ -148,6 +184,8 @@ export type ConcreteCoverageRequirement =
 
 /**
  * Union type for coverage - either semantic (type-safe) or concrete.
+ *
+ * @category Semantic Times
  */
 export type MixedCoverageRequirement<S extends string> =
   | SemanticCoverageRequirement<S>
@@ -173,6 +211,8 @@ export function isSemanticCoverage<S extends string>(
 
 /**
  * Result of defineSemanticTimes - provides type-safe coverage function.
+ *
+ * @category Semantic Times
  */
 export interface SemanticTimeContext<S extends string> {
   /** The semantic time definitions */
@@ -198,6 +238,8 @@ export interface SemanticTimeContext<S extends string> {
  * - Type-safe coverage() function that only accepts defined semantic time names
  * - resolve() function to expand semantic times to concrete requirements
  *
+ * @category Semantic Times
+ *
  * @example Basic usage
  * ```typescript
  * const times = defineSemanticTimes({
@@ -218,8 +260,8 @@ export interface SemanticTimeContext<S extends string> {
  * ```typescript
  * const times = defineSemanticTimes({
  *   lunch: [
- *     { startTime: { hours: 11, minutes: 30 }, endTime: { hours: 14 }, days: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
- *     { startTime: { hours: 12 }, endTime: { hours: 15 }, days: ["saturday", "sunday"] },
+ *     { startTime: { hours: 11, minutes: 30 }, endTime: { hours: 14 }, dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
+ *     { startTime: { hours: 12 }, endTime: { hours: 15 }, dayOfWeek: ["saturday", "sunday"] },
  *   ],
  * });
  * ```
@@ -319,7 +361,7 @@ function resolveSemanticCoverage<S extends string>(
       }
 
       const autoGroupKey = generateSemanticGroupKey(req);
-      const applicableDays = filterDays(days, req.days, req.dates);
+      const applicableDays = filterDays(days, req.dayOfWeek, req.dates);
 
       for (const day of applicableDays) {
         const resolved = resolveTimeForDay(entry, day);
@@ -353,8 +395,8 @@ function generateSemanticGroupKey<S extends string>(req: SemanticCoverageRequire
   const base = `${req.targetCount}x ${roleOrSkills} during ${req.semanticTime}`;
 
   // Add scope qualifier if scoped to specific days
-  if (req.days && req.days.length > 0 && req.days.length < 7) {
-    return groupKey(`${base} (${formatDaysScope(req.days)})`);
+  if (req.dayOfWeek && req.dayOfWeek.length > 0 && req.dayOfWeek.length < 7) {
+    return groupKey(`${base} (${formatDaysScope(req.dayOfWeek)})`);
   }
   if (req.dates && req.dates.length > 0) {
     return groupKey(`${base} (specific dates)`);
@@ -411,7 +453,7 @@ function formatTime(time: TimeOfDay): string {
  */
 function filterDays(
   allDays: string[],
-  daysOfWeek?: DayOfWeek[],
+  dayOfWeek?: DayOfWeek[],
   specificDates?: string[],
 ): string[] {
   let result = allDays;
@@ -420,9 +462,9 @@ function filterDays(
     // If specific dates are provided, use only those (intersection with allDays)
     const dateSet = new Set(specificDates);
     result = result.filter((d) => dateSet.has(d));
-  } else if (daysOfWeek && daysOfWeek.length > 0) {
+  } else if (dayOfWeek && dayOfWeek.length > 0) {
     // Filter by day of week
-    const daySet = new Set(daysOfWeek);
+    const daySet = new Set(dayOfWeek);
     result = result.filter((d) => daySet.has(toDayOfWeekUTC(parseDayString(d))));
   }
 
@@ -452,10 +494,10 @@ function resolveTimeForDay(entry: SemanticTimeEntry, day: string): SemanticTimeD
       dateMatch = variant;
       break; // Date-specific is most specific
     }
-    if (variant.days && variant.days.includes(dayOfWeek)) {
+    if (variant.dayOfWeek && variant.dayOfWeek.includes(dayOfWeek)) {
       dowMatch = variant;
     }
-    if (!variant.dates && !variant.days) {
+    if (!variant.dates && !variant.dayOfWeek) {
       defaultMatch = variant;
     }
   }

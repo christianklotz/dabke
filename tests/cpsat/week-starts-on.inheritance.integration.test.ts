@@ -33,11 +33,10 @@ describe("CP-SAT: weekStartsOn inheritance", () => {
     const rule: CpsatRuleConfigEntry[] = [
       {
         name: "max-hours-week",
-        config: {
-          hours: 8,
-          priority: "MANDATORY",
-          // Intentionally omitted: weekStartsOn
-        },
+
+        hours: 8,
+        priority: "MANDATORY",
+        // Intentionally omitted: weekStartsOn,
       },
     ];
 

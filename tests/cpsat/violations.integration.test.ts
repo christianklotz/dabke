@@ -68,11 +68,10 @@ describe("Validation diagnostics (integration)", () => {
         ruleConfigs: [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-01"],
-              priority: "MANDATORY",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-01"],
+            priority: "MANDATORY",
           },
         ],
       });
@@ -202,11 +201,10 @@ describe("Validation diagnostics (integration)", () => {
         ruleConfigs: [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-01"],
-              priority: "LOW",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-01"],
+            priority: "LOW",
           },
         ],
       });
@@ -267,11 +265,10 @@ describe("Validation diagnostics (integration)", () => {
         ruleConfigs: [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-01"],
-              priority: "HIGH",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-01"],
+            priority: "HIGH",
           },
         ],
       });
@@ -336,11 +333,10 @@ describe("Validation diagnostics (integration)", () => {
         ruleConfigs: [
           {
             name: "time-off",
-            config: {
-              roleIds: ["barista"], // Scoped to baristas only
-              specificDates: ["2024-02-01"],
-              priority: "LOW",
-            },
+
+            roleIds: ["barista"], // Scoped to baristas only
+            specificDates: ["2024-02-01"],
+            priority: "LOW",
           },
         ],
       });
@@ -411,13 +407,12 @@ describe("Validation diagnostics (integration)", () => {
         ruleConfigs: [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-01"],
-              startTime: { hours: 14, minutes: 0 },
-              endTime: { hours: 18, minutes: 0 },
-              priority: "LOW",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-01"],
+            startTime: { hours: 14, minutes: 0 },
+            endTime: { hours: 18, minutes: 0 },
+            priority: "LOW",
           },
         ],
       });

@@ -50,11 +50,13 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
     const preference: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "high" },
+        employeeIds: ["alice"],
+        preference: "high",
       },
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "low" },
+        employeeIds: ["bob"],
+        preference: "low",
       },
     ];
 
@@ -76,7 +78,8 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
       ...preference,
       {
         name: "min-rest-between-shifts",
-        config: { hours: 10, priority: "MANDATORY" },
+        hours: 10,
+        priority: "MANDATORY",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withRest.status).toBe("OPTIMAL");

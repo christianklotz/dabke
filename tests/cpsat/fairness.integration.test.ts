@@ -183,11 +183,13 @@ describe("Fair distribution (integration)", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["anne"], preference: "high" },
+          employeeIds: ["anne"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["john"], preference: "low" },
+          employeeIds: ["john"],
+          preference: "low",
         },
       ];
 

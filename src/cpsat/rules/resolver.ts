@@ -14,11 +14,6 @@ import type {
 } from "./rules.types.js";
 import type { CompilationRule } from "../model-builder.js";
 
-type ResolvedRuleConfigEntry = {
-  name: CpsatRuleName;
-  config: CpsatRuleRegistry[CpsatRuleName];
-};
-
 type InternalEntry = {
   index: number;
   name: CpsatRuleName;
@@ -26,6 +21,14 @@ type InternalEntry = {
   entityScope: ParsedEntityScope;
   timeScope: ParsedTimeScope;
 };
+
+/**
+ * Extract the config portion from a flat rule entry (everything except `name`).
+ */
+function entryConfig(entry: CpsatRuleConfigEntry): CpsatRuleRegistry[CpsatRuleName] {
+  const { name: _name, ...config } = entry;
+  return config as CpsatRuleRegistry[CpsatRuleName];
+}
 
 /**
  * Gets the IDs that match an entity scope.
@@ -112,13 +115,13 @@ const NON_SCOPED_RULES = new Set<string>(["assign-together"]);
 export function resolveRuleScopes(
   entries: CpsatRuleConfigEntry[],
   employees: SchedulingEmployee[],
-): ResolvedRuleConfigEntry[] {
-  const resolved: ResolvedRuleConfigEntry[] = [];
+): CpsatRuleConfigEntry[] {
+  const resolved: CpsatRuleConfigEntry[] = [];
   const scopedEntries: Array<{ entry: CpsatRuleConfigEntry; index: number }> = [];
 
   entries.forEach((entry, index) => {
     if (NON_SCOPED_RULES.has(entry.name)) {
-      resolved.push({ name: entry.name, config: entry.config });
+      resolved.push(entry);
     } else {
       scopedEntries.push({ entry, index });
     }
@@ -130,15 +133,16 @@ export function resolveRuleScopes(
 
   const grouped = new Map<string, InternalEntry[]>();
   scopedEntries.forEach(({ entry, index }) => {
-    const entity = parseEntityScope(entry.config);
-    const time = parseTimeScope(entry.config);
+    const config = entryConfig(entry);
+    const entity = parseEntityScope(config);
+    const time = parseTimeScope(config);
     const timeKey = timeScopeKey(time);
     const groupKey = `${entry.name}::${timeKey}`;
     const list = grouped.get(groupKey) ?? [];
     list.push({
       index,
       name: entry.name,
-      config: entry.config,
+      config,
       entityScope: entity,
       timeScope: time,
     });
@@ -163,17 +167,16 @@ export function resolveRuleScopes(
       remaining.forEach((id) => assignedEmployees.add(id));
 
       const {
+        employeeIds: _employeeIds,
         roleIds: _roleIds,
         skillIds: _skillIds,
         ...configWithoutEntityScope
       } = entry.config as Record<string, unknown>;
       resolved.push({
         name: entry.name,
-        config: {
-          ...configWithoutEntityScope,
-          employeeIds: remaining,
-        } as CpsatRuleRegistry[CpsatRuleName],
-      });
+        ...configWithoutEntityScope,
+        employeeIds: remaining,
+      } as CpsatRuleConfigEntry);
     }
   }
 
@@ -197,6 +200,6 @@ export function buildCpsatRules(
     if (!factory) {
       throw new Error(`Unknown CP-SAT rule "${entry.name}"`);
     }
-    return factory(entry.config as any);
+    return factory(entryConfig(entry));
   });
 }

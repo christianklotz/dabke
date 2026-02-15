@@ -23,19 +23,20 @@ describe("CP-SAT: min-consecutive-days rule", () => {
     const baseRules: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "high" },
+        employeeIds: ["alice"],
+        preference: "high",
       },
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "low" },
+        employeeIds: ["bob"],
+        preference: "low",
       },
       {
         name: "time-off",
-        config: {
-          employeeIds: ["alice"],
-          specificDates: ["2024-02-02"],
-          priority: "MANDATORY",
-        },
+
+        employeeIds: ["alice"],
+        specificDates: ["2024-02-02"],
+        priority: "MANDATORY",
       },
     ];
 
@@ -49,11 +50,10 @@ describe("CP-SAT: min-consecutive-days rule", () => {
       ...baseRules,
       {
         name: "min-consecutive-days",
-        config: {
-          days: 2,
-          priority: "MANDATORY",
-          employeeIds: ["bob"],
-        },
+
+        days: 2,
+        priority: "MANDATORY",
+        employeeIds: ["bob"],
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withMinimum.status).toBe("OPTIMAL");

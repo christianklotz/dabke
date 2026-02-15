@@ -28,6 +28,8 @@ interface ExtractedDoc {
   returnType?: string;
   filePath: string;
   exportOrder?: number;
+  /** TSDoc @category tag value, used for filtering and grouping in llms.txt. */
+  category?: string;
 }
 
 interface RuleDoc {
@@ -343,6 +345,24 @@ class TSDocExtractor {
     return result;
   }
 
+  /**
+   * Extract the @category tag value from a node's JSDoc.
+   * Returns undefined if no @category tag is present.
+   */
+  private extractCategory(node: ts.Node): string | undefined {
+    const jsDoc = ts.getJSDocCommentsAndTags(node);
+    for (const item of jsDoc) {
+      if (ts.isJSDoc(item) && item.tags) {
+        for (const tag of item.tags) {
+          if (tag.tagName.text === "category") {
+            return tag.comment ? (ts.getTextOfJSDocComment(tag.comment) || "").trim() : undefined;
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
   private getTypeString(node: ts.Node, maxLength: number = 2000): string {
     const type = this.checker.getTypeAtLocation(node);
     const typeString = this.checker.typeToString(
@@ -491,6 +511,7 @@ class TSDocExtractor {
         properties: this.extractProperties(node),
         filePath: relativePath,
         exportOrder: this.exportOrder.get(node.name.text),
+        category: this.extractCategory(node),
       };
       this.docs.push(doc);
     }
@@ -510,6 +531,7 @@ class TSDocExtractor {
         signature: this.getTypeString(node.type),
         filePath: relativePath,
         exportOrder: this.exportOrder.get(node.name.text),
+        category: this.extractCategory(node),
       };
       this.docs.push(doc);
     }
@@ -535,6 +557,7 @@ class TSDocExtractor {
           returnType: node.type ? this.getTypeString(node.type) : "void",
           filePath: relativePath,
           exportOrder: this.exportOrder.get(node.name.text),
+          category: this.extractCategory(node),
         };
         this.docs.push(doc);
       }
@@ -548,6 +571,7 @@ class TSDocExtractor {
         description: this.extractJSDocComment(node),
         filePath: relativePath,
         exportOrder: this.exportOrder.get(node.name.text),
+        category: this.extractCategory(node),
       };
       this.docs.push(doc);
     }
@@ -560,6 +584,7 @@ class TSDocExtractor {
         description: this.extractJSDocComment(node),
         filePath: relativePath,
         exportOrder: this.exportOrder.get(node.name.text),
+        category: this.extractCategory(node),
       };
       this.docs.push(doc);
     }
@@ -578,6 +603,7 @@ class TSDocExtractor {
             signature: this.getTypeString(decl),
             filePath: relativePath,
             exportOrder: this.exportOrder.get(decl.name.text),
+            category: this.extractCategory(node),
           };
           this.docs.push(doc);
         }
@@ -747,165 +773,128 @@ class TSDocExtractor {
   }
 }
 
-function generateRulesSection(ruleDocs: RuleDoc[]): string {
-  let content = `## Built-In Rules Reference\n\n`;
-  content += `Rules are constraints and preferences you can apply to schedules using \`ctx.addRule(ruleName, config)\`.\n\n`;
+// ============================================================================
+// llms.txt rendering — grouped by domain concept, not TS construct type.
+//
+// Only items with a @category matching LLM_CATEGORIES are included.
+// The order here determines the reading order for the LLM.
+// ============================================================================
 
-  for (const rule of ruleDocs) {
-    content += `### ${rule.name}\n\n`;
-    content += `${rule.summary}\n\n`;
-
-    if (rule.details) {
-      content += `${rule.details}\n\n`;
-    }
-
-    if (rule.configType) {
-      content += `**Config:** \`${rule.configType}\`\n\n`;
-    }
-  }
-
-  return content;
-}
+const LLM_CATEGORIES = [
+  { tag: "Semantic Times", heading: "Semantic Times & Coverage" },
+  { tag: "Shifts", heading: "Shift Patterns" },
+  { tag: "Rules", heading: "Rules" },
+  { tag: "Types", heading: "Supporting Types" },
+];
 
 function generateLLMsTxt(
   docs: ExtractedDoc[],
-  packageInfo: any,
-  packageDoc: string,
-  moduleDocs: Map<string, string>,
+  packageInfo: { name: string; description: string },
   ruleDocs: RuleDoc[],
 ): string {
   let content = `# ${packageInfo.name}\n\n`;
   content += `> ${packageInfo.description}\n\n`;
 
-  // Add package documentation if available
-  if (packageDoc) {
-    content += `${packageDoc}\n\n`;
-  }
+  for (const cat of LLM_CATEGORIES) {
+    const catDocs = docs
+      .filter((d) => d.category === cat.tag)
+      .toSorted((a, b) => (a.exportOrder ?? 999999) - (b.exportOrder ?? 999999));
 
-  // Generate API documentation
-  if (docs.length > 0) {
-    content += `---\n\n`;
-    content += `# CP-SAT Scheduling API\n\n`;
+    // Always emit the Rules section (for the rules reference), even if no typed docs
+    if (catDocs.length === 0 && !(cat.tag === "Rules" && ruleDocs.length > 0)) continue;
 
-    const typesDoc = moduleDocs.get("types.ts");
-    if (typesDoc) {
-      content += `${typesDoc}\n\n`;
+    content += `---\n\n## ${cat.heading}\n\n`;
+
+    for (const doc of catDocs) {
+      content += renderDoc(doc);
     }
 
-    content += generateDocsSection(docs);
-
-    // Insert Rules Reference section
-    if (ruleDocs.length > 0) {
-      content += `\n`;
-      content += generateRulesSection(ruleDocs);
+    if (cat.tag === "Rules" && ruleDocs.length > 0) {
+      content += generateRulesReference(ruleDocs);
     }
   }
 
   return content;
 }
 
-function generateDocsSection(docs: ExtractedDoc[]): string {
-  let content = "";
+/**
+ * Render a single doc item uniformly regardless of TS construct type.
+ */
+function renderDoc(doc: ExtractedDoc): string {
+  let content = `### ${doc.name}\n`;
+  if (doc.description) content += `${doc.description}\n\n`;
 
-  // Group by type
-  const grouped = docs.reduce(
-    (acc, doc) => {
-      const bucket = acc[doc.type] ?? (acc[doc.type] = []);
-      bucket.push(doc);
-      return acc;
-    },
-    {} as Record<string, ExtractedDoc[]>,
-  );
-
-  // Interfaces
-  if (grouped.interface?.length) {
-    content += `## Interfaces\n\n`;
-    for (const doc of grouped.interface) {
-      content += `### ${doc.name}\n`;
-      if (doc.description) content += `${doc.description}\n\n`;
-
-      if (doc.properties?.length) {
-        content += `**Properties:**\n`;
-        for (const prop of doc.properties) {
-          const optional = prop.optional ? "?" : "";
-          content += `- \`${prop.name}${optional}: ${prop.type}\``;
-          if (prop.description) content += ` - ${prop.description}`;
-          content += "\n";
-        }
-      }
-      content += `\n`;
+  if (doc.properties?.length) {
+    content += `**Properties:**\n`;
+    for (const prop of doc.properties) {
+      const optional = prop.optional ? "?" : "";
+      content += `- \`${prop.name}${optional}: ${prop.type}\``;
+      if (prop.description) content += ` - ${prop.description}`;
+      content += "\n";
     }
+    content += "\n";
   }
 
-  // Type Aliases
-  if (grouped.type?.length) {
-    content += `## Type Aliases\n\n`;
-    for (const doc of grouped.type) {
-      content += `### ${doc.name}\n`;
-      if (doc.description) content += `${doc.description}\n\n`;
-      if (doc.signature) content += `\`\`\`typescript\n${doc.signature}\n\`\`\`\n\n`;
-      content += `\n`;
-    }
+  if (doc.type === "type" && doc.signature) {
+    content += `\`\`\`typescript\n${doc.signature}\n\`\`\`\n\n`;
   }
 
-  // Enums
-  if (grouped.enum?.length) {
-    content += `## Enums\n\n`;
-    for (const doc of grouped.enum) {
-      content += `### ${doc.name}\n`;
-      if (doc.description) content += `${doc.description}\n\n`;
-      content += `\n`;
+  if (doc.parameters?.length) {
+    content += `**Parameters:**\n`;
+    for (const param of doc.parameters) {
+      const optional = param.optional ? "?" : "";
+      content += `- \`${param.name}${optional}: ${param.type}\``;
+      if (param.description) content += ` - ${param.description}`;
+      content += "\n";
     }
+    content += "\n";
   }
 
-  // Functions
-  if (grouped.function?.length) {
-    content += `## Functions\n\n`;
-    for (const doc of grouped.function) {
-      content += `### ${doc.name}\n`;
-      if (doc.description) content += `${doc.description}\n\n`;
-
-      if (doc.parameters?.length) {
-        content += `**Parameters:**\n`;
-        for (const param of doc.parameters) {
-          const optional = param.optional ? "?" : "";
-          content += `- \`${param.name}${optional}: ${param.type}\``;
-          if (param.description) content += ` - ${param.description}`;
-          content += "\n";
-        }
-        content += "\n";
-      }
-
-      if (doc.returnType) {
-        content += `**Returns:** \`${doc.returnType}\`\n\n`;
-      }
-
-      content += `\n`;
-    }
+  if (doc.returnType && doc.type === "function") {
+    content += `**Returns:** \`${doc.returnType}\`\n\n`;
   }
 
-  // Classes
-  if (grouped.class?.length) {
-    content += `## Classes\n\n`;
-    for (const doc of grouped.class) {
-      content += `### ${doc.name}\n`;
-      if (doc.description) content += `${doc.description}\n\n`;
-      content += `\n`;
-    }
-  }
+  return content + "\n";
+}
 
-  // Constants
-  if (grouped.const?.length) {
-    content += `## Constants\n\n`;
-    for (const doc of grouped.const) {
-      content += `### ${doc.name}\n`;
-      if (doc.description) content += `${doc.description}\n\n`;
-      if (doc.signature) content += `**Type:** \`${doc.signature}\`\n\n`;
-      content += `\n`;
+/**
+ * Render the built-in rules reference with examples in ruleConfigs format.
+ */
+function generateRulesReference(ruleDocs: RuleDoc[]): string {
+  let content = `### Built-In Rules\n\n`;
+  content += `Each rule is a flat object in the \`ruleConfigs\` array with \`name\` as the discriminant.\n\n`;
+  content += `**Scoping fields** available on most rules:\n`;
+  content += `- Entity (at most one): \`employeeIds\`, \`roleIds\`, \`skillIds\`\n`;
+  content += `- Time (at most one): \`dateRange\`, \`specificDates\`, \`dayOfWeek\`, \`recurringPeriods\`\n\n`;
+
+  for (const rule of ruleDocs) {
+    content += `#### ${rule.name}\n`;
+
+    if (rule.details) {
+      content += `${transformRuleDetails(rule.details, rule.name)}\n\n`;
     }
   }
 
   return content;
+}
+
+/**
+ * Transform rule documentation to show ruleConfigs format instead of function calls.
+ * Rewrites `createXxxRule({ ... })` → `{ name: "rule-name", ... }`.
+ */
+function transformRuleDetails(details: string, ruleName: string): string {
+  let result = details;
+
+  // Remove variable assignment prefix: `const rule = createXxxRule({` → `{ name: ...`
+  result = result.replace(/(?:const \w+ = )?create\w+Rule\(\{/g, `{ name: "${ruleName}",`);
+
+  // Close objects: `});` → `}`
+  result = result.replace(/\}\);/g, "}");
+
+  // Remove ModelBuilder lines (from assign-together example)
+  result = result.replace(/^.*(?:new ModelBuilder|builder\b).*\n?/gm, "");
+
+  return result;
 }
 
 function main() {
@@ -921,12 +910,15 @@ function main() {
 
   console.log("Extracting TypeScript documentation...");
   const extractor = new TSDocExtractor(rootDir);
-  const { docs, packageDoc, moduleDocs, ruleDocs } = extractor.extract();
+  const { docs, ruleDocs } = extractor.extract();
 
-  console.log(`Found ${docs.length} documented items`);
+  const categorizedCount = docs.filter((d) => d.category).length;
+  console.log(
+    `Found ${docs.length} documented items (${categorizedCount} categorized for llms.txt)`,
+  );
   console.log(`Found ${ruleDocs.length} rule docs`);
 
-  const llmsTxtContent = generateLLMsTxt(docs, packageInfo, packageDoc, moduleDocs, ruleDocs);
+  const llmsTxtContent = generateLLMsTxt(docs, packageInfo, ruleDocs);
   const outputPath = path.join(rootDir, "llms.txt");
 
   fs.writeFileSync(outputPath, llmsTxtContent, "utf-8");

@@ -64,7 +64,8 @@ describe("CP-SAT: max-hours-day rule", () => {
       [
         {
           name: "max-hours-day",
-          config: { hours: 8, priority: "MANDATORY" },
+          hours: 8,
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[],
     );

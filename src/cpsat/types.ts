@@ -7,6 +7,8 @@ import type { GroupKey } from "./validation.types.js";
  *
  * - `"LOW"`, `"MEDIUM"`, `"HIGH"`: soft constraints with increasing penalty for violations
  * - `"MANDATORY"`: hard constraint; the solver will not produce a solution that violates it
+ *
+ * @category Types
  */
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 
@@ -15,6 +17,8 @@ export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
  *
  * Employees are assigned to shift patterns by the solver based on
  * coverage requirements, rules, and constraints.
+ *
+ * @category Types
  */
 export interface SchedulingEmployee {
   /** Unique identifier for this employee. Must not contain colons. */
@@ -36,6 +40,7 @@ export type Employee = SchedulingEmployee;
  * Shift patterns are templates that repeat across all scheduling days. The solver assigns
  * team members to these patterns based on coverage requirements and constraints.
  *
+ * @category Shifts
  * @example
  * // Simple venue: one shift type, anyone can work it
  * const patterns: ShiftPattern[] = [
@@ -77,13 +82,13 @@ export interface ShiftPattern {
    * @example
    * ```typescript
    * // Saturday-only short shift
-   * { id: "saturday_shift", startTime: t(9), endTime: t(14), daysOfWeek: ["saturday"] }
+   * { id: "saturday_shift", startTime: t(9), endTime: t(14), dayOfWeek: ["saturday"] }
    *
    * // Weekday-only full shift
-   * { id: "full_shift", startTime: t(9), endTime: t(18), daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] }
+   * { id: "full_shift", startTime: t(9), endTime: t(18), dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] }
    * ```
    */
-  daysOfWeek?: DayOfWeek[];
+  dayOfWeek?: DayOfWeek[];
 
   /**
    * Physical location where this shift takes place.

@@ -46,11 +46,10 @@ describe("Skill-based scheduling (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "time-off",
-        config: {
-          skillIds: ["keyholder"],
-          specificDates: ["2024-01-01"],
-          priority: "MANDATORY",
-        },
+
+        skillIds: ["keyholder"],
+        specificDates: ["2024-01-01"],
+        priority: "MANDATORY",
       },
     ];
 
@@ -83,10 +82,9 @@ describe("Skill-based scheduling (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: {
-          skillIds: ["keyholder"],
-          preference: "high",
-        },
+
+        skillIds: ["keyholder"],
+        preference: "high",
       },
     ];
 
@@ -242,10 +240,9 @@ describe("Skill-based scheduling (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: {
-          skillIds: ["senior"],
-          preference: "high",
-        },
+
+        skillIds: ["senior"],
+        preference: "high",
       },
     ];
 

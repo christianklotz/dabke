@@ -10,6 +10,11 @@ import * as z from "zod";
 // Time Primitives
 // ============================================================================
 
+/**
+ * Day of the week identifier.
+ *
+ * @category Types
+ */
 export type DayOfWeek =
   | "monday"
   | "tuesday"
@@ -40,6 +45,7 @@ export const DayOfWeekSchema = z.union([
  * Used for defining shift start/end times and semantic time boundaries.
  * Hours are in 24-hour format (0-23).
  *
+ * @category Types
  * @example
  * ```typescript
  * const morningStart: TimeOfDay = {
@@ -141,10 +147,11 @@ export interface DateTimeRange {
 /**
  * Defines a scheduling period as a date range with optional filters.
  *
- * The `dateRange` specifies the overall scheduling window. Use `daysOfWeek`
+ * The `dateRange` specifies the overall scheduling window. Use `dayOfWeek`
  * and/or `dates` to narrow which days within the range are included.
  * Filters compose: a day must pass all specified filters to be included.
  *
+ * @category Types
  * @example All days in a week
  * ```typescript
  * const period: SchedulingPeriod = {
@@ -156,7 +163,7 @@ export interface DateTimeRange {
  * ```typescript
  * const period: SchedulingPeriod = {
  *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
- *   daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+ *   dayOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
  * };
  * ```
  *
@@ -178,10 +185,10 @@ export interface SchedulingPeriod {
    * Include only these days of the week.
    * If omitted, all days of the week are included.
    */
-  daysOfWeek?: DayOfWeek[];
+  dayOfWeek?: DayOfWeek[];
   /**
    * Include only these specific dates (YYYY-MM-DD) within the range.
-   * If omitted, all dates in the range are included (subject to daysOfWeek filter).
+   * If omitted, all dates in the range are included (subject to dayOfWeek filter).
    */
   dates?: string[];
 }

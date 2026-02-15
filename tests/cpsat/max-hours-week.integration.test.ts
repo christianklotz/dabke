@@ -24,11 +24,13 @@ describe("CP-SAT: max-hours-week rule", () => {
     const preferenceRules: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "high" },
+        employeeIds: ["alice"],
+        preference: "high",
       },
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "low" },
+        employeeIds: ["bob"],
+        preference: "low",
       },
     ];
 
@@ -41,10 +43,9 @@ describe("CP-SAT: max-hours-week rule", () => {
       ...preferenceRules,
       {
         name: "max-hours-week",
-        config: {
-          hours: 16,
-          priority: "MANDATORY",
-        },
+
+        hours: 16,
+        priority: "MANDATORY",
       },
     ] satisfies CpsatRuleConfigEntry[]);
 

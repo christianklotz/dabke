@@ -151,11 +151,13 @@ describe("ModelBuilder (CP-SAT)", () => {
       ruleConfigs: [
         {
           name: "max-hours-day",
-          config: { hours: 8, priority: "MANDATORY" },
+          hours: 8,
+          priority: "MANDATORY",
         } satisfies CpsatRuleConfigEntry,
         {
           name: "min-rest-between-shifts",
-          config: { hours: 3, priority: "HIGH" },
+          hours: 3,
+          priority: "HIGH",
         } satisfies CpsatRuleConfigEntry,
       ],
     });
@@ -741,11 +743,10 @@ describe("ModelBuilder (CP-SAT)", () => {
         ruleConfigs: [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-01"],
-              priority: "MANDATORY",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-01"],
+            priority: "MANDATORY",
           },
         ],
       });
@@ -802,14 +803,14 @@ describe("ModelBuilder (CP-SAT)", () => {
       expect(builder.days).toEqual(["2025-02-03", "2025-02-04", "2025-02-05"]);
     });
 
-    it("accepts schedulingPeriod with dateRange and daysOfWeek filter", () => {
+    it("accepts schedulingPeriod with dateRange and dayOfWeek filter", () => {
       // 2025-02-03 is Monday, 2025-02-09 is Sunday
       const builder = new ModelBuilder({
         employees: baseEmployees,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-09" },
-          daysOfWeek: ["wednesday", "thursday", "friday", "saturday", "sunday"],
+          dayOfWeek: ["wednesday", "thursday", "friday", "saturday", "sunday"],
         },
         coverage: [],
       });
@@ -865,7 +866,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-09" },
-          daysOfWeek: ["wednesday", "thursday", "friday", "saturday", "sunday"],
+          dayOfWeek: ["wednesday", "thursday", "friday", "saturday", "sunday"],
         },
         coverage: [
           {
@@ -910,14 +911,14 @@ describe("ModelBuilder (CP-SAT)", () => {
       expect(request.variables).toHaveLength(0);
     });
 
-    it("daysOfWeek filter excludes days from all constraint generation", () => {
+    it("dayOfWeek filter excludes days from all constraint generation", () => {
       // 2025-02-03 is Monday, 2025-02-04 is Tuesday
       const builder = new ModelBuilder({
         employees: baseEmployees,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-07" },
-          daysOfWeek: ["wednesday", "friday"], // Only Wed (05) and Fri (07)
+          dayOfWeek: ["wednesday", "friday"], // Only Wed (05) and Fri (07)
         },
         coverage: [
           {
@@ -957,14 +958,14 @@ describe("ModelBuilder (CP-SAT)", () => {
     });
 
     it("coverage on filtered-out day is silently ignored (no matching shifts)", () => {
-      // 2025-02-03 is Monday - filtered out by daysOfWeek
+      // 2025-02-03 is Monday - filtered out by dayOfWeek
       // Coverage for this day has no overlapping shift patterns, so no constraints generated
       const builder = new ModelBuilder({
         employees: baseEmployees,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-07" },
-          daysOfWeek: ["wednesday", "friday"],
+          dayOfWeek: ["wednesday", "friday"],
         },
         coverage: [
           {
@@ -994,7 +995,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-01", end: "2025-02-09" },
-          daysOfWeek: ["saturday", "sunday"],
+          dayOfWeek: ["saturday", "sunday"],
         },
         coverage: [],
       });
@@ -1010,7 +1011,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-01", end: "2025-02-28" },
-          daysOfWeek: ["monday"],
+          dayOfWeek: ["monday"],
         },
         coverage: [],
       });

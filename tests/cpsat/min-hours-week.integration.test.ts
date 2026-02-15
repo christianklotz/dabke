@@ -39,10 +39,9 @@ describe("CP-SAT: min-hours-week rule", () => {
     const withMinimum = await solveWithRules(client, { ...baseConfig, weekStartsOn: "thursday" }, [
       {
         name: "min-hours-week",
-        config: {
-          hours: 16,
-          priority: "MANDATORY",
-        },
+
+        hours: 16,
+        priority: "MANDATORY",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withMinimum.status).toBe("OPTIMAL");

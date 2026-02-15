@@ -24,11 +24,13 @@ describe("CP-SAT: time-off rule", () => {
       const preferences: CpsatRuleConfigEntry[] = [
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["alice"], preference: "high" },
+          employeeIds: ["alice"],
+          preference: "high",
         },
         {
           name: "employee-assignment-priority",
-          config: { employeeIds: ["bob"], preference: "low" },
+          employeeIds: ["bob"],
+          preference: "low",
         },
       ];
 
@@ -41,11 +43,10 @@ describe("CP-SAT: time-off rule", () => {
         ...preferences,
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-01"],
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-01"],
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
       expect(withTimeOff.status).toBe("OPTIMAL");
@@ -64,11 +65,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["solo"],
-            specificDates: ["2024-02-04"],
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["solo"],
+          specificDates: ["2024-02-04"],
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -88,11 +88,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            roleIds: ["cashier"],
-            specificDates: ["2024-02-01"],
-            priority: "MANDATORY",
-          },
+
+          roleIds: ["cashier"],
+          specificDates: ["2024-02-01"],
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -113,11 +112,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            dateRange: { start: "2024-02-01", end: "2024-02-02" },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          dateRange: { start: "2024-02-01", end: "2024-02-02" },
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -147,11 +145,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            dayOfWeek: ["monday"],
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          dayOfWeek: ["monday"],
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -172,11 +169,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["solo"],
-            specificDates: ["2024-02-04"],
-            priority: "LOW",
-          },
+
+          employeeIds: ["solo"],
+          specificDates: ["2024-02-04"],
+          priority: "LOW",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -208,13 +204,12 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-01"],
-            startTime: { hours: 13, minutes: 0 },
-            endTime: { hours: 23, minutes: 59 },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-01"],
+          startTime: { hours: 13, minutes: 0 },
+          endTime: { hours: 23, minutes: 59 },
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -240,13 +235,12 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-01"],
-            startTime: { hours: 6, minutes: 0 },
-            endTime: { hours: 8, minutes: 0 },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-01"],
+          startTime: { hours: 6, minutes: 0 },
+          endTime: { hours: 8, minutes: 0 },
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -273,13 +267,12 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-05"],
-            startTime: { hours: 14, minutes: 0 },
-            endTime: { hours: 18, minutes: 0 },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-05"],
+          startTime: { hours: 14, minutes: 0 },
+          endTime: { hours: 18, minutes: 0 },
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -305,13 +298,12 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-05"],
-            startTime: { hours: 14, minutes: 0 },
-            endTime: { hours: 18, minutes: 0 },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-05"],
+          startTime: { hours: 14, minutes: 0 },
+          endTime: { hours: 18, minutes: 0 },
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -336,13 +328,12 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-05"],
-            startTime: { hours: 9, minutes: 0 },
-            endTime: { hours: 18, minutes: 0 },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-05"],
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 18, minutes: 0 },
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -364,11 +355,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-05"],
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-05"],
+          priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -386,11 +376,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-05"],
-            priority: "HIGH",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-05"],
+          priority: "HIGH",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -410,11 +399,10 @@ describe("CP-SAT: time-off rule", () => {
       const response = await solveWithRules(client, baseConfig, [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            specificDates: ["2024-02-05"],
-            priority: "MEDIUM",
-          },
+
+          employeeIds: ["alice"],
+          specificDates: ["2024-02-05"],
+          priority: "MEDIUM",
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
@@ -431,11 +419,10 @@ describe("CP-SAT: time-off rule", () => {
         solveWithRules(client, baseConfig, [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["Feb 1, 2024"],
-              priority: "MANDATORY",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["Feb 1, 2024"],
+            priority: "MANDATORY",
           },
         ] as CpsatRuleConfigEntry[]),
       ).rejects.toThrow(/Invalid.*date/i);
@@ -447,11 +434,10 @@ describe("CP-SAT: time-off rule", () => {
         solveWithRules(client, baseConfig, [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              dateRange: { start: "2024/02/01", end: "2024/02/05" },
-              priority: "MANDATORY",
-            },
+
+            employeeIds: ["alice"],
+            dateRange: { start: "2024/02/01", end: "2024/02/05" },
+            priority: "MANDATORY",
           },
         ] as CpsatRuleConfigEntry[]),
       ).rejects.toThrow(/Invalid.*date/i);
@@ -479,12 +465,11 @@ describe("CP-SAT: time-off rule", () => {
         solveWithRules(client, baseConfig, [
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-01"],
-              startTime: { hours: 9, minutes: 0 },
-              priority: "MANDATORY",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-01"],
+            startTime: { hours: 9, minutes: 0 },
+            priority: "MANDATORY",
           },
         ] as CpsatRuleConfigEntry[]),
       ).rejects.toThrow(/Both startTime and endTime/i);
@@ -513,7 +498,7 @@ describe("CP-SAT: time-off rule", () => {
         ],
         schedulingPeriod: {
           dateRange: { start: "2024-02-05", end: "2024-02-09" },
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         targetCount: 1,
       });
@@ -521,21 +506,19 @@ describe("CP-SAT: time-off rule", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["emp1"],
-            specificDates: ["2024-02-07"],
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["emp1"],
+          specificDates: ["2024-02-07"],
+          priority: "MANDATORY",
         },
         {
           name: "time-off",
-          config: {
-            employeeIds: ["emp2"],
-            specificDates: ["2024-02-08", "2024-02-09"],
-            startTime: { hours: 0, minutes: 0 },
-            endTime: { hours: 14, minutes: 0 },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["emp2"],
+          specificDates: ["2024-02-08", "2024-02-09"],
+          startTime: { hours: 0, minutes: 0 },
+          endTime: { hours: 14, minutes: 0 },
+          priority: "MANDATORY",
         },
       ];
 
@@ -601,13 +584,12 @@ describe("CP-SAT: time-off rule", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "time-off",
-          config: {
-            roleIds: ["chef"],
-            dayOfWeek: ["monday"],
-            startTime: { hours: 14, minutes: 0 },
-            endTime: { hours: 23, minutes: 59 },
-            priority: "MANDATORY",
-          },
+
+          roleIds: ["chef"],
+          dayOfWeek: ["monday"],
+          startTime: { hours: 14, minutes: 0 },
+          endTime: { hours: 23, minutes: 59 },
+          priority: "MANDATORY",
         },
       ];
 
@@ -653,10 +635,9 @@ describe("CP-SAT: time-off rule", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "time-off",
-          config: {
-            dayOfWeek: ["sunday"],
-            priority: "MANDATORY",
-          },
+
+          dayOfWeek: ["sunday"],
+          priority: "MANDATORY",
         },
       ];
 
@@ -686,11 +667,10 @@ describe("CP-SAT: time-off rule", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "time-off",
-          config: {
-            skillIds: ["keyholder"],
-            dayOfWeek: ["monday"],
-            priority: "MANDATORY",
-          },
+
+          skillIds: ["keyholder"],
+          dayOfWeek: ["monday"],
+          priority: "MANDATORY",
         },
       ];
 
@@ -718,11 +698,10 @@ describe("CP-SAT: time-off rule", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "time-off",
-          config: {
-            skillIds: ["keyholder"],
-            dayOfWeek: ["monday"],
-            priority: "MANDATORY",
-          },
+
+          skillIds: ["keyholder"],
+          dayOfWeek: ["monday"],
+          priority: "MANDATORY",
         },
       ];
 
@@ -758,19 +737,17 @@ describe("CP-SAT: time-off rule", () => {
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "time-off",
-          config: {
-            employeeIds: ["alice"],
-            dateRange: { start: "2024-02-07", end: "2024-02-08" },
-            priority: "MANDATORY",
-          },
+
+          employeeIds: ["alice"],
+          dateRange: { start: "2024-02-07", end: "2024-02-08" },
+          priority: "MANDATORY",
         },
         {
           name: "max-hours-week",
-          config: {
-            hours: 32,
-            priority: "MANDATORY",
-            weekStartsOn: "monday",
-          },
+
+          hours: 32,
+          priority: "MANDATORY",
+          weekStartsOn: "monday",
         },
       ];
 
@@ -820,18 +797,16 @@ describe("CP-SAT: time-off rule", () => {
         ruleConfigs: [
           {
             name: "min-rest-between-shifts",
-            config: {
-              hours: 10,
-              priority: "MANDATORY",
-            },
+
+            hours: 10,
+            priority: "MANDATORY",
           },
           {
             name: "time-off",
-            config: {
-              employeeIds: ["alice"],
-              specificDates: ["2024-02-06"],
-              priority: "MANDATORY",
-            },
+
+            employeeIds: ["alice"],
+            specificDates: ["2024-02-06"],
+            priority: "MANDATORY",
           },
         ],
       });

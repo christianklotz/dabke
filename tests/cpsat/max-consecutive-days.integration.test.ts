@@ -23,11 +23,13 @@ describe("CP-SAT: max-consecutive-days rule", () => {
     const preference: CpsatRuleConfigEntry[] = [
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["alice"], preference: "high" },
+        employeeIds: ["alice"],
+        preference: "high",
       },
       {
         name: "employee-assignment-priority",
-        config: { employeeIds: ["bob"], preference: "low" },
+        employeeIds: ["bob"],
+        preference: "low",
       },
     ];
 
@@ -40,7 +42,8 @@ describe("CP-SAT: max-consecutive-days rule", () => {
       ...preference,
       {
         name: "max-consecutive-days",
-        config: { days: 2, priority: "MANDATORY" },
+        days: 2,
+        priority: "MANDATORY",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withLimit.status).toBe("OPTIMAL");

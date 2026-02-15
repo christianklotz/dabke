@@ -21,7 +21,7 @@ describe("groupKey propagation", () => {
         semanticTime: "weekday_open",
         roleIds: ["staff"],
         targetCount: 2,
-        days: ["monday", "tuesday"],
+        dayOfWeek: ["monday", "tuesday"],
       },
     ]);
 

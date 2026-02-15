@@ -4,12 +4,12 @@ import { resolveAssignments } from "../../src/cpsat/response.js";
 import { getSolverClient, decodeAssignments } from "./helpers.js";
 
 /**
- * Integration tests for ShiftPattern daysOfWeek restrictions.
+ * Integration tests for ShiftPattern dayOfWeek restrictions.
  *
  * Tests that shift patterns with day-of-week restrictions are only
  * used on the specified days by the solver.
  */
-describe("ShiftPattern daysOfWeek restriction (integration)", () => {
+describe("ShiftPattern dayOfWeek restriction (integration)", () => {
   let client: ReturnType<typeof getSolverClient>;
 
   beforeAll(() => {
@@ -30,14 +30,14 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
           id: "full_shift",
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 18, minutes: 30 },
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         // Short shift for Saturday only
         {
           id: "saturday_shift",
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 14, minutes: 30 },
-          daysOfWeek: ["saturday"],
+          dayOfWeek: ["saturday"],
         },
       ],
       schedulingPeriod: {
@@ -114,35 +114,35 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
           id: "full_shift",
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 18, minutes: 30 },
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         // Saturday shift (shorter day)
         {
           id: "saturday_shift",
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 14, minutes: 30 },
-          daysOfWeek: ["saturday"],
+          dayOfWeek: ["saturday"],
         },
         // AM half shift - available weekdays only for split coverage
         {
           id: "am_shift",
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 14, minutes: 30 },
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         // PM half shift - weekdays only
         {
           id: "pm_shift",
           startTime: { hours: 13, minutes: 30 },
           endTime: { hours: 18, minutes: 30 },
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
       ],
       schedulingPeriod: {
         // 2026-02-02 is Monday, 2026-02-07 is Saturday
         // Closed Sunday
         dateRange: { start: "2026-02-02", end: "2026-02-07" },
-        daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
+        dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
       },
       coverage: [
         // Monday: 1 staff 9-18
@@ -200,16 +200,17 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
       ruleConfigs: [
         {
           name: "max-hours-week",
-          config: { hours: 20, skillIds: ["student"], priority: "MANDATORY" },
+          hours: 20,
+          skillIds: ["student"],
+          priority: "MANDATORY",
         },
-        { name: "max-hours-week", config: { hours: 48, priority: "MANDATORY" } },
+        { name: "max-hours-week", hours: 48, priority: "MANDATORY" },
         {
           name: "time-off",
-          config: {
-            priority: "MANDATORY",
-            dayOfWeek: ["saturday", "sunday"],
-            skillIds: ["no_weekends"],
-          },
+
+          priority: "MANDATORY",
+          dayOfWeek: ["saturday", "sunday"],
+          skillIds: ["no_weekends"],
         },
       ],
     });
@@ -251,7 +252,7 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
     }
   }, 60_000);
 
-  it("pattern without daysOfWeek can be used on any day", async () => {
+  it("pattern without dayOfWeek can be used on any day", async () => {
     const builder = new ModelBuilder({
       employees: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
@@ -303,7 +304,7 @@ describe("ShiftPattern daysOfWeek restriction (integration)", () => {
           id: "weekday_only",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
       ],
       schedulingPeriod: {

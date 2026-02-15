@@ -179,12 +179,12 @@ const times = defineSemanticTimes({
     {
       startTime: { hours: 11, minutes: 30 },
       endTime: { hours: 14 },
-      days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
     },
     {
       startTime: { hours: 12 },
       endTime: { hours: 15 },
-      days: ["saturday", "sunday"],
+      dayOfWeek: ["saturday", "sunday"],
     },
   ],
   closing: { startTime: { hours: 21 }, endTime: { hours: 23 } },

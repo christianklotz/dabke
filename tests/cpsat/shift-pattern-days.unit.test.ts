@@ -4,7 +4,7 @@ import type { TimeOfDay } from "../../src/types.js";
 
 const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 
-describe("ShiftPattern daysOfWeek restriction", () => {
+describe("ShiftPattern dayOfWeek restriction", () => {
   it("should only create assignment variables for patterns available on that day", () => {
     const builder = new ModelBuilder({
       employees: [{ id: "alice", roleIds: ["staff"] }],
@@ -14,14 +14,14 @@ describe("ShiftPattern daysOfWeek restriction", () => {
           id: "full_shift",
           startTime: t(9),
           endTime: t(18),
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         // Saturday shift only available on Saturday
         {
           id: "saturday_shift",
           startTime: t(9),
           endTime: t(14),
-          daysOfWeek: ["saturday"],
+          dayOfWeek: ["saturday"],
         },
       ],
       schedulingPeriod: {
@@ -76,7 +76,7 @@ describe("ShiftPattern daysOfWeek restriction", () => {
           id: "weekday_shift",
           startTime: t(9),
           endTime: t(18),
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
       ],
       schedulingPeriod: {
@@ -101,11 +101,11 @@ describe("ShiftPattern daysOfWeek restriction", () => {
     expect(result.validation.errors.length).toBeGreaterThan(0);
   });
 
-  it("should allow patterns without daysOfWeek restriction on any day", () => {
+  it("should allow patterns without dayOfWeek restriction on any day", () => {
     const builder = new ModelBuilder({
       employees: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
-        // Pattern available any day (no daysOfWeek restriction)
+        // Pattern available any day (no dayOfWeek restriction)
         { id: "any_shift", startTime: t(9), endTime: t(17) },
       ],
       schedulingPeriod: {
@@ -155,14 +155,14 @@ describe("ShiftPattern daysOfWeek restriction", () => {
           id: "full_shift",
           startTime: t(8, 30),
           endTime: t(18, 30),
-          daysOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
         },
         // Short shift for Saturday only
         {
           id: "saturday_shift",
           startTime: t(8, 30),
           endTime: t(14, 30),
-          daysOfWeek: ["saturday"],
+          dayOfWeek: ["saturday"],
         },
         // AM half shift - available all days
         {

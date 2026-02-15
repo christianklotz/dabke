@@ -35,7 +35,23 @@ export type CpsatRuleRegistryFromFactories<F extends CpsatRuleFactories> = {
   [K in keyof F]: InferCpsatRuleConfig<F[K]>;
 };
 
-export type CpsatRuleConfigEntry<K extends CpsatRuleName = CpsatRuleName> = {
-  name: K;
-  config: CpsatRuleRegistry[K];
-};
+/**
+ * A named rule configuration entry.
+ *
+ * Flat discriminated union: `name` is the discriminant and all config fields
+ * (including scope fields like `employeeIds`, `dayOfWeek`, etc.) sit at the
+ * same level. This eliminates the `{ name, config: { ... } }` nesting that
+ * invited misplacement of scope fields.
+ *
+ * @category Rules
+ * @example
+ * ```ts
+ * const rules: CpsatRuleConfigEntry[] = [
+ *   { name: "max-hours-week", hours: 40, priority: "MANDATORY" },
+ *   { name: "time-off", employeeIds: ["alice"], dayOfWeek: ["monday"], priority: "MANDATORY" },
+ * ];
+ * ```
+ */
+export type CpsatRuleConfigEntry = {
+  [K in CpsatRuleName]: { name: K } & CpsatRuleRegistry[K];
+}[CpsatRuleName];

@@ -72,7 +72,7 @@ export interface CompilationResult {
  *   coverage: [...],
  *   schedulingPeriod: {
  *     dateRange: { start: '2025-02-03', end: '2025-02-09' },
- *     daysOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+ *     dayOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
  *   },
  * };
  * ```
@@ -84,7 +84,7 @@ export interface ModelBuilderConfig extends ModelBuilderOptions {
   shiftPatterns: ShiftPattern[];
   /**
    * Defines when scheduling should occur as a date range with optional
-   * `daysOfWeek` and `dates` filters that compose to narrow which days are included.
+   * `dayOfWeek` and `dates` filters that compose to narrow which days are included.
    */
   schedulingPeriod: SchedulingPeriod;
   coverage: CoverageRequirement[];
@@ -330,17 +330,17 @@ export class ModelBuilder {
 
   /**
    * Checks if a shift pattern can be used on a specific day.
-   * Returns false if the pattern has daysOfWeek restrictions that exclude this day.
+   * Returns false if the pattern has dayOfWeek restrictions that exclude this day.
    */
   patternAvailableOnDay(pattern: ShiftPattern, day: string): boolean {
     // If pattern has no day restrictions, it's available every day
-    if (!pattern.daysOfWeek || pattern.daysOfWeek.length === 0) {
+    if (!pattern.dayOfWeek || pattern.dayOfWeek.length === 0) {
       return true;
     }
     // Check if this day's day-of-week is in the allowed list
     const date = parseDayString(day);
-    const dayOfWeek = toDayOfWeekUTC(date);
-    return pattern.daysOfWeek.includes(dayOfWeek);
+    const dow = toDayOfWeekUTC(date);
+    return pattern.dayOfWeek.includes(dow);
   }
 
   patternDuration(patternId: string): number {

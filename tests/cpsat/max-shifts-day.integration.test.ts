@@ -32,10 +32,9 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "max-shifts-day",
-        config: {
-          shifts: 1,
-          priority: "MANDATORY",
-        },
+
+        shifts: 1,
+        priority: "MANDATORY",
       },
     ];
 
@@ -80,10 +79,9 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "max-shifts-day",
-        config: {
-          shifts: 2,
-          priority: "MANDATORY",
-        },
+
+        shifts: 2,
+        priority: "MANDATORY",
       },
     ];
 
@@ -161,10 +159,9 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "max-shifts-day",
-        config: {
-          shifts: 1,
-          priority: "LOW", // Soft constraint
-        },
+
+        shifts: 1,
+        priority: "LOW", // Soft constraint,
       },
     ];
 
@@ -203,10 +200,9 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "max-shifts-day",
-        config: {
-          shifts: 1,
-          priority: "MANDATORY",
-        },
+
+        shifts: 1,
+        priority: "MANDATORY",
       },
     ];
 
