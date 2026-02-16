@@ -291,3 +291,46 @@ export type {
   SkillValidationResult,
   CoverageConfigValidationResult,
 } from "./validation.js";
+
+// ============================================================================
+// Schedule Definition API (v2)
+// ============================================================================
+
+export {
+  defineSchedule,
+  t,
+  time,
+  cover,
+  shift,
+  maxHoursPerDay,
+  maxHoursPerWeek,
+  minHoursPerDay,
+  minHoursPerWeek,
+  maxShiftsPerDay,
+  maxConsecutiveDays,
+  minConsecutiveDays,
+  minRestBetweenShifts,
+  preference,
+  preferLocation,
+  timeOff,
+  assignTogether,
+  weekdays,
+  weekend,
+} from "./schedule.js";
+
+export type {
+  TimeEntry,
+  CoverageEntry,
+  CoverageOptions,
+  ShiftPatternDef,
+  ShiftOptions,
+  RuleEntry,
+  RuleOptions,
+  EntityOnlyRuleOptions,
+  TimeOffOptions,
+  AssignTogetherOptions,
+  SchedulingMember,
+  RuntimeArgs,
+  ScheduleDefinition,
+  ScheduleConfig,
+} from "./schedule.js";
