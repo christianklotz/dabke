@@ -3,6 +3,35 @@ import type { SolverRequest, SolverTerm } from "../client.types.js";
 import type { GroupKey } from "./validation.types.js";
 
 /**
+ * Pay per hour in the caller's smallest currency unit (e.g., pence, cents).
+ *
+ * @category Types
+ */
+export interface HourlyPay {
+  /** Pay per hour in smallest currency unit. */
+  hourlyRate: number;
+}
+
+/**
+ * Annual salary with contracted weekly hours.
+ *
+ * The solver treats salaried employees as having a fixed weekly cost
+ * (`annual / 52`) that is incurred once they work any shift in a week.
+ * Additional shifts within the same week have zero marginal cost.
+ *
+ * Note: overtime rules currently apply only to hourly employees.
+ * Salaried employees are skipped by overtime multiplier/surcharge rules.
+ *
+ * @category Types
+ */
+export interface SalariedPay {
+  /** Annual salary in smallest currency unit. */
+  annual: number;
+  /** Contracted hours per week. Reserved for future overtime support. */
+  hoursPerWeek: number;
+}
+
+/**
  * How strictly the solver enforces a rule.
  *
  * - `"LOW"`, `"MEDIUM"`, `"HIGH"`: soft constraints with increasing penalty for violations
@@ -27,6 +56,8 @@ export interface SchedulingEmployee {
   roleIds: string[];
   /** Skills this employee has (e.g. "senior", "trainer"). */
   skillIds?: string[];
+  /** Base pay. Required when cost rules are used. */
+  pay?: HourlyPay | SalariedPay;
 }
 
 /**

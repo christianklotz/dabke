@@ -57,9 +57,16 @@ import type {
 import { defineSemanticTimes } from "./cpsat/semantic-time.js";
 import { resolveDaysFromPeriod } from "./datetime.utils.js";
 import type { ModelBuilderConfig } from "./cpsat/model-builder.js";
-import type { SchedulingEmployee, ShiftPattern, Priority } from "./cpsat/types.js";
+import type {
+  SchedulingEmployee,
+  ShiftPattern,
+  Priority,
+  HourlyPay,
+  SalariedPay,
+} from "./cpsat/types.js";
 import type { CpsatRuleConfigEntry } from "./cpsat/rules/rules.types.js";
 import type { RecurringPeriod } from "./cpsat/rules/scope.types.js";
+import type { OvertimeTier } from "./cpsat/rules/overtime-tiered-multiplier.js";
 
 // ============================================================================
 // Primitives
@@ -336,6 +343,25 @@ export interface AssignTogetherOptions {
   priority?: Priority;
 }
 
+/**
+ * Options for cost rules.
+ *
+ * Cost rules are objective terms, not constraints. The `priority` field from
+ * {@link RuleOptions} does not apply.
+ */
+export interface CostRuleOptions {
+  /** Who this rule applies to (role name, skill name, or member ID). */
+  appliesTo?: string | string[];
+  /** Restrict to specific days of the week. */
+  dayOfWeek?: DayOfWeek[];
+  /** Restrict to a date range. */
+  dateRange?: { start: string; end: string };
+  /** Restrict to specific dates (YYYY-MM-DD). */
+  dates?: string[];
+  /** Restrict to recurring calendar periods. */
+  recurringPeriods?: [RecurringPeriod, ...RecurringPeriod[]];
+}
+
 // Internal rule entry type
 interface RuleEntryBase {
   readonly _type: "rule";
@@ -451,6 +477,170 @@ export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions)
 }
 
 /**
+ * Tells the solver to minimize total labor cost.
+ *
+ * Without this rule, cost modifiers only affect post-solve calculation.
+ * When present, the solver actively prefers cheaper assignments.
+ *
+ * For hourly employees, penalizes each assignment proportionally to cost.
+ * For salaried employees, adds a fixed weekly salary cost when they have
+ * any assignment that week (zero marginal cost up to contracted hours).
+ *
+ * @param opts - Entity and time scoping
+ */
+export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
+  return makeRule("minimize-cost", { ...opts });
+}
+
+/**
+ * Multiplies the base rate for assignments on specified days.
+ *
+ * The base cost (1x) is already counted by `minimizeCost()`;
+ * this rule adds only the extra portion above 1x.
+ *
+ * @param factor - Multiplier (e.g., 1.5 for time-and-a-half)
+ * @param opts - Entity and time scoping
+ *
+ * @example Weekend multiplier
+ * ```typescript
+ * dayMultiplier(1.5, { dayOfWeek: weekend })
+ * ```
+ */
+export function dayMultiplier(factor: number, opts?: CostRuleOptions): RuleEntry {
+  return makeRule("day-cost-multiplier", { factor, ...opts });
+}
+
+/**
+ * Adds a flat extra amount per hour for assignments on specified days,
+ * independent of the employee's base rate.
+ *
+ * @param amountPerHour - Flat surcharge per hour in smallest currency unit
+ * @param opts - Entity and time scoping
+ *
+ * @example Weekend surcharge
+ * ```typescript
+ * daySurcharge(500, { dayOfWeek: weekend })
+ * ```
+ */
+export function daySurcharge(amountPerHour: number, opts?: CostRuleOptions): RuleEntry {
+  return makeRule("day-cost-surcharge", { amountPerHour, ...opts });
+}
+
+/**
+ * Adds a flat surcharge per hour for the portion of a shift that overlaps
+ * a time-of-day window.
+ *
+ * @param amountPerHour - Flat surcharge per hour in smallest currency unit
+ * @param window - Time-of-day window (supports overnight, e.g., 22:00-06:00)
+ * @param opts - Entity and time scoping
+ *
+ * @example Night differential
+ * ```typescript
+ * timeSurcharge(200, { from: t(22), until: t(6) })
+ * ```
+ */
+export function timeSurcharge(
+  amountPerHour: number,
+  window: { from: TimeOfDay; until: TimeOfDay },
+  opts?: CostRuleOptions,
+): RuleEntry {
+  return makeRule("time-cost-surcharge", { amountPerHour, window, ...opts });
+}
+
+/**
+ * Hours beyond the threshold per week are paid at `factor` times the base rate.
+ * Only the extra portion above 1x is added.
+ *
+ * @param opts - Must include `after` (hours threshold) and `factor` (multiplier)
+ *
+ * @example
+ * ```typescript
+ * overtimeMultiplier({ after: 40, factor: 1.5 })
+ * ```
+ */
+export function overtimeMultiplier(
+  opts: { after: number; factor: number } & CostRuleOptions,
+): RuleEntry {
+  return makeRule("overtime-weekly-multiplier", { ...opts });
+}
+
+/**
+ * Hours beyond the threshold per week get a flat surcharge per hour,
+ * independent of the employee's base rate.
+ *
+ * @param opts - Must include `after` (hours threshold) and `amount` (flat extra per hour)
+ *
+ * @example
+ * ```typescript
+ * overtimeSurcharge({ after: 40, amount: 1000 })
+ * ```
+ */
+export function overtimeSurcharge(
+  opts: { after: number; amount: number } & CostRuleOptions,
+): RuleEntry {
+  return makeRule("overtime-weekly-surcharge", { ...opts });
+}
+
+/**
+ * Hours beyond the threshold per day are paid at `factor` times the base rate.
+ * Only the extra portion above 1x is added.
+ *
+ * @param opts - Must include `after` (hours threshold per day) and `factor`
+ *
+ * @example
+ * ```typescript
+ * dailyOvertimeMultiplier({ after: 8, factor: 1.5 })
+ * ```
+ */
+export function dailyOvertimeMultiplier(
+  opts: { after: number; factor: number } & CostRuleOptions,
+): RuleEntry {
+  return makeRule("overtime-daily-multiplier", { ...opts });
+}
+
+/**
+ * Hours beyond the threshold per day get a flat surcharge per hour,
+ * independent of the employee's base rate.
+ *
+ * @param opts - Must include `after` (hours threshold per day) and `amount`
+ *
+ * @example
+ * ```typescript
+ * dailyOvertimeSurcharge({ after: 8, amount: 500 })
+ * ```
+ */
+export function dailyOvertimeSurcharge(
+  opts: { after: number; amount: number } & CostRuleOptions,
+): RuleEntry {
+  return makeRule("overtime-daily-surcharge", { ...opts });
+}
+
+/**
+ * Multiple overtime thresholds with increasing multipliers.
+ * Each tier applies only to the hours between its threshold and the next.
+ *
+ * @param tiers - At least one tier, sorted by threshold ascending
+ * @param opts - Entity and time scoping
+ *
+ * @example
+ * ```typescript
+ * // Hours 0-40: base rate
+ * // Hours 40-48: 1.5x
+ * // Hours 48+: 2.0x
+ * tieredOvertimeMultiplier([
+ *   { after: 40, factor: 1.5 },
+ *   { after: 48, factor: 2.0 },
+ * ])
+ * ```
+ */
+export function tieredOvertimeMultiplier(
+  tiers: [OvertimeTier, ...OvertimeTier[]],
+  opts?: CostRuleOptions,
+): RuleEntry {
+  return makeRule("overtime-tiered-multiplier", { tiers, ...opts });
+}
+
+/**
  * Blocks or penalizes assignments during specified time periods.
  *
  * @remarks
@@ -503,6 +693,8 @@ export interface SchedulingMember {
   roles: string[];
   /** Skills this member has. Each must be a declared skill. */
   skills?: string[];
+  /** Base pay. Required when cost rules are used. */
+  pay?: HourlyPay | SalariedPay;
 }
 
 /** Runtime arguments passed to {@link ScheduleDefinition.createSchedulerConfig}. */
@@ -706,13 +898,39 @@ export function defineSchedule<
         id: m.id,
         roleIds: m.roles,
         skillIds: m.skills,
+        pay: m.pay,
       }));
 
       // Resolve rules
       const specRules = config.rules ?? [];
       const runtimeRules = args.runtimeRules ?? [];
       const allRules = [...specRules, ...runtimeRules];
-      const ruleConfigs = resolveRules(allRules, roles, skills, memberIds);
+
+      // Validate pay data when cost rules are present
+      const costRuleNames = new Set([
+        "minimize-cost",
+        "day-cost-multiplier",
+        "day-cost-surcharge",
+        "time-cost-surcharge",
+        "overtime-weekly-multiplier",
+        "overtime-weekly-surcharge",
+        "overtime-daily-multiplier",
+        "overtime-daily-surcharge",
+        "overtime-tiered-multiplier",
+      ]);
+      const hasCostRules = allRules.some((r) => costRuleNames.has(r._rule));
+      if (hasCostRules) {
+        const missingPay = args.members.filter((m) => !m.pay).map((m) => m.id);
+        if (missingPay.length > 0) {
+          throw new Error(
+            `Cost rules require pay data on all members. Missing pay: ${missingPay.join(", ")}`,
+          );
+        }
+      }
+
+      // Sort rules so minimize-cost compiles before modifier rules
+      const sortedRules = sortCostRulesFirst(allRules);
+      const ruleConfigs = resolveRules(sortedRules, roles, skills, memberIds);
 
       // Resolve scheduling period with dayOfWeek filter
       const resolvedPeriod = applyDaysFilter(args.schedulingPeriod, config.dayOfWeek);
@@ -1043,10 +1261,105 @@ function resolveRules(
         };
       }
 
+      case "minimize-cost":
+        return {
+          name: "minimize-cost" as const,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "day-cost-multiplier":
+        return {
+          name: "day-cost-multiplier" as const,
+          factor: rest.factor as number,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "day-cost-surcharge":
+        return {
+          name: "day-cost-surcharge" as const,
+          amountPerHour: rest.amountPerHour as number,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "time-cost-surcharge":
+        return {
+          name: "time-cost-surcharge" as const,
+          amountPerHour: rest.amountPerHour as number,
+          window: rest.window as { from: TimeOfDay; until: TimeOfDay },
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "overtime-weekly-multiplier":
+        return {
+          name: "overtime-weekly-multiplier" as const,
+          after: rest.after as number,
+          factor: rest.factor as number,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "overtime-weekly-surcharge":
+        return {
+          name: "overtime-weekly-surcharge" as const,
+          after: rest.after as number,
+          amount: rest.amount as number,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "overtime-daily-multiplier":
+        return {
+          name: "overtime-daily-multiplier" as const,
+          after: rest.after as number,
+          factor: rest.factor as number,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "overtime-daily-surcharge":
+        return {
+          name: "overtime-daily-surcharge" as const,
+          after: rest.after as number,
+          amount: rest.amount as number,
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
+      case "overtime-tiered-multiplier":
+        return {
+          name: "overtime-tiered-multiplier" as const,
+          tiers: rest.tiers as [
+            { after: number; factor: number },
+            ...{ after: number; factor: number }[],
+          ],
+          ...entityScope,
+          ...resolveTimeScope(rest),
+        };
+
       default:
         throw new Error(`Unknown rule type: ${_rule}`);
     }
   }) as CpsatRuleConfigEntry[];
+}
+
+// ============================================================================
+// Internal: Cost Rule Ordering
+// ============================================================================
+
+/**
+ * Sorts rules so that `minimize-cost` compiles before cost modifier rules.
+ * Non-cost rules retain their original order.
+ */
+function sortCostRulesFirst(rules: RuleEntry[]): RuleEntry[] {
+  return rules.toSorted((a, b) => {
+    const aIsCostBase = a._rule === "minimize-cost" ? 0 : 1;
+    const bIsCostBase = b._rule === "minimize-cost" ? 0 : 1;
+    return aIsCostBase - bIsCostBase;
+  });
 }
 
 // ============================================================================

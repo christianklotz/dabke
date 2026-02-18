@@ -13,6 +13,7 @@ export const MINUTES_PER_DAY = 24 * 60;
  *
  * Weight hierarchy (highest to lowest priority):
  * - SHIFT_ACTIVE (1000): Minimize number of active shift patterns
+ * - COST (100): Labor cost optimization (base pay + modifiers)
  * - ASSIGNMENT_PREFERENCE (10): Per-assignment preference (e.g., prefer permanent staff)
  * - FAIRNESS (5): Fair distribution of shifts across team members
  * - ASSIGNMENT_BASE (1): Tiebreaker - minimize total assignments
@@ -31,6 +32,8 @@ export const MINUTES_PER_DAY = 24 * 60;
 export const OBJECTIVE_WEIGHTS = {
   /** Weight for minimizing active shift patterns (reduces fragmentation) */
   SHIFT_ACTIVE: 1000,
+  /** Weight for cost optimization (labor cost minimization) */
+  COST: 100,
   /** Weight for per-assignment preferences (e.g., prefer/avoid certain team members) */
   ASSIGNMENT_PREFERENCE: 10,
   /** Weight for fair distribution objective (minimizes max shifts per employee) */
@@ -69,6 +72,28 @@ export function priorityToPenalty(priority: Priority): number {
     default:
       return 0;
   }
+}
+
+/**
+ * Computes the total duration of the union of time ranges.
+ *
+ * Merges overlapping ranges and sums the merged durations.
+ * Used to bound the maximum working minutes per day when
+ * no-overlap constraints are enforced.
+ */
+export function unionMinutes(ranges: ReadonlyArray<{ start: number; end: number }>): number {
+  if (ranges.length === 0) return 0;
+  const sorted = ranges.toSorted((a, b) => a.start - b.start);
+  let total = 0;
+  let currentEnd = sorted[0]!.start;
+  for (const r of sorted) {
+    const effectiveStart = Math.max(r.start, currentEnd);
+    if (effectiveStart < r.end) {
+      total += r.end - effectiveStart;
+      currentEnd = r.end;
+    }
+  }
+  return total;
 }
 
 export function splitIntoWeeks(days: string[], weekStartsOn: DayOfWeek): string[][] {

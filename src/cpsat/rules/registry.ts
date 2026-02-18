@@ -11,6 +11,15 @@ import {
   createMinHoursWeekRule,
   createMinRestBetweenShiftsRule,
   createTimeOffRule,
+  createMinimizeCostRule,
+  createDayCostMultiplierRule,
+  createDayCostSurchargeRule,
+  createTimeCostSurchargeRule,
+  createOvertimeWeeklyMultiplierRule,
+  createOvertimeWeeklySurchargeRule,
+  createOvertimeDailyMultiplierRule,
+  createOvertimeDailySurchargeRule,
+  createOvertimeTieredMultiplierRule,
 } from "./index.js";
 import type {
   BuiltInCpsatRuleFactories,
@@ -31,6 +40,15 @@ export const builtInCpsatRuleFactories: BuiltInCpsatRuleFactories = {
   "min-hours-week": createMinHoursWeekRule,
   "min-rest-between-shifts": createMinRestBetweenShiftsRule,
   "time-off": createTimeOffRule,
+  "minimize-cost": createMinimizeCostRule,
+  "day-cost-multiplier": createDayCostMultiplierRule,
+  "day-cost-surcharge": createDayCostSurchargeRule,
+  "time-cost-surcharge": createTimeCostSurchargeRule,
+  "overtime-weekly-multiplier": createOvertimeWeeklyMultiplierRule,
+  "overtime-weekly-surcharge": createOvertimeWeeklySurchargeRule,
+  "overtime-daily-multiplier": createOvertimeDailyMultiplierRule,
+  "overtime-daily-surcharge": createOvertimeDailySurchargeRule,
+  "overtime-tiered-multiplier": createOvertimeTieredMultiplierRule,
 };
 
 /**

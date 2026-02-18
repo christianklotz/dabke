@@ -16,6 +16,15 @@ export interface CpsatRuleRegistry {
   "min-hours-week": import("./min-hours-week.js").MinHoursWeekConfig;
   "min-rest-between-shifts": import("./min-rest-between-shifts.js").MinRestBetweenShiftsConfig;
   "time-off": import("./time-off.js").TimeOffConfig;
+  "minimize-cost": import("./minimize-cost.js").MinimizeCostConfig;
+  "day-cost-multiplier": import("./day-cost-multiplier.js").DayCostMultiplierConfig;
+  "day-cost-surcharge": import("./day-cost-surcharge.js").DayCostSurchargeConfig;
+  "time-cost-surcharge": import("./time-cost-surcharge.js").TimeCostSurchargeConfig;
+  "overtime-weekly-multiplier": import("./overtime-weekly-multiplier.js").OvertimeWeeklyMultiplierConfig;
+  "overtime-weekly-surcharge": import("./overtime-weekly-surcharge.js").OvertimeWeeklySurchargeConfig;
+  "overtime-daily-multiplier": import("./overtime-daily-multiplier.js").OvertimeDailyMultiplierConfig;
+  "overtime-daily-surcharge": import("./overtime-daily-surcharge.js").OvertimeDailySurchargeConfig;
+  "overtime-tiered-multiplier": import("./overtime-tiered-multiplier.js").OvertimeTieredMultiplierConfig;
 }
 
 export type CpsatRuleName = keyof CpsatRuleRegistry;

@@ -22,7 +22,7 @@ import { builtInCpsatRuleFactories } from "./rules/registry.js";
 import { ValidationReporterImpl } from "./validation-reporter.js";
 import type { ValidationReporter } from "./validation-reporter.js";
 import type { ScheduleValidation, CoverageExclusion } from "./validation.types.js";
-import type { ResolvedShiftAssignment } from "./response.js";
+import type { ShiftAssignment, ResolvedShiftAssignment } from "./response.js";
 
 /**
  * Builds a CP-SAT solver request from high-level scheduling constructs
@@ -53,6 +53,45 @@ export interface CompilationRule {
     reporter: ValidationReporter,
     context: RuleValidationContext,
   ): void;
+  /** Compute cost contribution for a solved schedule. */
+  cost?(
+    assignments: ShiftAssignment[],
+    employees: ReadonlyArray<SchedulingEmployee>,
+    shiftPatterns: ReadonlyArray<ShiftPattern>,
+  ): CostContribution;
+}
+
+/**
+ * Shared context for cost rules.
+ *
+ * Set by `minimizeCost()` during compilation, read by modifier rules.
+ * When undefined, modifier rules skip emitting solver terms.
+ */
+export interface CostContext {
+  /** Normalization divisor: max raw cost of any single assignment. */
+  normalizationFactor: number;
+  /** Whether minimizeCost() is active (modifier rules check this). */
+  active: boolean;
+}
+
+/**
+ * A cost entry produced by a rule's `cost()` method.
+ *
+ * The `category` is an open-ended string. Built-in rules use well-known
+ * categories from {@link COST_CATEGORY}. Custom rules can use any string.
+ */
+export interface CostEntry {
+  employeeId: string;
+  day: string;
+  category: string;
+  amount: number;
+}
+
+/**
+ * Cost contribution from a single rule.
+ */
+export interface CostContribution {
+  entries: CostEntry[];
 }
 
 export interface CompilationResult {
@@ -121,6 +160,9 @@ export class ModelBuilder {
   readonly coverageBucketMinutes: number;
   readonly reporter: ValidationReporter;
   readonly fairDistribution: boolean;
+
+  /** Shared context for cost rules. Set by minimizeCost(), read by modifiers. */
+  costContext: CostContext | undefined;
 
   #variables = new Map<string, SolverVariable>();
   #constraints: SolverConstraint[] = [];
@@ -283,8 +325,10 @@ export class ModelBuilder {
   }
 
   addPenalty(varName: string, weight: number): void {
-    if (weight === 0) return;
-    this.#objective.push({ var: varName, coeff: weight });
+    // CP-SAT requires integer coefficients. Round to nearest integer.
+    const rounded = Math.round(weight);
+    if (rounded === 0) return;
+    this.#objective.push({ var: varName, coeff: rounded });
   }
 
   employeesWithRole(roleId: string): SchedulingEmployee[] {

@@ -147,6 +147,9 @@ export type {
   CompilationResult,
   CompilationRule,
   RuleValidationContext,
+  CostContext,
+  CostEntry,
+  CostContribution,
 } from "./cpsat/model-builder.js";
 
 // ============================================================================
@@ -174,6 +177,15 @@ export {
   createMinHoursWeekRule,
   createMinRestBetweenShiftsRule,
   createTimeOffRule,
+  createMinimizeCostRule,
+  createDayCostMultiplierRule,
+  createDayCostSurchargeRule,
+  createTimeCostSurchargeRule,
+  createOvertimeWeeklyMultiplierRule,
+  createOvertimeWeeklySurchargeRule,
+  createOvertimeDailyMultiplierRule,
+  createOvertimeDailySurchargeRule,
+  createOvertimeTieredMultiplierRule,
 } from "./cpsat/rules/index.js";
 
 export type {
@@ -196,6 +208,18 @@ export type { MinHoursDayConfig } from "./cpsat/rules/min-hours-day.js";
 export type { MinHoursWeekConfig } from "./cpsat/rules/min-hours-week.js";
 export type { MinRestBetweenShiftsConfig } from "./cpsat/rules/min-rest-between-shifts.js";
 export type { TimeOffConfig } from "./cpsat/rules/time-off.js";
+export type { MinimizeCostConfig } from "./cpsat/rules/minimize-cost.js";
+export type { DayCostMultiplierConfig } from "./cpsat/rules/day-cost-multiplier.js";
+export type { DayCostSurchargeConfig } from "./cpsat/rules/day-cost-surcharge.js";
+export type { TimeCostSurchargeConfig } from "./cpsat/rules/time-cost-surcharge.js";
+export type { OvertimeWeeklyMultiplierConfig } from "./cpsat/rules/overtime-weekly-multiplier.js";
+export type { OvertimeWeeklySurchargeConfig } from "./cpsat/rules/overtime-weekly-surcharge.js";
+export type { OvertimeDailyMultiplierConfig } from "./cpsat/rules/overtime-daily-multiplier.js";
+export type { OvertimeDailySurchargeConfig } from "./cpsat/rules/overtime-daily-surcharge.js";
+export type {
+  OvertimeTieredMultiplierConfig,
+  OvertimeTier,
+} from "./cpsat/rules/overtime-tiered-multiplier.js";
 
 export { builtInCpsatRuleFactories, createCpsatRuleFactory } from "./cpsat/rules/registry.js";
 
@@ -230,10 +254,20 @@ export type {
 } from "./cpsat/semantic-time.js";
 
 // ============================================================================
+// Cost calculation
+// ============================================================================
+
+export { calculateScheduleCost, COST_CATEGORY } from "./cpsat/cost.js";
+
+export type { CostBreakdown, EmployeeCostDetail, CostCalculationConfig } from "./cpsat/cost.js";
+
+// ============================================================================
 // Types (scheduling domain)
 // ============================================================================
 
 export type {
+  HourlyPay,
+  SalariedPay,
   SchedulingEmployee,
   Employee,
   ShiftPattern,
@@ -314,6 +348,15 @@ export {
   preferLocation,
   timeOff,
   assignTogether,
+  minimizeCost,
+  dayMultiplier,
+  daySurcharge,
+  timeSurcharge,
+  overtimeMultiplier,
+  overtimeSurcharge,
+  dailyOvertimeMultiplier,
+  dailyOvertimeSurcharge,
+  tieredOvertimeMultiplier,
   weekdays,
   weekend,
 } from "./schedule.js";
@@ -329,6 +372,7 @@ export type {
   EntityOnlyRuleOptions,
   TimeOffOptions,
   AssignTogetherOptions,
+  CostRuleOptions,
   SchedulingMember,
   RuntimeArgs,
   ScheduleDefinition,
