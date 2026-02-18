@@ -113,10 +113,17 @@ export const startSolverContainer = async (
 
   const resolvedPort = port ?? (await allocatePort());
 
+  const containerName = `dabke-solver-${resolvedPort}`;
+
+  // Remove any stale container with the same name from a previous interrupted run
+  spawnSync("docker", ["rm", "-f", containerName], { stdio: "ignore" });
+
   const runResult = spawnSync("docker", [
     "run",
     "-d",
     "--rm",
+    "--name",
+    containerName,
     "-p",
     `${resolvedPort}:8080`,
     imageTag,
