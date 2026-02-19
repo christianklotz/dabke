@@ -47,7 +47,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
-          roleIds: ["staff"] as [string, ...string[]],
+          roles: ["staff"] as [string, ...string[]],
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 17, minutes: 30 },
           targetCount: 1,
@@ -115,7 +115,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
-          roleIds: ["staff"] as [string, ...string[]],
+          roles: ["staff"] as [string, ...string[]],
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 17, minutes: 30 },
           targetCount: 1,
@@ -171,7 +171,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-08" } },
         coverage: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"].map((day) => ({
           day,
-          roleIds: ["staff"] as [string, ...string[]],
+          roles: ["staff"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -226,7 +226,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
-          roleIds: ["staff"] as [string, ...string[]],
+          roles: ["staff"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,

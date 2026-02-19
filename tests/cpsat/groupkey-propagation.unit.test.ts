@@ -19,7 +19,7 @@ describe("groupKey propagation", () => {
     const coverage = times.coverage([
       {
         semanticTime: "weekday_open",
-        roleIds: ["staff"],
+        roles: ["staff"],
         targetCount: 2,
         dayOfWeek: ["monday", "tuesday"],
       },
@@ -81,8 +81,8 @@ describe("groupKey propagation", () => {
     });
 
     const coverage = times.coverage([
-      { semanticTime: "morning", roleIds: ["staff"], targetCount: 1 },
-      { semanticTime: "afternoon", roleIds: ["staff"], targetCount: 2 },
+      { semanticTime: "morning", roles: ["staff"], targetCount: 1 },
+      { semanticTime: "afternoon", roles: ["staff"], targetCount: 2 },
     ]);
 
     const days = ["2026-02-02"];
@@ -132,7 +132,7 @@ describe("groupKey propagation", () => {
     });
 
     const coverage = times.coverage([
-      { semanticTime: "working_hours", roleIds: ["staff"], targetCount: 2 },
+      { semanticTime: "working_hours", roles: ["staff"], targetCount: 2 },
     ]);
 
     const days = ["2026-02-02", "2026-02-03", "2026-02-04"];

@@ -7,7 +7,7 @@ import { getSolverClient, decodeAssignments, solveWithRules, createBaseConfig } 
  * Tests for skill-based scheduling via time-off rules.
  *
  * Note: The CP-SAT CoverageRequirement type currently does not support
- * `skillIds` directly on coverage. Instead, skill-based constraints are
+ * `skills` directly on coverage. Instead, skill-based constraints are
  * enforced via:
  * 1. Role restrictions on shift patterns
  * 2. Time-off rules scoped by skillIds
@@ -39,7 +39,7 @@ describe("Skill-based scheduling (integration)", () => {
     });
 
     // Block members WITHOUT keyholder skill from morning (inverse of what we want)
-    // Actually, time-off blocks by skillIds means "members WITH these skills are off"
+    // Actually, time-off blocks by skills means "members WITH these skills are off"
     // So we need the opposite - this demonstrates the pattern limitation
 
     // For now, test that we can block skilled members
@@ -117,7 +117,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["chef"],
+          roles: ["chef"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -155,7 +155,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["waiter"],
+          roles: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -193,7 +193,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["waiter"],
+          roles: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -228,7 +228,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["waiter"],
+          roles: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 2,

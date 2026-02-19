@@ -548,13 +548,13 @@ describe("CP-SAT: time-off rule", () => {
         shifts: [
           {
             id: "morning",
-            roleIds: ["chef"],
+            roles: ["chef"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
           },
           {
             id: "evening",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -563,7 +563,7 @@ describe("CP-SAT: time-off rule", () => {
         coverage: [
           {
             day: "2024-02-05",
-            roleIds: ["chef"],
+            roles: ["chef"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,
@@ -571,7 +571,7 @@ describe("CP-SAT: time-off rule", () => {
           },
           {
             day: "2024-02-05",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 1,
@@ -785,7 +785,7 @@ describe("CP-SAT: time-off rule", () => {
         coverage: ["2024-02-05", "2024-02-06", "2024-02-07"].flatMap((day) => [
           {
             day,
-            roleIds: ["nurse"],
+            roles: ["nurse"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 19, minutes: 0 },
             targetCount: 1,

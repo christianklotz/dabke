@@ -30,7 +30,7 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
       coverage: [
         {
           day: "2024-02-01",
-          roleIds: ["chef"],
+          roles: ["chef"],
           startTime: { hours: 14, minutes: 0 },
           endTime: { hours: 22, minutes: 0 },
           targetCount: 1,
@@ -38,7 +38,7 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
         },
         {
           day: "2024-02-02",
-          roleIds: ["chef"],
+          roles: ["chef"],
           startTime: { hours: 6, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
           targetCount: 1,

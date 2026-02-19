@@ -9,28 +9,28 @@ import type { CoverageRequirement, SchedulingMember } from "../src/index.js";
 /**
  * Helper to create role-based coverage requirements for tests.
  */
-function roleBasedCoverage(roleIds: [string, ...string[]]): CoverageRequirement {
+function roleBasedCoverage(roles: [string, ...string[]]): CoverageRequirement {
   return {
     day: "2024-01-01",
     startTime: { hours: 9, minutes: 0 },
     endTime: { hours: 17, minutes: 0 },
     targetCount: 1,
     priority: "MANDATORY",
-    roleIds,
+    roles,
   };
 }
 
 /**
  * Helper to create skill-based coverage requirements for tests.
  */
-function skillBasedCoverage(skillIds: [string, ...string[]]): CoverageRequirement {
+function skillBasedCoverage(skills: [string, ...string[]]): CoverageRequirement {
   return {
     day: "2024-01-01",
     startTime: { hours: 9, minutes: 0 },
     endTime: { hours: 17, minutes: 0 },
     targetCount: 1,
     priority: "MANDATORY",
-    skillIds,
+    skills,
   };
 }
 
@@ -38,8 +38,8 @@ function skillBasedCoverage(skillIds: [string, ...string[]]): CoverageRequiremen
  * Helper to create coverage with both roles and skills for tests.
  */
 function roleAndSkillCoverage(
-  roleIds: [string, ...string[]],
-  skillIds: [string, ...string[]],
+  roles: [string, ...string[]],
+  skills: [string, ...string[]],
 ): CoverageRequirement {
   return {
     day: "2024-01-01",
@@ -47,8 +47,8 @@ function roleAndSkillCoverage(
     endTime: { hours: 17, minutes: 0 },
     targetCount: 1,
     priority: "MANDATORY",
-    roleIds,
-    skillIds,
+    roles,
+    skills,
   };
 }
 
@@ -87,7 +87,7 @@ describe("validateCoverageRoles", () => {
     expect(result.knownRoles).toEqual(["cashier"]);
   });
 
-  it("ignores coverage without roleIds (skill-only coverage)", () => {
+  it("ignores coverage without roles (skill-only coverage)", () => {
     const members: SchedulingMember[] = [{ id: "alice", roles: ["server"], skills: ["keyholder"] }];
 
     const coverage: CoverageRequirement[] = [skillBasedCoverage(["keyholder"])];
@@ -183,9 +183,9 @@ describe("validateCoverageSkills", () => {
     expect(result.knownSkills).toEqual(["keyholder"]);
   });
 
-  it("handles members without skillIds", () => {
+  it("handles members without skills", () => {
     const members: SchedulingMember[] = [
-      { id: "alice", roles: ["server"] }, // No skillIds
+      { id: "alice", roles: ["server"] }, // No skills
     ];
 
     const coverage: CoverageRequirement[] = [skillBasedCoverage(["keyholder"])];
@@ -196,7 +196,7 @@ describe("validateCoverageSkills", () => {
     expect(result.unknownSkills).toEqual(["keyholder"]);
   });
 
-  it("ignores coverage without skillIds", () => {
+  it("ignores coverage without skills", () => {
     const members: SchedulingMember[] = [{ id: "alice", roles: ["server"] }];
 
     const coverage: CoverageRequirement[] = [roleBasedCoverage(["server"])];

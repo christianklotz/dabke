@@ -28,13 +28,13 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 3 },
       ]);
 
       expect(coverage).toHaveLength(1);
       expect(coverage[0]).toEqual({
         semanticTime: "lunch",
-        roleIds: ["server"],
+        roles: ["server"],
         targetCount: 3,
       });
     });
@@ -47,7 +47,7 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 3 },
       ]);
 
       const days = ["2026-01-12", "2026-01-13", "2026-01-14"];
@@ -58,7 +58,7 @@ describe("defineSemanticTimes", () => {
         day: "2026-01-12",
         startTime: t(11, 30),
         endTime: t(14),
-        roleIds: ["server"],
+        roles: ["server"],
         targetCount: 3,
         priority: "MANDATORY",
       });
@@ -74,7 +74,7 @@ describe("defineSemanticTimes", () => {
       const coverage = times.coverage([
         {
           semanticTime: "lunch",
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 4,
           dayOfWeek: ["saturday", "sunday"],
         },
@@ -96,7 +96,7 @@ describe("defineSemanticTimes", () => {
       const coverage = times.coverage([
         {
           semanticTime: "lunch",
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 5,
           dates: ["2026-01-12"],
         },
@@ -121,7 +121,7 @@ describe("defineSemanticTimes", () => {
           day: "2026-01-14",
           startTime: t(15),
           endTime: t(20),
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 5,
         },
       ]);
@@ -134,7 +134,7 @@ describe("defineSemanticTimes", () => {
         day: "2026-01-14",
         startTime: t(15),
         endTime: t(20),
-        roleIds: ["server"],
+        roles: ["server"],
         targetCount: 5,
         priority: "MANDATORY",
       });
@@ -152,7 +152,7 @@ describe("defineSemanticTimes", () => {
           day: "2026-01-20",
           startTime: t(15),
           endTime: t(20),
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 5,
         },
       ]);
@@ -169,12 +169,12 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 3 },
         {
           day: "2026-01-14",
           startTime: t(15),
           endTime: t(20),
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 5,
           priority: "MANDATORY",
         },
@@ -207,7 +207,7 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 3 },
       ]);
 
       // 2026-01-09 is Friday, 2026-01-10 is Saturday
@@ -235,7 +235,7 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "closing", roleIds: ["server"], targetCount: 2 },
+        { semanticTime: "closing", roles: ["server"], targetCount: 2 },
       ]);
 
       const days = ["2025-12-31", "2026-01-01", "2026-01-02"];
@@ -265,7 +265,7 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "weekdayOnly", roleIds: ["staff"], targetCount: 1 },
+        { semanticTime: "weekdayOnly", roles: ["staff"], targetCount: 1 },
       ]);
 
       // 2026-01-10 is Saturday - no variant matches
@@ -284,7 +284,7 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 2 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 2 },
       ]);
 
       // 2026-01-09 Friday (uses default), 2026-01-10 Saturday (uses variant)
@@ -306,7 +306,7 @@ describe("defineSemanticTimes", () => {
           day: "2026-01-14",
           startTime: t(15),
           endTime: t(20),
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 5,
         }),
       ).toBe(true);
@@ -314,7 +314,7 @@ describe("defineSemanticTimes", () => {
       expect(
         isConcreteCoverage({
           semanticTime: "lunch",
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 3,
         } as any),
       ).toBe(false);
@@ -324,7 +324,7 @@ describe("defineSemanticTimes", () => {
       expect(
         isSemanticCoverage({
           semanticTime: "lunch",
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 3,
         }),
       ).toBe(true);
@@ -334,7 +334,7 @@ describe("defineSemanticTimes", () => {
           day: "2026-01-14",
           startTime: t(15),
           endTime: t(20),
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 5,
         } as any),
       ).toBe(false);
@@ -348,7 +348,7 @@ describe("defineSemanticTimes", () => {
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 3 },
       ]);
 
       const resolved = times.resolve(coverage, ["2026-01-12"]);
@@ -363,7 +363,7 @@ describe("defineSemanticTimes", () => {
       const coverage = times.coverage([
         {
           semanticTime: "opening",
-          roleIds: ["keyholder"],
+          roles: ["keyholder"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -384,7 +384,7 @@ describe("defineSemanticTimes", () => {
       const coverage = [
         {
           semanticTime: "dinner" as "lunch",
-          roleIds: ["server"] as [string, ...string[]],
+          roles: ["server"] as [string, ...string[]],
           targetCount: 2,
         },
       ];
@@ -396,7 +396,7 @@ describe("defineSemanticTimes", () => {
   });
 
   describe("skill-based coverage", () => {
-    it("should resolve semantic coverage with skillIds only", () => {
+    it("should resolve semantic coverage with skills only", () => {
       const times = defineSemanticTimes({
         opening: { startTime: t(6), endTime: t(8) },
       });
@@ -404,7 +404,7 @@ describe("defineSemanticTimes", () => {
       const coverage = times.coverage([
         {
           semanticTime: "opening",
-          skillIds: ["keyholder"],
+          skills: ["keyholder"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -417,15 +417,15 @@ describe("defineSemanticTimes", () => {
         day: "2026-01-12",
         startTime: t(6),
         endTime: t(8),
-        skillIds: ["keyholder"],
+        skills: ["keyholder"],
         targetCount: 1,
         priority: "MANDATORY",
       });
-      expect(resolved[0]?.roleIds).toBeUndefined();
+      expect(resolved[0]?.roles).toBeUndefined();
       expect(resolved[0]?.groupKey).toBe("1x keyholder during opening");
     });
 
-    it("should resolve semantic coverage with both roleIds and skillIds", () => {
+    it("should resolve semantic coverage with both roles and skills", () => {
       const times = defineSemanticTimes({
         training: { startTime: t(9), endTime: t(17) },
       });
@@ -433,8 +433,8 @@ describe("defineSemanticTimes", () => {
       const coverage = times.coverage([
         {
           semanticTime: "training",
-          roleIds: ["waiter"],
-          skillIds: ["senior", "trainer"],
+          roles: ["waiter"],
+          skills: ["senior", "trainer"],
           targetCount: 1,
         },
       ]);
@@ -442,11 +442,11 @@ describe("defineSemanticTimes", () => {
       const resolved = times.resolve(coverage, ["2026-01-12"]);
 
       expect(resolved).toHaveLength(1);
-      expect(resolved[0]?.roleIds).toEqual(["waiter"]);
-      expect(resolved[0]?.skillIds).toEqual(["senior", "trainer"]);
+      expect(resolved[0]?.roles).toEqual(["waiter"]);
+      expect(resolved[0]?.skills).toEqual(["senior", "trainer"]);
     });
 
-    it("should resolve concrete coverage with skillIds only", () => {
+    it("should resolve concrete coverage with skills only", () => {
       const times = defineSemanticTimes({
         lunch: { startTime: t(11, 30), endTime: t(14) },
       });
@@ -456,7 +456,7 @@ describe("defineSemanticTimes", () => {
           day: "2026-01-12",
           startTime: t(6),
           endTime: t(8),
-          skillIds: ["keyholder"],
+          skills: ["keyholder"],
           targetCount: 1,
         },
       ]);
@@ -464,11 +464,11 @@ describe("defineSemanticTimes", () => {
       const resolved = times.resolve(coverage, ["2026-01-12"]);
 
       expect(resolved).toHaveLength(1);
-      expect(resolved[0]?.skillIds).toEqual(["keyholder"]);
-      expect(resolved[0]?.roleIds).toBeUndefined();
+      expect(resolved[0]?.skills).toEqual(["keyholder"]);
+      expect(resolved[0]?.roles).toBeUndefined();
     });
 
-    it("should resolve concrete coverage with both roleId and skillIds", () => {
+    it("should resolve concrete coverage with both roles and skills", () => {
       const times = defineSemanticTimes({
         lunch: { startTime: t(11, 30), endTime: t(14) },
       });
@@ -478,8 +478,8 @@ describe("defineSemanticTimes", () => {
           day: "2026-01-12",
           startTime: t(22),
           endTime: t(23),
-          roleIds: ["waiter"],
-          skillIds: ["can_close"],
+          roles: ["waiter"],
+          skills: ["can_close"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -488,25 +488,25 @@ describe("defineSemanticTimes", () => {
       const resolved = times.resolve(coverage, ["2026-01-12"]);
 
       expect(resolved).toHaveLength(1);
-      expect(resolved[0]?.roleIds).toEqual(["waiter"]);
-      expect(resolved[0]?.skillIds).toEqual(["can_close"]);
+      expect(resolved[0]?.roles).toEqual(["waiter"]);
+      expect(resolved[0]?.skills).toEqual(["can_close"]);
     });
 
-    it("should not include skillIds when not provided", () => {
+    it("should not include skills when not provided", () => {
       const times = defineSemanticTimes({
         lunch: { startTime: t(11, 30), endTime: t(14) },
       });
 
       const coverage = times.coverage([
-        { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
+        { semanticTime: "lunch", roles: ["server"], targetCount: 3 },
       ]);
 
       const resolved = times.resolve(coverage, ["2026-01-12"]);
 
-      expect(resolved[0]).not.toHaveProperty("skillIds");
+      expect(resolved[0]).not.toHaveProperty("skills");
     });
 
-    it("should include skillIds when provided with roleIds", () => {
+    it("should include skills when provided with roles", () => {
       const times = defineSemanticTimes({
         lunch: { startTime: t(11, 30), endTime: t(14) },
       });
@@ -514,16 +514,16 @@ describe("defineSemanticTimes", () => {
       const coverage = times.coverage([
         {
           semanticTime: "lunch",
-          roleIds: ["server"],
-          skillIds: ["senior"],
+          roles: ["server"],
+          skills: ["senior"],
           targetCount: 3,
         },
       ]);
 
       const resolved = times.resolve(coverage, ["2026-01-12"]);
 
-      expect(resolved[0]?.roleIds).toEqual(["server"]);
-      expect(resolved[0]?.skillIds).toEqual(["senior"]);
+      expect(resolved[0]?.roles).toEqual(["server"]);
+      expect(resolved[0]?.skills).toEqual(["senior"]);
     });
   });
 });

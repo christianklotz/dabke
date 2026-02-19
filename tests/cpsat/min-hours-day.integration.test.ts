@@ -27,7 +27,7 @@ describe("CP-SAT: min-hours-day rule", () => {
     const coverage = [
       {
         day: "2024-02-01",
-        roleIds: ["server"] as [string],
+        roles: ["server"] as [string],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
         targetCount: 1,

@@ -830,7 +830,7 @@ describe("end-to-end config structure", () => {
 
     // Verify coverage has skill-based entries
     const skillCoverage = config.coverage.filter(
-      (c) => "skillIds" in c && c.skillIds?.includes("senior"),
+      (c) => "skills" in c && c.skills?.includes("senior"),
     );
     expect(skillCoverage.length).toBeGreaterThan(0);
   });

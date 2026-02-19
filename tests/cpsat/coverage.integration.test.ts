@@ -37,7 +37,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["bar"],
+            roles: ["bar"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -45,7 +45,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roleIds: ["bar"],
+            roles: ["bar"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 2,
@@ -81,7 +81,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -89,7 +89,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roleIds: ["bar"],
+            roles: ["bar"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 1,
@@ -130,7 +130,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -138,8 +138,8 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
-            skillIds: ["can_close"],
+            roles: ["waiter"],
+            skills: ["can_close"],
             startTime: { hours: 22, minutes: 0 },
             endTime: { hours: 23, minutes: 0 },
             targetCount: 1,
@@ -180,7 +180,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 7, minutes: 30 },
             endTime: { hours: 10, minutes: 0 },
             targetCount: 1,
@@ -188,7 +188,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 16, minutes: 0 },
             targetCount: 2,
@@ -224,7 +224,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 20, minutes: 0 },
             targetCount: 1,
@@ -232,7 +232,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 12, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 2,
@@ -270,7 +270,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -307,8 +307,8 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
-            skillIds: ["keyholder"],
+            roles: ["server"],
+            skills: ["keyholder"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -349,7 +349,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skillIds: ["keyholder", "senior"],
+            skills: ["keyholder", "senior"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -385,7 +385,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -417,8 +417,8 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
-            skillIds: ["keyholder"],
+            roles: ["server"],
+            skills: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -451,7 +451,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -459,7 +459,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -495,7 +495,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -531,7 +531,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -539,7 +539,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -576,7 +576,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 2,

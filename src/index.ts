@@ -36,7 +36,7 @@
  *
  * // Create coverage requirements
  * const coverage = times.coverage([
- *   { semanticTime: "business_hours", roleIds: ["worker"], targetCount: 2 },
+ *   { semanticTime: "business_hours", roles: ["worker"], targetCount: 2 },
  * ]);
  *
  * // Define shift patterns

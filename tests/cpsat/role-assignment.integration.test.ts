@@ -27,7 +27,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["server"], // Coverage still needs a role for tracking
+          roles: ["server"], // Coverage still needs a role for tracking
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -66,7 +66,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["server"],
+          roles: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -106,7 +106,7 @@ describe("Role-based shift assignment (integration)", () => {
         // Need 1 server and 1 runner - both can work the floor_shift
         {
           day: "2024-01-01",
-          roleIds: ["server"],
+          roles: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -114,7 +114,7 @@ describe("Role-based shift assignment (integration)", () => {
         },
         {
           day: "2024-01-01",
-          roleIds: ["runner"],
+          roles: ["runner"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -153,7 +153,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["server"],
+          roles: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -187,7 +187,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["host"],
+          roles: ["host"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -231,7 +231,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["server"],
+          roles: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 13, minutes: 0 },
           targetCount: 1,
@@ -239,7 +239,7 @@ describe("Role-based shift assignment (integration)", () => {
         },
         {
           day: "2024-01-01",
-          roleIds: ["chef"],
+          roles: ["chef"],
           startTime: { hours: 13, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,

@@ -26,7 +26,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -58,7 +58,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -102,7 +102,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 2,
@@ -146,7 +146,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -171,7 +171,7 @@ describe("Validation diagnostics (integration)", () => {
       expect(validation.passed.length).toBeGreaterThan(0);
       const coveragePassed = validation.passed.find((p) => p.type === "coverage");
       expect(coveragePassed).toBeDefined();
-      expect(coveragePassed?.roleIds).toEqual(["barista"]);
+      expect(coveragePassed?.roles).toEqual(["barista"]);
     }, 30_000);
   });
 
@@ -191,7 +191,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -255,7 +255,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -323,7 +323,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -334,7 +334,7 @@ describe("Validation diagnostics (integration)", () => {
           {
             name: "time-off",
 
-            roleIds: ["barista"], // Scoped to baristas only
+            roles: ["barista"], // Scoped to baristas only
             specificDates: ["2024-02-01"],
             priority: "LOW",
           },
@@ -388,7 +388,7 @@ describe("Validation diagnostics (integration)", () => {
           },
           {
             id: "afternoon",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -397,7 +397,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["barista"],
+            roles: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,

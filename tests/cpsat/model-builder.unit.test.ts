@@ -7,7 +7,7 @@ import type { CoverageRequirement, SchedulingMember, ShiftPattern } from "../../
 function baseCoverage(override: Partial<CoverageRequirement> = {}): CoverageRequirement {
   return {
     day: "2024-02-01",
-    roleIds: ["barista"],
+    roles: ["barista"],
     startTime: { hours: 9, minutes: 0 },
     endTime: { hours: 13, minutes: 0 },
     targetCount: 1,
@@ -47,7 +47,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       coverage: [
         {
           day: "2024-02-01",
-          roleIds: ["role"],
+          roles: ["role"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -82,7 +82,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const coverage: CoverageRequirement[] = [
       {
         day: "2024-01-01",
-        roleIds: ["server"],
+        roles: ["server"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
         targetCount: 1,
@@ -400,11 +400,11 @@ describe("ModelBuilder (CP-SAT)", () => {
   });
 
   describe("skill-based coverage", () => {
-    // Note: Tests for invalid coverage (missing roleIds/skillIds, empty arrays) are no longer needed
+    // Note: Tests for invalid coverage (missing roles/skills, empty arrays) are no longer needed
     // because the discriminated union type now enforces these constraints at compile time.
     // The runtime validation in ModelBuilder serves as defense-in-depth for non-TypeScript callers.
 
-    it("accepts coverage with roleIds only", () => {
+    it("accepts coverage with roles only", () => {
       const builder = new ModelBuilder({
         members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
@@ -420,7 +420,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             day: "2024-01-01",
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
-            roleIds: ["server"],
+            roles: ["server"],
             targetCount: 1,
             priority: "MANDATORY",
           },
@@ -430,7 +430,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       expect(() => builder.compile()).not.toThrow();
     });
 
-    it("accepts coverage with skillIds only", () => {
+    it("accepts coverage with skills only", () => {
       const builder = new ModelBuilder({
         members: [{ id: "alice", roles: ["server"], skills: ["keyholder"] }],
         shiftPatterns: [
@@ -446,7 +446,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             day: "2024-01-01",
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             targetCount: 1,
             priority: "MANDATORY",
           },
@@ -456,7 +456,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       expect(() => builder.compile()).not.toThrow();
     });
 
-    it("accepts coverage with both roleId and skillIds", () => {
+    it("accepts coverage with both roles and skills", () => {
       const builder = new ModelBuilder({
         members: [{ id: "alice", roles: ["server"], skills: ["keyholder"] }],
         shiftPatterns: [
@@ -472,8 +472,8 @@ describe("ModelBuilder (CP-SAT)", () => {
             day: "2024-01-01",
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
-            roleIds: ["server"],
-            skillIds: ["keyholder"],
+            roles: ["server"],
+            skills: ["keyholder"],
             targetCount: 1,
             priority: "MANDATORY",
           },
@@ -507,7 +507,7 @@ describe("ModelBuilder (CP-SAT)", () => {
               day: "2024-01-01",
               startTime: { hours: 9, minutes: 0 },
               endTime: { hours: 17, minutes: 0 },
-              roleIds: ["server"],
+              roles: ["server"],
               targetCount: 1,
               priority: "MANDATORY",
             },
@@ -520,7 +520,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          roleIds: ["server"],
+          roles: ["server"],
           targetCount: 1,
           priority: "MANDATORY",
         });
@@ -535,7 +535,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          skillIds: ["keyholder"],
+          skills: ["keyholder"],
           targetCount: 1,
           priority: "MANDATORY",
         });
@@ -550,7 +550,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          skillIds: ["keyholder", "senior"],
+          skills: ["keyholder", "senior"],
           targetCount: 1,
           priority: "MANDATORY",
         });
@@ -565,8 +565,8 @@ describe("ModelBuilder (CP-SAT)", () => {
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          roleIds: ["server"],
-          skillIds: ["keyholder"],
+          roles: ["server"],
+          skills: ["keyholder"],
           targetCount: 1,
           priority: "MANDATORY",
         });
@@ -581,7 +581,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          skillIds: ["nonexistent"],
+          skills: ["nonexistent"],
           targetCount: 1,
           priority: "MANDATORY",
         });
@@ -595,8 +595,8 @@ describe("ModelBuilder (CP-SAT)", () => {
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          roleIds: ["chef"],
-          skillIds: ["senior"],
+          roles: ["chef"],
+          skills: ["senior"],
           targetCount: 1,
           priority: "MANDATORY",
         });
@@ -624,7 +624,7 @@ describe("ModelBuilder (CP-SAT)", () => {
             day: "2024-01-01",
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
-            skillIds: ["keyholder"],
+            skills: ["keyholder"],
             targetCount: 1,
             priority: "MANDATORY",
           },
@@ -670,8 +670,8 @@ describe("ModelBuilder (CP-SAT)", () => {
             day: "2024-01-01",
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
-            roleIds: ["server"],
-            skillIds: ["keyholder"],
+            roles: ["server"],
+            skills: ["keyholder"],
             targetCount: 1,
             priority: "MANDATORY",
           },
@@ -718,7 +718,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
-        coverage: [baseCoverage({ roleIds: ["barista"] })],
+        coverage: [baseCoverage({ roles: ["barista"] })],
         rules: [],
       });
 
@@ -867,7 +867,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         coverage: [
           {
             day: "2025-02-05", // Wednesday
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -919,7 +919,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         coverage: [
           {
             day: "2025-02-05",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -927,7 +927,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           },
           {
             day: "2025-02-07",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -966,7 +966,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         coverage: [
           {
             day: "2025-02-03", // Monday - not in filtered days!
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,

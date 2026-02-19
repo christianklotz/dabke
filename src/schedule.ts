@@ -930,7 +930,7 @@ function buildCoverageRequirements<T extends string>(
       // Array = OR of roles
       return {
         ...base,
-        roleIds: entry.target as [string, ...string[]],
+        roles: entry.target as [string, ...string[]],
       } satisfies MixedCoverageRequirement<T>;
     }
 
@@ -941,13 +941,13 @@ function buildCoverageRequirements<T extends string>(
       if (entry.options.skills) {
         return {
           ...base,
-          roleIds: [singleTarget] as [string, ...string[]],
-          skillIds: entry.options.skills,
+          roles: [singleTarget] as [string, ...string[]],
+          skills: entry.options.skills,
         } satisfies MixedCoverageRequirement<T>;
       }
       return {
         ...base,
-        roleIds: [singleTarget] as [string, ...string[]],
+        roles: [singleTarget] as [string, ...string[]],
       } satisfies MixedCoverageRequirement<T>;
     }
 
@@ -955,7 +955,7 @@ function buildCoverageRequirements<T extends string>(
       // Skill-based coverage
       return {
         ...base,
-        skillIds: [singleTarget] as [string, ...string[]],
+        skills: [singleTarget] as [string, ...string[]],
       } satisfies MixedCoverageRequirement<T>;
     }
 

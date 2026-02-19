@@ -48,22 +48,22 @@ export interface ValidationReporter {
 
 /**
  * Generates a deterministic ID for a coverage-based validation item.
- * Format: {category}:coverage:{day}:{timeSlots}:{roleIds}:{skillIds}
+ * Format: {category}:coverage:{day}:{timeSlots}:{roles}:{skills}
  */
 function coverageId(
   category: "error" | "violation" | "passed",
   day: string,
   timeSlots: readonly string[],
-  roleIds?: readonly string[],
-  skillIds?: readonly string[],
+  roles?: readonly string[],
+  skills?: readonly string[],
 ): string {
   const parts = [
     category,
     "coverage",
     day,
     [...timeSlots].toSorted().join(",") || "_",
-    roleIds && roleIds.length > 0 ? [...roleIds].toSorted().join(",") : "_",
-    skillIds ? [...skillIds].toSorted().join(",") : "_",
+    roles && roles.length > 0 ? [...roles].toSorted().join(",") : "_",
+    skills ? [...skills].toSorted().join(",") : "_",
   ];
   return parts.join(":");
 }
@@ -100,7 +100,7 @@ export class ValidationReporterImpl implements ValidationReporter {
   }
 
   reportCoverageError(error: Omit<CoverageError, "type" | "id">): void {
-    const id = coverageId("error", error.day, error.timeSlots, error.roleIds, error.skillIds);
+    const id = coverageId("error", error.day, error.timeSlots, error.roles, error.skills);
     this.#errors.push({ id, type: "coverage", ...error });
   }
 
@@ -120,8 +120,8 @@ export class ValidationReporterImpl implements ValidationReporter {
       "violation",
       violation.day,
       violation.timeSlots,
-      violation.roleIds,
-      violation.skillIds,
+      violation.roles,
+      violation.skills,
     );
     this.#violations.push({ id, type: "coverage", ...violation });
   }
@@ -132,7 +132,7 @@ export class ValidationReporterImpl implements ValidationReporter {
   }
 
   reportCoveragePassed(passed: Omit<CoveragePassed, "type" | "id">): void {
-    const id = coverageId("passed", passed.day, passed.timeSlots, passed.roleIds, passed.skillIds);
+    const id = coverageId("passed", passed.day, passed.timeSlots, passed.roles, passed.skills);
     this.#passed.push({ id, type: "coverage", ...passed });
   }
 
@@ -186,8 +186,8 @@ export class ValidationReporterImpl implements ValidationReporter {
         this.reportCoverageViolation({
           day: tracked.day ?? "",
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
-          roleIds: tracked.roleIds,
-          skillIds: tracked.skillIds,
+          roles: tracked.roles,
+          skills: tracked.skills,
           targetCount: violation.targetValue,
           actualCount: violation.actualValue,
           shortfall: violation.violationAmount,
@@ -222,8 +222,8 @@ export class ValidationReporterImpl implements ValidationReporter {
         this.reportCoveragePassed({
           day: tracked.day ?? "",
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
-          roleIds: tracked.roleIds,
-          skillIds: tracked.skillIds,
+          roles: tracked.roles,
+          skills: tracked.skills,
           description: tracked.description,
           groupKey: tracked.groupKey,
         });

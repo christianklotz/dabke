@@ -18,7 +18,7 @@ describe("CP-SAT: scope resolution", () => {
           { id: "alice", roles: ["worker", "student"] },
           { id: "bob", roles: ["worker", "manager"] },
         ],
-        roleIds: ["worker"],
+        roles: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -81,7 +81,7 @@ describe("CP-SAT: scope resolution", () => {
           { id: "alice", roles: ["worker", "student"] },
           { id: "bob", roles: ["worker"] },
         ],
-        roleIds: ["worker"],
+        roles: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -146,7 +146,7 @@ describe("CP-SAT: scope resolution", () => {
             skills: ["certified", "senior"],
           },
         ],
-        roleIds: ["worker"],
+        roles: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -208,7 +208,7 @@ describe("CP-SAT: scope resolution", () => {
           { id: "alice", roles: ["worker", "student"] },
           { id: "bob", roles: ["worker", "student"] },
         ],
-        roleIds: ["worker"],
+        roles: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -267,7 +267,7 @@ describe("CP-SAT: scope resolution", () => {
           { id: "alice", roles: ["worker", "intern"] },
           { id: "bob", roles: ["worker"] },
         ],
-        roleIds: ["worker"],
+        roles: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },

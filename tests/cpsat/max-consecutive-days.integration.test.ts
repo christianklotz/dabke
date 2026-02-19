@@ -11,7 +11,7 @@ describe("CP-SAT: max-consecutive-days rule", () => {
 
   it("limits consecutive working days", async () => {
     const baseConfig = createBaseConfig({
-      roleIds: ["barista"],
+      roles: ["barista"],
       shift: {
         id: "day",
         startTime: { hours: 7, minutes: 0 },

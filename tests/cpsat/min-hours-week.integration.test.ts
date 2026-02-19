@@ -22,7 +22,7 @@ describe("CP-SAT: min-hours-week rule", () => {
       coverage: [
         {
           day: "2024-02-01",
-          roleIds: ["barista"],
+          roles: ["barista"],
           startTime: { hours: 8, minutes: 0 },
           endTime: { hours: 16, minutes: 0 },
           targetCount: 1,

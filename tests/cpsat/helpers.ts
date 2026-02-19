@@ -79,14 +79,14 @@ export function createSimpleConfig(opts: {
   const shiftStart = opts.shiftStart ?? { hours: 9, minutes: 0 };
   const shiftEnd = opts.shiftEnd ?? { hours: 17, minutes: 0 };
   const shiftId = opts.shiftId ?? "day";
-  const roleIds: [string, ...string[]] = [opts.roleId];
+  const roles: [string, ...string[]] = [opts.roleId];
 
   return {
     members: opts.memberIds.map((id) => ({ id, roles: [opts.roleId] })),
     shiftPatterns: [
       {
         id: shiftId,
-        roles: roleIds,
+        roles,
         startTime: shiftStart,
         endTime: shiftEnd,
       },
@@ -94,7 +94,7 @@ export function createSimpleConfig(opts: {
     schedulingPeriod,
     coverage: days.map((day) => ({
       day,
-      roleIds,
+      roles,
       startTime: shiftStart,
       endTime: shiftEnd,
       targetCount: opts.targetCount ?? 1,
@@ -108,10 +108,10 @@ export function createSimpleConfig(opts: {
 // ============================================================================
 
 type BaseConfigOverrides = {
-  /** Single role ID (convenience) - use roleIds for multiple roles */
+  /** Single role ID (convenience) - use roles for multiple roles */
   roleId?: string;
   /** Multiple role IDs for coverage. Takes precedence over roleId. */
-  roleIds?: [string, ...string[]];
+  roles?: [string, ...string[]];
   memberIds?: string[];
   /** Provide full member objects for more control over roles/skills */
   members?: SchedulingMember[];
@@ -140,14 +140,14 @@ type BaseConfigOverrides = {
  * Creates a base configuration with sensible defaults and flexible overrides.
  *
  * Role derivation priority:
- * 1. Explicit `roleIds` parameter (array)
+ * 1. Explicit `roles` parameter (array)
  * 2. Explicit `roleId` parameter (single)
  * 3. First role from first member (if `members` provided)
  * 4. Default "role"
  */
 export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScenarioConfig => {
-  // Derive roleIds: explicit roleIds > roleId > from members > default
-  const roleIds: [string, ...string[]] = overrides.roleIds ??
+  // Derive roles: explicit roles > roleId > from members > default
+  const roles: [string, ...string[]] = overrides.roles ??
     (overrides.roleId ? [overrides.roleId] : null) ??
     (overrides.members?.[0]?.roles as [string, ...string[]] | undefined) ?? ["role"];
 
@@ -156,7 +156,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     overrides.members ??
     (overrides.memberIds ?? ["alice", "bob"]).map((id) => ({
       id,
-      roles: [...roleIds],
+      roles: [...roles],
     }));
 
   let shiftPatterns: ShiftPattern[];
@@ -166,7 +166,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
   } else if (overrides.shifts) {
     shiftPatterns = overrides.shifts.map((s) => ({
       id: s.id,
-      roles: s.roles ?? roleIds,
+      roles: s.roles ?? roles,
       startTime: s.startTime,
       endTime: s.endTime,
       ...(s.locationId ? { locationId: s.locationId } : {}),
@@ -175,7 +175,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     shiftPatterns = [
       {
         id: overrides.shift?.id ?? "day",
-        roles: overrides.shift?.roles ?? roleIds,
+        roles: overrides.shift?.roles ?? roles,
         startTime: overrides.shift?.startTime ?? { hours: 9, minutes: 0 },
         endTime: overrides.shift?.endTime ?? { hours: 17, minutes: 0 },
         ...(overrides.shift?.locationId ? { locationId: overrides.shift.locationId } : {}),
@@ -191,7 +191,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     days.flatMap((day) =>
       shiftPatterns.map((pattern) => ({
         day,
-        roleIds: pattern.roles ?? roleIds,
+        roles: pattern.roles ?? roles,
         startTime: pattern.startTime,
         endTime: pattern.endTime,
         targetCount: overrides.targetCount ?? 1,
@@ -260,7 +260,7 @@ export const fixtures = {
     coverage: [
       {
         day: "2024-02-01",
-        roleIds: ["chef"],
+        roles: ["chef"],
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 14, minutes: 0 },
         targetCount: 1,
@@ -268,7 +268,7 @@ export const fixtures = {
       },
       {
         day: "2024-02-01",
-        roleIds: ["waiter"],
+        roles: ["waiter"],
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 14, minutes: 0 },
         targetCount: 1,
@@ -276,7 +276,7 @@ export const fixtures = {
       },
       {
         day: "2024-02-01",
-        roleIds: ["chef"],
+        roles: ["chef"],
         startTime: { hours: 16, minutes: 0 },
         endTime: { hours: 22, minutes: 0 },
         targetCount: 1,
@@ -284,7 +284,7 @@ export const fixtures = {
       },
       {
         day: "2024-02-01",
-        roleIds: ["waiter"],
+        roles: ["waiter"],
         startTime: { hours: 16, minutes: 0 },
         endTime: { hours: 22, minutes: 0 },
         targetCount: 1,

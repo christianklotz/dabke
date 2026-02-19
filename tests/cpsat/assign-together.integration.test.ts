@@ -11,7 +11,7 @@ describe("CP-SAT: assign-together rule", () => {
 
   it("keeps paired members on the same shifts", async () => {
     const baseConfig = createBaseConfig({
-      roleIds: ["runner"],
+      roles: ["runner"],
       memberIds: ["alice", "bob"],
       shift: {
         id: "day",

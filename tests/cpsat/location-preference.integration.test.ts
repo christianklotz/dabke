@@ -29,7 +29,7 @@ describe("CP-SAT: location-preference rule", () => {
     const coverage = [
       {
         day: "2024-02-01",
-        roleIds: ["waiter"] as [string],
+        roles: ["waiter"] as [string],
         startTime: { hours: 12, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
         targetCount: 1,

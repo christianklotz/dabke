@@ -11,7 +11,7 @@ describe("CP-SAT: min-consecutive-days rule", () => {
 
   it("extends work streaks once an member starts working", async () => {
     const baseConfig = createBaseConfig({
-      roleIds: ["cashier"],
+      roles: ["cashier"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },

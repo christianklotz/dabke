@@ -185,13 +185,13 @@ export class ModelBuilder {
       }
     }
 
-    // Validate coverage requirements have at least roleIds or skillIds
+    // Validate coverage requirements have at least roles or skills
     for (const cov of config.coverage) {
-      const hasRoles = cov.roleIds !== undefined && cov.roleIds.length > 0;
-      const hasSkills = cov.skillIds !== undefined && cov.skillIds.length > 0;
+      const hasRoles = cov.roles !== undefined && cov.roles.length > 0;
+      const hasSkills = cov.skills !== undefined && cov.skills.length > 0;
       if (!hasRoles && !hasSkills) {
         throw new Error(
-          `Coverage requirement for day "${cov.day}" must have at least one of roleIds or skillIds`,
+          `Coverage requirement for day "${cov.day}" must have at least one of roles or skills`,
         );
       }
     }
@@ -339,21 +339,21 @@ export class ModelBuilder {
    * Returns team members who can satisfy a coverage requirement.
    *
    * Matching logic:
-   * - If only roleIds: must have ANY of those roles (OR)
-   * - If only skillIds: must have ALL specified skills (AND)
+   * - If only roles: must have ANY of those roles (OR)
+   * - If only skills: must have ALL specified skills (AND)
    * - If both: must have a matching role AND ALL specified skills
    */
   membersForCoverage(cov: CoverageRequirement): SchedulingMember[] {
     return this.members.filter((m) => {
-      if (cov.roleIds && cov.roleIds.length > 0) {
-        const hasMatchingRole = cov.roleIds.some((role) => m.roles.includes(role));
+      if (cov.roles && cov.roles.length > 0) {
+        const hasMatchingRole = cov.roles.some((role) => m.roles.includes(role));
         if (!hasMatchingRole) {
           return false;
         }
       }
-      if (cov.skillIds && cov.skillIds.length > 0) {
+      if (cov.skills && cov.skills.length > 0) {
         const memberSkills = m.skills ?? [];
-        if (!cov.skillIds.every((skill) => memberSkills.includes(skill))) {
+        if (!cov.skills.every((skill) => memberSkills.includes(skill))) {
           return false;
         }
       }
@@ -498,13 +498,13 @@ export class ModelBuilder {
     for (const cov of this.coverage) {
       const covStart = timeOfDayToMinutes(cov.startTime);
       const covEnd = normalizeEndMinutes(covStart, timeOfDayToMinutes(cov.endTime));
-      const covKey = cov.roleIds?.join(",") ?? cov.skillIds?.join(",") ?? "unknown";
+      const covKey = cov.roles?.join(",") ?? cov.skills?.join(",") ?? "unknown";
       const coverageLabel =
-        cov.roleIds && cov.roleIds.length > 0
-          ? cov.roleIds.length === 1
-            ? `role "${cov.roleIds[0]}"`
-            : `role "${cov.roleIds.join(" or ")}"`
-          : `skills [${cov.skillIds?.join(", ")}]`;
+        cov.roles && cov.roles.length > 0
+          ? cov.roles.length === 1
+            ? `role "${cov.roles[0]}"`
+            : `role "${cov.roles.join(" or ")}"`
+          : `skills [${cov.skills?.join(", ")}]`;
       const coverageWindow = formatTimeRange(covStart, covEnd);
 
       const eligibleMembers = this.membersForCoverage(cov);
@@ -513,12 +513,12 @@ export class ModelBuilder {
           this.reporter.reportCoverageError({
             day: cov.day,
             timeSlots: [coverageWindow],
-            roleIds: cov.roleIds,
-            skillIds: cov.skillIds,
+            roles: cov.roles,
+            skills: cov.skills,
             reason: `Coverage for ${coverageLabel} on ${cov.day} (${coverageWindow}) cannot be met: no eligible team members available.`,
             suggestions: [
-              cov.roleIds && cov.roleIds.length > 0
-                ? `Add team members with role "${cov.roleIds.join(" or ")}"`
+              cov.roles && cov.roles.length > 0
+                ? `Add team members with role "${cov.roles.join(" or ")}"`
                 : "Add team members with the required skills",
               "Change the coverage requirement to match available team members",
             ],
@@ -679,8 +679,8 @@ export class ModelBuilder {
           comparator: ">=",
           day: cov.day,
           timeSlot: formatMinutes(bucketStart),
-          roleIds: cov.roleIds,
-          skillIds: cov.skillIds,
+          roles: cov.roles,
+          skills: cov.skills,
           context: {
             days: [cov.day],
             memberIds: eligibleMembers.map((e) => e.id),
@@ -701,8 +701,8 @@ export class ModelBuilder {
           this.reporter.reportCoverageError({
             day: cov.day,
             timeSlots: ranges,
-            roleIds: cov.roleIds,
-            skillIds: cov.skillIds,
+            roles: cov.roles,
+            skills: cov.skills,
             reason,
             suggestions: issue.suggestions,
             groupKey: cov.groupKey,

@@ -152,7 +152,7 @@ interface CoverageRequirementBase extends TimeInterval {
 /**
  * Coverage requiring specific roles, optionally filtered by skills.
  * Team members must have ANY of the specified roles (OR logic).
- * If skillIds provided, they must ALSO have ALL specified skills (AND logic).
+ * If skills provided, they must ALSO have ALL specified skills (AND logic).
  */
 interface RoleBasedCoverageRequirement extends CoverageRequirementBase {
   /**
@@ -160,12 +160,12 @@ interface RoleBasedCoverageRequirement extends CoverageRequirementBase {
    * A person matches if they have ANY of these roles.
    * Must have at least one role.
    */
-  roleIds: [string, ...string[]];
+  roles: [string, ...string[]];
   /**
    * Additional skill filter (AND logic with roles).
    * If provided, team members must have ALL specified skills in addition to matching a role.
    */
-  skillIds?: [string, ...string[]];
+  skills?: [string, ...string[]];
 }
 
 /**
@@ -176,39 +176,39 @@ interface SkillBasedCoverageRequirement extends CoverageRequirementBase {
   /**
    * Must not be present for skill-based coverage.
    */
-  roleIds?: never;
+  roles?: never;
   /**
    * Skills required to satisfy this coverage (ALL required, AND logic).
    * Must have at least one skill.
    */
-  skillIds: [string, ...string[]];
+  skills: [string, ...string[]];
 }
 
 /**
  * Defines staffing needs for a specific time period.
  *
  * This is a discriminated union that enforces at compile time that at least
- * one of `roleIds` or `skillIds` must be provided:
+ * one of `roles` or `skills` must be provided:
  *
- * - Role-based: `{ roleIds: ["waiter"], ... }` - anyone with ANY of these roles (OR logic)
- * - Role + skill: `{ roleIds: ["waiter"], skillIds: ["senior"], ... }` - role AND skills
- * - Skill-only: `{ skillIds: ["keyholder"], ... }` - any role with ALL skills (AND logic)
+ * - Role-based: `{ roles: ["waiter"], ... }` - anyone with ANY of these roles (OR logic)
+ * - Role + skill: `{ roles: ["waiter"], skills: ["senior"], ... }` - role AND skills
+ * - Skill-only: `{ skills: ["keyholder"], ... }` - any role with ALL skills (AND logic)
  *
  * @example
  * // Need 2 waiters during lunch (role-based)
- * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 14 }, roleIds: ["waiter"], targetCount: 2, priority: "MANDATORY" }
+ * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 14 }, roles: ["waiter"], targetCount: 2, priority: "MANDATORY" }
  *
  * @example
  * // Need 1 manager OR supervisor during service (OR logic on roles)
- * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 22 }, roleIds: ["manager", "supervisor"], targetCount: 1, priority: "MANDATORY" }
+ * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 22 }, roles: ["manager", "supervisor"], targetCount: 1, priority: "MANDATORY" }
  *
  * @example
  * // Need 1 keyholder for opening (skill-only, any role)
- * { day: "2024-01-01", startTime: { hours: 6 }, endTime: { hours: 8 }, skillIds: ["keyholder"], targetCount: 1, priority: "MANDATORY" }
+ * { day: "2024-01-01", startTime: { hours: 6 }, endTime: { hours: 8 }, skills: ["keyholder"], targetCount: 1, priority: "MANDATORY" }
  *
  * @example
  * // Need 1 senior waiter for training shift (role + skill filter)
- * { day: "2024-01-01", startTime: { hours: 9 }, endTime: { hours: 17 }, roleIds: ["waiter"], skillIds: ["senior"], targetCount: 1, priority: "HIGH" }
+ * { day: "2024-01-01", startTime: { hours: 9 }, endTime: { hours: 17 }, roles: ["waiter"], skills: ["senior"], targetCount: 1, priority: "HIGH" }
  */
 export type CoverageRequirement = RoleBasedCoverageRequirement | SkillBasedCoverageRequirement;
 

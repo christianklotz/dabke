@@ -20,7 +20,7 @@ export interface CoverageValidationResult {
 }
 
 /**
- * Validates that all roleIds used in coverage requirements match the team.
+ * Validates that all roles used in coverage requirements match the team.
  *
  * This catches a common LLM error where the model generates coverage requirements
  * using role names that don't match any team member's roles. Without this validation,
@@ -35,8 +35,8 @@ export interface CoverageValidationResult {
  * ];
  *
  * const coverage = [
- *   { roleId: "cashier", targetCount: 1, ... },  // OK
- *   { roleId: "worker", targetCount: 1, ... },   // Unknown role!
+ *   { roles: ["cashier"], targetCount: 1, ... },  // OK
+ *   { roles: ["worker"], targetCount: 1, ... },   // Unknown role!
  * ];
  *
  * const result = validateCoverageRoles(coverage, members);
@@ -50,7 +50,7 @@ export function validateCoverageRoles(
   members: SchedulingMember[],
 ): CoverageValidationResult {
   const memberRoles = new Set(members.flatMap((e) => e.roles));
-  const coverageRoles = new Set(coverage.flatMap((c) => c.roleIds ?? []));
+  const coverageRoles = new Set(coverage.flatMap((c) => c.roles ?? []));
 
   const unknownRoles: string[] = [];
   const knownRoles: string[] = [];
@@ -82,7 +82,7 @@ export interface SkillValidationResult {
 }
 
 /**
- * Validates that all skillIds used in coverage requirements match the team.
+ * Validates that all skills used in coverage requirements match the team.
  *
  * Similar to role validation, this catches LLM hallucinations where skill names
  * in coverage don't match any team member's skills.
@@ -95,8 +95,8 @@ export interface SkillValidationResult {
  * ];
  *
  * const coverage = [
- *   { skillIds: ["keyholder"], targetCount: 1, ... },  // OK
- *   { skillIds: ["manager"], targetCount: 1, ... },   // Unknown skill!
+ *   { skills: ["keyholder"], targetCount: 1, ... },  // OK
+ *   { skills: ["manager"], targetCount: 1, ... },   // Unknown skill!
  * ];
  *
  * const result = validateCoverageSkills(coverage, members);
@@ -109,7 +109,7 @@ export function validateCoverageSkills(
   members: SchedulingMember[],
 ): SkillValidationResult {
   const memberSkills = new Set(members.flatMap((e) => e.skills ?? []));
-  const coverageSkills = new Set(coverage.flatMap((c) => c.skillIds ?? []));
+  const coverageSkills = new Set(coverage.flatMap((c) => c.skills ?? []));
 
   const unknownSkills: string[] = [];
   const knownSkills: string[] = [];

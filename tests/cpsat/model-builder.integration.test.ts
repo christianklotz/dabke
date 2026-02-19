@@ -14,7 +14,7 @@ describe("CP-SAT compilation integration", () => {
   it("solves compiled models end-to-end", async () => {
     const builder = new ModelBuilder({
       ...createBaseConfig({
-        roleIds: ["cashier"],
+        roles: ["cashier"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -36,7 +36,7 @@ describe("CP-SAT compilation integration", () => {
 
   it("reports infeasible status for conflicting mandatory rules", async () => {
     const baseConfig = createBaseConfig({
-      roleIds: ["cook"],
+      roles: ["cook"],
       memberIds: ["solo"],
       shift: {
         id: "day",
@@ -83,13 +83,13 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "morning",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 13, minutes: 30 },
           },
           {
             id: "afternoon",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -99,7 +99,7 @@ describe("CP-SAT compilation integration", () => {
           // Early morning: only morning shift covers this
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 10, minutes: 0 },
             targetCount: 1,
@@ -108,7 +108,7 @@ describe("CP-SAT compilation integration", () => {
           // Late afternoon: only afternoon shift covers this
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 1,
@@ -151,13 +151,13 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "morning",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 13, minutes: 30 },
           },
           {
             id: "afternoon",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -166,7 +166,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 12, minutes: 30 },
             targetCount: 1,
@@ -174,7 +174,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -212,7 +212,7 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "full_day",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -221,7 +221,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -249,13 +249,13 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "morning",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
           },
           {
             id: "afternoon",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -264,7 +264,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
             targetCount: 1,
@@ -272,7 +272,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 1,
@@ -302,13 +302,13 @@ describe("CP-SAT compilation integration", () => {
           shiftPatterns: [
             {
               id: "morning",
-              roleIds: ["staff"],
+              roles: ["staff"],
               startTime: { hours: 8, minutes: 0 },
               endTime: { hours: 12, minutes: 0 },
             },
             {
               id: "afternoon",
-              roleIds: ["staff"],
+              roles: ["staff"],
               startTime: { hours: 14, minutes: 0 },
               endTime: { hours: 18, minutes: 0 },
             },
@@ -317,7 +317,7 @@ describe("CP-SAT compilation integration", () => {
           coverage: [
             {
               day: "2024-02-01",
-              roleIds: ["staff"],
+              roles: ["staff"],
               startTime: { hours: 8, minutes: 0 },
               endTime: { hours: 12, minutes: 0 },
               targetCount: 1,
@@ -325,7 +325,7 @@ describe("CP-SAT compilation integration", () => {
             },
             {
               day: "2024-02-01",
-              roleIds: ["staff"],
+              roles: ["staff"],
               startTime: { hours: 14, minutes: 0 },
               endTime: { hours: 18, minutes: 0 },
               targetCount: 1,
@@ -360,19 +360,19 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "opening",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 11, minutes: 0 },
           },
           {
             id: "midday",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
           },
           {
             id: "closing",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 15, minutes: 0 },
             endTime: { hours: 19, minutes: 0 },
           },
@@ -381,7 +381,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 11, minutes: 0 },
             targetCount: 1,
@@ -389,7 +389,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -397,7 +397,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 15, minutes: 0 },
             endTime: { hours: 19, minutes: 0 },
             targetCount: 1,
@@ -438,7 +438,7 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "evening",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -448,7 +448,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner: 5pm-10pm, need 2 waiters
           {
             day: "2024-06-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -457,7 +457,7 @@ describe("CP-SAT compilation integration", () => {
           // Happy hour: 5pm-6pm, need 3 waiters total (overlaps with dinner)
           {
             day: "2024-06-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 3,
@@ -493,13 +493,13 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "server_evening",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
           {
             id: "bar_evening",
-            roleIds: ["bartender"],
+            roles: ["bartender"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -509,7 +509,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner servers: 5pm-10pm
           {
             day: "2024-06-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -518,7 +518,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner bartender: 5pm-10pm
           {
             day: "2024-06-01",
-            roleIds: ["bartender"],
+            roles: ["bartender"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 1,
@@ -527,7 +527,7 @@ describe("CP-SAT compilation integration", () => {
           // Happy hour bartenders: 5pm-6pm (overlaps, need 2 total)
           {
             day: "2024-06-01",
-            roleIds: ["bartender"],
+            roles: ["bartender"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 2,
@@ -565,7 +565,7 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "full_day",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 20, minutes: 0 },
           },
@@ -575,7 +575,7 @@ describe("CP-SAT compilation integration", () => {
           // All day: 8am-8pm
           {
             day: "2024-06-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 20, minutes: 0 },
             targetCount: 2,
@@ -584,7 +584,7 @@ describe("CP-SAT compilation integration", () => {
           // Lunch rush: 12pm-2pm
           {
             day: "2024-06-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 12, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 4,
@@ -593,7 +593,7 @@ describe("CP-SAT compilation integration", () => {
           // Peak hour: 12:30pm-1:30pm
           {
             day: "2024-06-01",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 13, minutes: 30 },
             targetCount: 6,
@@ -625,13 +625,13 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "lunch_shift",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
           },
           {
             id: "dinner_shift",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -641,7 +641,7 @@ describe("CP-SAT compilation integration", () => {
           // Lunch: 11am-2pm, need 2 servers
           {
             day: "2024-06-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 2,
@@ -650,7 +650,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner: 5pm-10pm, need 2 servers
           {
             day: "2024-06-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -685,7 +685,7 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "evening",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -694,7 +694,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-06-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -703,7 +703,7 @@ describe("CP-SAT compilation integration", () => {
           // Happy hour needs 5 total - but we only have 3 waiters!
           {
             day: "2024-06-01",
-            roleIds: ["waiter"],
+            roles: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 5,
@@ -736,7 +736,7 @@ describe("CP-SAT compilation integration", () => {
       // So a per-week cap should limit Fri and Sat separately.
 
       const baseConfig = createBaseConfig({
-        roleIds: ["server"],
+        roles: ["server"],
         memberIds: ["alice"],
         shift: {
           id: "day",
@@ -821,7 +821,7 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "day_shift",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -829,7 +829,7 @@ describe("CP-SAT compilation integration", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: weekdays.map((day) => ({
           day,
-          roleIds: ["staff"],
+          roles: ["staff"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -858,7 +858,7 @@ describe("CP-SAT compilation integration", () => {
         shiftPatterns: [
           {
             id: "day_shift",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -867,7 +867,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-07",
-            roleIds: ["staff"],
+            roles: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -909,7 +909,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
             targetCount: 1,
@@ -952,7 +952,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 2,
@@ -995,7 +995,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,
@@ -1033,7 +1033,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
             targetCount: 1,
@@ -1041,7 +1041,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 21, minutes: 0 },
             targetCount: 1,
@@ -1092,7 +1092,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 1,
@@ -1145,7 +1145,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 22, minutes: 0 },
             endTime: { hours: 23, minutes: 59 },
             targetCount: 1,
@@ -1153,7 +1153,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-01-02",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 5, minutes: 0 },
             endTime: { hours: 9, minutes: 0 },
             targetCount: 1,
@@ -1206,7 +1206,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 22, minutes: 0 },
             endTime: { hours: 23, minutes: 59 },
             targetCount: 1,
@@ -1214,7 +1214,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-01-02",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 5, minutes: 0 },
             endTime: { hours: 9, minutes: 0 },
             targetCount: 1,
@@ -1248,7 +1248,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 12, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,
@@ -1289,7 +1289,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,

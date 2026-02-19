@@ -44,8 +44,8 @@ export interface CoverageError {
   readonly type: "coverage";
   readonly day: string;
   readonly timeSlots: readonly string[];
-  readonly roleIds?: string[];
-  readonly skillIds?: readonly string[];
+  readonly roles?: string[];
+  readonly skills?: readonly string[];
   readonly reason: string;
   readonly suggestions?: readonly string[];
   readonly groupKey?: GroupKey;
@@ -78,8 +78,8 @@ export interface CoverageViolation {
   readonly type: "coverage";
   readonly day: string;
   readonly timeSlots: readonly string[];
-  readonly roleIds?: string[];
-  readonly skillIds?: readonly string[];
+  readonly roles?: string[];
+  readonly skills?: readonly string[];
   readonly targetCount: number;
   readonly actualCount: number;
   readonly shortfall: number;
@@ -108,8 +108,8 @@ export interface CoveragePassed {
   readonly type: "coverage";
   readonly day: string;
   readonly timeSlots: readonly string[];
-  readonly roleIds?: string[];
-  readonly skillIds?: readonly string[];
+  readonly roles?: string[];
+  readonly skills?: readonly string[];
   readonly description: string;
   readonly groupKey?: GroupKey;
 }
@@ -167,8 +167,8 @@ export interface TrackedConstraint {
   readonly comparator: "<=" | ">=";
   readonly day?: string;
   readonly timeSlot?: string;
-  readonly roleIds?: string[];
-  readonly skillIds?: readonly string[];
+  readonly roles?: string[];
+  readonly skills?: readonly string[];
   readonly context: ValidationContext;
   readonly groupKey?: GroupKey;
 }

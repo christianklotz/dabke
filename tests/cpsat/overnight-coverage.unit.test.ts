@@ -17,7 +17,7 @@ describe("Overnight coverage bucket lookups", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["staff"],
+          roles: ["staff"],
           startTime: { hours: 18, minutes: 0 },
           endTime: { hours: 6, minutes: 0 },
           targetCount: 1,
@@ -47,7 +47,7 @@ describe("Overnight coverage bucket lookups", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["staff"],
+          roles: ["staff"],
           startTime: { hours: 22, minutes: 0 },
           endTime: { hours: 7, minutes: 0 },
           targetCount: 1,
@@ -77,7 +77,7 @@ describe("Overnight coverage bucket lookups", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["staff"],
+          roles: ["staff"],
           startTime: { hours: 0, minutes: 0 },
           endTime: { hours: 6, minutes: 0 },
           targetCount: 1,
@@ -109,14 +109,14 @@ describe("Overnight coverage bucket lookups", () => {
           id: "night_shift",
           startTime: { hours: 22, minutes: 0 },
           endTime: { hours: 6, minutes: 0 },
-          roleIds: ["staff"],
+          roles: ["staff"],
         },
       ],
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [
         {
           day: "2024-01-01",
-          roleIds: ["staff"],
+          roles: ["staff"],
           startTime: { hours: 23, minutes: 0 },
           endTime: { hours: 5, minutes: 0 },
           targetCount: 1,

@@ -65,11 +65,11 @@ interface RoleBasedSemanticCoverageRequirement<
    * Roles that satisfy this coverage (OR logic).
    * Must have at least one role.
    */
-  roleIds: [string, ...string[]];
+  roles: [string, ...string[]];
   /**
    * Additional skill filter (AND logic with roles).
    */
-  skillIds?: [string, ...string[]];
+  skills?: [string, ...string[]];
 }
 
 /**
@@ -78,12 +78,12 @@ interface RoleBasedSemanticCoverageRequirement<
 interface SkillBasedSemanticCoverageRequirement<
   S extends string,
 > extends SemanticCoverageRequirementBase<S> {
-  roleIds?: never;
+  roles?: never;
   /**
    * Skills required (ALL required, AND logic).
    * Must have at least one skill.
    */
-  skillIds: [string, ...string[]];
+  skills: [string, ...string[]];
 }
 
 /**
@@ -91,14 +91,14 @@ interface SkillBasedSemanticCoverageRequirement<
  * Type-safe: S is constrained to known semantic time names.
  *
  * This is a discriminated union enforcing at compile time that at least
- * one of `roleIds` or `skillIds` must be provided.
+ * one of `roles` or `skills` must be provided.
  *
  * @remarks
  * **Fields:**
  * - `semanticTime` (required) — name of a defined semantic time
  * - `targetCount` (required) — how many people are needed
- * - `roleIds` — roles that satisfy this (OR logic); at least one of `roleIds`/`skillIds` required
- * - `skillIds` — skills required (AND logic); at least one of `roleIds`/`skillIds` required
+ * - `roles` — roles that satisfy this (OR logic); at least one of `roles`/`skills` required
+ * - `skills` — skills required (AND logic); at least one of `roles`/`skills` required
  * - `dayOfWeek` — scope to specific days of the week (e.g. `["monday", "tuesday"]`)
  * - `dates` — scope to specific dates (`"YYYY-MM-DD"` strings)
  * - `priority` — `"MANDATORY"` | `"HIGH"` | `"MEDIUM"` | `"LOW"`
@@ -108,15 +108,15 @@ interface SkillBasedSemanticCoverageRequirement<
  *
  * @example Weekday vs weekend (mutually exclusive dayOfWeek)
  * ```typescript
- * { semanticTime: "lunch", roleIds: ["waiter"], targetCount: 2,
+ * { semanticTime: "lunch", roles: ["waiter"], targetCount: 2,
  *   dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
- * { semanticTime: "lunch", roleIds: ["waiter"], targetCount: 3,
+ * { semanticTime: "lunch", roles: ["waiter"], targetCount: 3,
  *   dayOfWeek: ["saturday", "sunday"] },
  * ```
  *
  * @example Skill-based coverage (any role with the skill)
  * ```typescript
- * { semanticTime: "opening", skillIds: ["keyholder"], targetCount: 1 },
+ * { semanticTime: "opening", skills: ["keyholder"], targetCount: 1 },
  * ```
  *
  * @category Semantic Times
@@ -150,23 +150,23 @@ interface RoleBasedConcreteCoverageRequirement extends ConcreteCoverageRequireme
    * Roles that satisfy this coverage (OR logic).
    * Must have at least one role.
    */
-  roleIds: [string, ...string[]];
+  roles: [string, ...string[]];
   /**
    * Additional skill filter (AND logic with roles).
    */
-  skillIds?: [string, ...string[]];
+  skills?: [string, ...string[]];
 }
 
 /**
  * Concrete coverage requiring specific skills only (any role).
  */
 interface SkillBasedConcreteCoverageRequirement extends ConcreteCoverageRequirementBase {
-  roleIds?: never;
+  roles?: never;
   /**
    * Skills required (ALL required, AND logic).
    * Must have at least one skill.
    */
-  skillIds: [string, ...string[]];
+  skills: [string, ...string[]];
 }
 
 /**
@@ -174,7 +174,7 @@ interface SkillBasedConcreteCoverageRequirement extends ConcreteCoverageRequirem
  * Used for one-off requirements that don't fit a semantic time.
  *
  * This is a discriminated union enforcing at compile time that at least
- * one of `roleIds` or `skillIds` must be provided.
+ * one of `roles` or `skills` must be provided.
  *
  * @category Semantic Times
  */
@@ -301,25 +301,25 @@ function buildCoverageRequirement(
   day: string,
   startTime: TimeOfDay,
   endTime: TimeOfDay,
-  roleIds: [string, ...string[]] | undefined,
-  skillIds: [string, ...string[]] | undefined,
+  roles: [string, ...string[]] | undefined,
+  skills: [string, ...string[]] | undefined,
   targetCount: number,
   priority: Priority,
   gKey: GroupKey,
 ): CoverageRequirement {
   const base = { day, startTime, endTime, targetCount, priority, groupKey: gKey };
 
-  if (roleIds && roleIds.length > 0) {
+  if (roles && roles.length > 0) {
     // Role-based (with optional skills)
-    return skillIds && skillIds.length > 0 ? { ...base, roleIds, skillIds } : { ...base, roleIds };
-  } else if (skillIds && skillIds.length > 0) {
+    return skills && skills.length > 0 ? { ...base, roles, skills } : { ...base, roles };
+  } else if (skills && skills.length > 0) {
     // Skill-only
-    return { ...base, skillIds };
+    return { ...base, skills };
   }
 
   // This shouldn't happen if input types are correct, but handle gracefully
   throw new Error(
-    `Coverage requirement for day "${day}" must have at least one of roleIds or skillIds`,
+    `Coverage requirement for day "${day}" must have at least one of roles or skills`,
   );
 }
 
@@ -345,8 +345,8 @@ function resolveSemanticCoverage<S extends string>(
             req.day,
             req.startTime,
             req.endTime,
-            req.roleIds,
-            req.skillIds,
+            req.roles,
+            req.skills,
             req.targetCount,
             req.priority ?? "MANDATORY",
             req.groupKey ?? autoGroupKey,
@@ -371,8 +371,8 @@ function resolveSemanticCoverage<S extends string>(
               day,
               resolved.startTime,
               resolved.endTime,
-              req.roleIds,
-              req.skillIds,
+              req.roles,
+              req.skills,
               req.targetCount,
               req.priority ?? "MANDATORY",
               req.groupKey ?? autoGroupKey,
@@ -391,7 +391,7 @@ function resolveSemanticCoverage<S extends string>(
  * Format: "{count}x {role/skills} during {semanticTime}" with optional scope
  */
 function generateSemanticGroupKey<S extends string>(req: SemanticCoverageRequirement<S>): GroupKey {
-  const roleOrSkills = req.roleIds?.join("/") ?? req.skillIds?.join("+") ?? "staff";
+  const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
   const base = `${req.targetCount}x ${roleOrSkills} during ${req.semanticTime}`;
 
   // Add scope qualifier if scoped to specific days
@@ -410,7 +410,7 @@ function generateSemanticGroupKey<S extends string>(req: SemanticCoverageRequire
  * Format: "{count}x {role/skills} on {day} {time}"
  */
 function generateConcreteGroupKey(req: ConcreteCoverageRequirement): GroupKey {
-  const roleOrSkills = req.roleIds?.join("/") ?? req.skillIds?.join("+") ?? "staff";
+  const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
   const timeRange = `${formatTime(req.startTime)}-${formatTime(req.endTime)}`;
   return groupKey(`${req.targetCount}x ${roleOrSkills} on ${req.day} ${timeRange}`);
 }
