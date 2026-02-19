@@ -46,7 +46,7 @@
  *
  * // Build the model
  * const builder = new ModelBuilder({
- *   employees: [{ id: "alice", roleIds: ["worker"] }],
+ *   members: [{ id: "alice", roles: ["worker"] }],
  *   shiftPatterns,
  *   schedulingPeriod: {
  *     dateRange: { start: "2026-02-09", end: "2026-02-15" },
@@ -166,7 +166,7 @@ export type { ShiftAssignment, ResolvedShiftAssignment, SolverResult } from "./c
 
 export {
   createAssignTogetherRule,
-  createEmployeeAssignmentPriorityRule,
+  createAssignmentPriorityRule,
   createLocationPreferenceRule,
   createMaxConsecutiveDaysRule,
   createMaxHoursDayRule,
@@ -197,7 +197,7 @@ export type {
   RecurringPeriod,
 } from "./cpsat/rules/scope.types.js";
 export type { AssignTogetherConfig } from "./cpsat/rules/assign-together.js";
-export type { EmployeeAssignmentPriorityConfig } from "./cpsat/rules/employee-assignment-priority.js";
+export type { AssignmentPriorityConfig } from "./cpsat/rules/assignment-priority.js";
 export type { LocationPreferenceConfig } from "./cpsat/rules/location-preference.js";
 export type { MaxConsecutiveDaysConfig } from "./cpsat/rules/max-consecutive-days.js";
 export type { MaxHoursDayConfig } from "./cpsat/rules/max-hours-day.js";
@@ -259,7 +259,7 @@ export type {
 
 export { calculateScheduleCost, COST_CATEGORY } from "./cpsat/cost.js";
 
-export type { CostBreakdown, EmployeeCostDetail, CostCalculationConfig } from "./cpsat/cost.js";
+export type { CostBreakdown, MemberCostDetail, CostCalculationConfig } from "./cpsat/cost.js";
 
 // ============================================================================
 // Types (scheduling domain)
@@ -268,8 +268,7 @@ export type { CostBreakdown, EmployeeCostDetail, CostCalculationConfig } from ".
 export type {
   HourlyPay,
   SalariedPay,
-  SchedulingEmployee,
-  Employee,
+  SchedulingMember,
   ShiftPattern,
   CoverageRequirement,
   TimeInterval,
@@ -373,7 +372,6 @@ export type {
   TimeOffOptions,
   AssignTogetherOptions,
   CostRuleOptions,
-  SchedulingMember,
   RuntimeArgs,
   ScheduleDefinition,
   ScheduleConfig,

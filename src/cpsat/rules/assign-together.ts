@@ -3,7 +3,7 @@ import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
 
 const AssignTogetherSchema = z.object({
-  groupEmployeeIds: z
+  groupMemberIds: z
     .tuple([z.string(), z.string()])
     .rest(z.string())
     .refine((ids) => new Set(ids).size === ids.length, {
@@ -20,7 +20,7 @@ const AssignTogetherSchema = z.object({
 /**
  * Configuration for {@link createAssignTogetherRule}.
  *
- * - `groupEmployeeIds` (required): employee IDs to assign together (at least two, must be unique)
+ * - `groupMemberIds` (required): member IDs to assign together (at least two, must be unique)
  * - `priority` (required): how strictly the solver enforces this rule
  */
 export type AssignTogetherConfig = z.infer<typeof AssignTogetherSchema>;
@@ -33,36 +33,36 @@ export type AssignTogetherConfig = z.infer<typeof AssignTogetherSchema>;
  * @example
  * ```ts
  * const rule = createAssignTogetherRule({
- *   groupEmployeeIds: ["alice", "bob", "charlie"],
+ *   groupMemberIds: ["alice", "bob", "charlie"],
  *   priority: "HIGH",
  * });
  * builder = new ModelBuilder({ ...config, rules: [rule] });
  * ```
  */
 export function createAssignTogetherRule(config: AssignTogetherConfig): CompilationRule {
-  const { groupEmployeeIds, priority } = AssignTogetherSchema.parse(config);
+  const { groupMemberIds, priority } = AssignTogetherSchema.parse(config);
 
   return {
     compile(b) {
-      const employees = groupEmployeeIds
-        .map((id) => b.employees.find((e) => e.id === id))
-        .filter((e): e is NonNullable<typeof e> => e !== undefined);
+      const targetMembers = groupMemberIds
+        .map((id) => b.members.find((m) => m.id === id))
+        .filter((m): m is NonNullable<typeof m> => m !== undefined);
 
-      if (employees.length < 2) return;
+      if (targetMembers.length < 2) return;
 
-      for (let i = 0; i < employees.length - 1; i++) {
-        const emp1 = employees[i]!;
-        const emp2 = employees[i + 1]!;
+      for (let i = 0; i < targetMembers.length - 1; i++) {
+        const m1 = targetMembers[i]!;
+        const m2 = targetMembers[i + 1]!;
 
         for (const pattern of b.shiftPatterns) {
-          const canAssign1 = b.canAssign(emp1, pattern);
-          const canAssign2 = b.canAssign(emp2, pattern);
+          const canAssign1 = b.canAssign(m1, pattern);
+          const canAssign2 = b.canAssign(m2, pattern);
           if (!canAssign1 || !canAssign2) continue;
 
           for (const day of b.days) {
             if (!b.patternAvailableOnDay(pattern, day)) continue;
-            const var1 = b.assignment(emp1.id, pattern.id, day);
-            const var2 = b.assignment(emp2.id, pattern.id, day);
+            const var1 = b.assignment(m1.id, pattern.id, day);
+            const var2 = b.assignment(m2.id, pattern.id, day);
 
             if (priority === "MANDATORY") {
               b.addLinear(
@@ -74,7 +74,7 @@ export function createAssignTogetherRule(config: AssignTogetherConfig): Compilat
                 0,
               );
             } else {
-              const diffVar = b.boolVar(`together_diff_${emp1.id}_${emp2.id}_${pattern.id}_${day}`);
+              const diffVar = b.boolVar(`together_diff_${m1.id}_${m2.id}_${pattern.id}_${day}`);
               b.addLinear(
                 [
                   { var: diffVar, coeff: 1 },

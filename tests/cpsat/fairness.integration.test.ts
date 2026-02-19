@@ -6,7 +6,7 @@ import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
 /**
  * Integration tests for fair distribution of shifts.
  *
- * The solver should distribute work fairly among employees by default,
+ * The solver should distribute work fairly among members by default,
  * rather than assigning all work to a single person.
  */
 describe("Fair distribution (integration)", () => {
@@ -16,10 +16,10 @@ describe("Fair distribution (integration)", () => {
     client = getSolverClient();
   });
 
-  describe("Two employees, one shift per day for a week", () => {
-    it("should distribute shifts fairly between two employees over 7 days", async () => {
+  describe("Two members, one shift per day for a week", () => {
+    it("should distribute shifts fairly between two members over 7 days", async () => {
       // Scenario: Retail shop open 9-5pm every day, need 1 person (8:30am-5:30pm)
-      // Two employees: Anne and John
+      // Two members: Anne and John
       // Fair distribution: each should work roughly half the days (3-4 days each)
       const days = [
         "2024-02-05", // Monday
@@ -32,9 +32,9 @@ describe("Fair distribution (integration)", () => {
       ];
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "anne", roleIds: ["staff"] },
-          { id: "john", roleIds: ["staff"] },
+        members: [
+          { id: "anne", roles: ["staff"] },
+          { id: "john", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -64,13 +64,13 @@ describe("Fair distribution (integration)", () => {
       // Should have exactly 7 assignments (one per day)
       expect(assignments).toHaveLength(7);
 
-      // Count assignments per employee
-      const anneDays = assignments.filter((a) => a?.employeeId === "anne").length;
-      const johnDays = assignments.filter((a) => a?.employeeId === "john").length;
+      // Count assignments per member
+      const anneDays = assignments.filter((a) => a?.memberId === "anne").length;
+      const johnDays = assignments.filter((a) => a?.memberId === "john").length;
 
       console.log(`Anne: ${anneDays} days, John: ${johnDays} days`);
 
-      // Fair distribution means neither employee should work all 7 days
+      // Fair distribution means neither member should work all 7 days
       // and both should work at least some days
       // Ideal: 3-4 days each
       expect(anneDays).toBeGreaterThan(0);
@@ -85,8 +85,8 @@ describe("Fair distribution (integration)", () => {
       expect(johnDays).toBeLessThanOrEqual(4);
     }, 30_000);
 
-    it("should distribute shifts fairly with three employees over 7 days", async () => {
-      // Similar scenario but with 3 employees
+    it("should distribute shifts fairly with three members over 7 days", async () => {
+      // Similar scenario but with 3 members
       // Fair distribution: ~2-3 days each
       const days = [
         "2024-02-05",
@@ -99,10 +99,10 @@ describe("Fair distribution (integration)", () => {
       ];
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "anne", roleIds: ["staff"] },
-          { id: "john", roleIds: ["staff"] },
-          { id: "mary", roleIds: ["staff"] },
+        members: [
+          { id: "anne", roles: ["staff"] },
+          { id: "john", roles: ["staff"] },
+          { id: "mary", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -131,34 +131,34 @@ describe("Fair distribution (integration)", () => {
 
       expect(assignments).toHaveLength(7);
 
-      // Count assignments per employee
+      // Count assignments per member
       const counts: Record<string, number> = {};
       for (const a of assignments) {
-        const id = a?.employeeId ?? "unknown";
+        const id = a?.memberId ?? "unknown";
         counts[id] = (counts[id] ?? 0) + 1;
       }
 
       console.log("Assignment counts:", counts);
 
-      // Min-max fairness: no employee works more than ceil(7/3) = 3 days
-      // The solver minimizes the maximum, so at least one employee must work 3 days
+      // Min-max fairness: no member works more than ceil(7/3) = 3 days
+      // The solver minimizes the maximum, so at least one member must work 3 days
       // and the rest should work at most 3 days
       const maxCount = Math.max(...Object.values(counts));
       expect(maxCount).toBeLessThanOrEqual(3);
 
-      // At least 2 employees should be used (could be 2 or 3 depending on solver choice)
+      // At least 2 members should be used (could be 2 or 3 depending on solver choice)
       expect(Object.keys(counts).length).toBeGreaterThanOrEqual(2);
     }, 30_000);
   });
 
   describe("Fairness interacts with preferences", () => {
-    it("employee-assignment-priority can override fairness when needed", async () => {
+    it("member-assignment-priority can override fairness when needed", async () => {
       // Scenario: Prefer permanent staff (Anne) over temp staff (John)
       // Fairness should still apply but preference should win
       const baseConfig = {
-        employees: [
-          { id: "anne", roleIds: ["staff"] },
-          { id: "john", roleIds: ["staff"] },
+        members: [
+          { id: "anne", roles: ["staff"] },
+          { id: "john", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -182,13 +182,13 @@ describe("Fair distribution (integration)", () => {
       // With strong preference for Anne, she should get more shifts
       const rules: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["anne"],
+          name: "assignment-priority",
+          memberIds: ["anne"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["john"],
+          name: "assignment-priority",
+          memberIds: ["john"],
           preference: "low",
         },
       ];
@@ -197,8 +197,8 @@ describe("Fair distribution (integration)", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
 
-      const anneDays = assignments.filter((a) => a?.employeeId === "anne").length;
-      const johnDays = assignments.filter((a) => a?.employeeId === "john").length;
+      const anneDays = assignments.filter((a) => a?.memberId === "anne").length;
+      const johnDays = assignments.filter((a) => a?.memberId === "john").length;
 
       console.log(`With preference - Anne: ${anneDays} days, John: ${johnDays} days`);
 
@@ -211,9 +211,9 @@ describe("Fair distribution (integration)", () => {
       const days = ["2024-02-05", "2024-02-06", "2024-02-07"];
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "anne", roleIds: ["staff"] },
-          { id: "john", roleIds: ["staff"] },
+        members: [
+          { id: "anne", roles: ["staff"] },
+          { id: "john", roles: ["staff"] },
         ],
         shiftPatterns: [
           {

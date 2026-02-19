@@ -19,7 +19,7 @@ const _valid1: TimeOffConfig = {
 const _valid2: TimeOffConfig = {
   priority: "MANDATORY",
   dayOfWeek: ["saturday", "sunday"],
-  employeeIds: ["mauro"],
+  memberIds: ["mauro"],
 };
 
 const _valid3: TimeOffConfig = {
@@ -55,11 +55,11 @@ const _bugEmptySpecificDates: TimeOffConfig = {
   specificDates: [],
 };
 
-const _bugEmptyEmployeeIds: TimeOffConfig = {
+const _bugEmptyMemberIds: TimeOffConfig = {
   priority: "MANDATORY",
   dayOfWeek: ["monday"],
   // @ts-expect-error: [] not assignable to [string, ...string[]]
-  employeeIds: [],
+  memberIds: [],
 };
 
 // ============================================================================
@@ -74,18 +74,18 @@ const _noTime: TimeOffConfig = {
 // @ts-expect-error: missing required time scope
 const _noTimeWithEntity: TimeOffConfig = {
   priority: "MANDATORY",
-  employeeIds: ["alice"],
+  memberIds: ["alice"],
 };
 
 // ============================================================================
 // Multiple entity scopes (should fail)
 // ============================================================================
 
-// @ts-expect-error: roleIds is never when employeeIds is present
+// @ts-expect-error: roleIds is never when memberIds is present
 const _multiEntity: TimeOffConfig = {
   priority: "MANDATORY",
   dayOfWeek: ["monday"],
-  employeeIds: ["alice"],
+  memberIds: ["alice"],
   roleIds: ["barista"],
 };
 
@@ -108,7 +108,7 @@ void [
   _valid5,
   _validEntry,
   _bugEmptySpecificDates,
-  _bugEmptyEmployeeIds,
+  _bugEmptyMemberIds,
   _noTime,
   _noTimeWithEntity,
   _multiEntity,

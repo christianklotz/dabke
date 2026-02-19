@@ -9,7 +9,7 @@ import {
   requiredTimeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -31,7 +31,7 @@ const TimeOffSchema = z
     startTime: timeOfDaySchema.optional(),
     endTime: timeOfDaySchema.optional(),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(requiredTimeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]))
   .refine(
     (config) => {
@@ -52,9 +52,9 @@ const TimeOffSchema = z
  * - `endTime` (optional): end of the time-off window within each day; must be paired with `startTime`
  *
  * Entity scoping (at most one):
- * - `employeeIds`: restrict to specific employees
- * - `roleIds`: restrict to employees with matching roles
- * - `skillIds`: restrict to employees with matching skills
+ * - `memberIds`: restrict to specific members
+ * - `roleIds`: restrict to members with matching roles
+ * - `skillIds`: restrict to members with matching skills
  *
  * Time scoping (exactly one required):
  * - `dateRange`: contiguous date range
@@ -75,7 +75,7 @@ export type TimeOffConfig = z.infer<typeof TimeOffSchema>;
  * @example Full day vacation
  * ```ts
  * createTimeOffRule({
- *   employeeIds: ["alice"],
+ *   memberIds: ["alice"],
  *   dateRange: { start: "2024-02-01", end: "2024-02-05" },
  *   priority: "MANDATORY",
  * });
@@ -95,7 +95,7 @@ export type TimeOffConfig = z.infer<typeof TimeOffSchema>;
  * @example Specific date, partial day
  * ```ts
  * createTimeOffRule({
- *   employeeIds: ["bob"],
+ *   memberIds: ["bob"],
  *   specificDates: ["2024-03-15"],
  *   startTime: { hours: 16, minutes: 0 },
  *   endTime: { hours: 23, minutes: 59 },
@@ -117,18 +117,18 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
 
   return {
     compile(builder) {
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, builder.employees);
-      if (targetEmployees.length === 0) return;
+      const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
+      if (targetMembers.length === 0) return;
 
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
       if (activeDays.length === 0) return;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         for (const day of activeDays) {
           // Report exclusion for coverage analysis (MANDATORY only)
           if (priority === "MANDATORY") {
             builder.reporter.excludeFromCoverage({
-              employeeId: emp.id,
+              memberId: emp.id,
               day,
               startTime: timeWindowStart,
               endTime: timeWindowEnd,
@@ -170,17 +170,17 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
       // MANDATORY time-off is a hard constraint - can't be violated
       if (priority === "MANDATORY") return;
 
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, context.employees);
-      if (targetEmployees.length === 0) return;
+      const targetMembers = resolveMembersFromScope(entityScopeValue, context.members);
+      if (targetMembers.length === 0) return;
 
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, context.days);
       if (activeDays.length === 0) return;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         for (const day of activeDays) {
           const violated = assignments.some(
             (a) =>
-              a.employeeId === emp.id &&
+              a.memberId === emp.id &&
               a.day === day &&
               assignmentOverlapsTimeWindow(a, timeWindowStart, timeWindowEnd),
           );
@@ -190,7 +190,7 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
               rule: "time-off",
               reason: `Time-off request for ${emp.id} on ${day} could not be honored`,
               context: {
-                employeeIds: [emp.id],
+                memberIds: [emp.id],
                 days: [day],
               },
             });
@@ -199,7 +199,7 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
               rule: "time-off",
               description: `Time-off honored for ${emp.id} on ${day}`,
               context: {
-                employeeIds: [emp.id],
+                memberIds: [emp.id],
                 days: [day],
               },
             });

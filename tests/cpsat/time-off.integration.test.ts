@@ -23,13 +23,13 @@ describe("CP-SAT: time-off rule", () => {
 
       const preferences: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["alice"],
+          name: "assignment-priority",
+          memberIds: ["alice"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["bob"],
+          name: "assignment-priority",
+          memberIds: ["bob"],
           preference: "low",
         },
       ];
@@ -37,28 +37,28 @@ describe("CP-SAT: time-off rule", () => {
       const baseline = await solveWithRules(client, baseConfig, preferences);
       expect(baseline.status).toBe("OPTIMAL");
       const baselineAssignments = decodeAssignments(baseline.values);
-      expect(baselineAssignments).toContainEqual(expect.objectContaining({ employeeId: "alice" }));
+      expect(baselineAssignments).toContainEqual(expect.objectContaining({ memberId: "alice" }));
 
       const withTimeOff = await solveWithRules(client, baseConfig, [
         ...preferences,
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           priority: "MANDATORY",
         },
       ] satisfies CpsatRuleConfigEntry[]);
       expect(withTimeOff.status).toBe("OPTIMAL");
       const timeOffAssignments = decodeAssignments(withTimeOff.values);
-      expect(timeOffAssignments).toContainEqual(expect.objectContaining({ employeeId: "bob" }));
-      expect(timeOffAssignments.find((a) => a.employeeId === "alice")).toBeUndefined();
+      expect(timeOffAssignments).toContainEqual(expect.objectContaining({ memberId: "bob" }));
+      expect(timeOffAssignments.find((a) => a.memberId === "alice")).toBeUndefined();
     }, 30_000);
 
     it("treats mandatory time off as infeasible when no alternative coverage exists", async () => {
       const baseConfig = createBaseConfig({
         roleId: "barista",
-        employeeIds: ["solo"],
+        memberIds: ["solo"],
         schedulingPeriod: { dateRange: { start: "2024-02-04", end: "2024-02-04" } },
       });
 
@@ -66,7 +66,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["solo"],
+          memberIds: ["solo"],
           specificDates: ["2024-02-04"],
           priority: "MANDATORY",
         },
@@ -113,7 +113,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dateRange: { start: "2024-02-01", end: "2024-02-02" },
           priority: "MANDATORY",
         },
@@ -122,7 +122,7 @@ describe("CP-SAT: time-off rule", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
 
-      const aliceAssignments = assignments.filter((a) => a.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a.memberId === "alice");
       const aliceBlockedDays = aliceAssignments.filter(
         (a) => a.day === "2024-02-01" || a.day === "2024-02-02",
       );
@@ -146,7 +146,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dayOfWeek: ["monday"],
           priority: "MANDATORY",
         },
@@ -155,14 +155,14 @@ describe("CP-SAT: time-off rule", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
 
-      const aliceAssignments = assignments.filter((a) => a.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a.memberId === "alice");
       expect(aliceAssignments.every((a) => a.day !== "2024-02-05")).toBe(true);
     }, 30_000);
 
     it("supports soft time-off constraints", async () => {
       const baseConfig = createBaseConfig({
         roleId: "barista",
-        employeeIds: ["solo"],
+        memberIds: ["solo"],
         schedulingPeriod: { dateRange: { start: "2024-02-04", end: "2024-02-04" } },
       });
 
@@ -170,7 +170,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["solo"],
+          memberIds: ["solo"],
           specificDates: ["2024-02-04"],
           priority: "LOW",
         },
@@ -178,7 +178,7 @@ describe("CP-SAT: time-off rule", () => {
 
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
-      expect(assignments).toContainEqual(expect.objectContaining({ employeeId: "solo" }));
+      expect(assignments).toContainEqual(expect.objectContaining({ memberId: "solo" }));
     }, 30_000);
   });
 
@@ -205,7 +205,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           startTime: { hours: 13, minutes: 0 },
           endTime: { hours: 23, minutes: 59 },
@@ -216,14 +216,14 @@ describe("CP-SAT: time-off rule", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
 
-      const aliceAssignments = assignments.filter((a) => a.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a.memberId === "alice");
       expect(aliceAssignments.every((a) => a.shiftPatternId === "morning")).toBe(true);
     }, 30_000);
 
     it("does not block shifts outside time-off window", async () => {
       const baseConfig = createBaseConfig({
         roleId: "cashier",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         shift: {
           id: "morning",
@@ -236,7 +236,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           startTime: { hours: 6, minutes: 0 },
           endTime: { hours: 8, minutes: 0 },
@@ -248,13 +248,13 @@ describe("CP-SAT: time-off rule", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments.length).toBeGreaterThan(0);
-      expect(assignments[0]?.employeeId).toBe("alice");
+      expect(assignments[0]?.memberId).toBe("alice");
     }, 30_000);
 
     it("blocks shift that partially overlaps with time-off window", async () => {
       const baseConfig = createBaseConfig({
         roleId: "staff",
-        employeeIds: ["alice", "bob"],
+        memberIds: ["alice", "bob"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -268,7 +268,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-05"],
           startTime: { hours: 14, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
@@ -278,14 +278,14 @@ describe("CP-SAT: time-off rule", () => {
 
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
-      expect(assignments).not.toContainEqual(expect.objectContaining({ employeeId: "alice" }));
-      expect(assignments).toContainEqual(expect.objectContaining({ employeeId: "bob" }));
+      expect(assignments).not.toContainEqual(expect.objectContaining({ memberId: "alice" }));
+      expect(assignments).toContainEqual(expect.objectContaining({ memberId: "bob" }));
     }, 30_000);
 
     it("allows shift that does not overlap with time-off window", async () => {
       const baseConfig = createBaseConfig({
         roleId: "staff",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         shift: {
           id: "morning",
           startTime: { hours: 9, minutes: 0 },
@@ -299,7 +299,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-05"],
           startTime: { hours: 14, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
@@ -309,13 +309,13 @@ describe("CP-SAT: time-off rule", () => {
 
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
-      expect(assignments).toContainEqual(expect.objectContaining({ employeeId: "alice" }));
+      expect(assignments).toContainEqual(expect.objectContaining({ memberId: "alice" }));
     }, 30_000);
 
     it("blocks shift fully contained within time-off window", async () => {
       const baseConfig = createBaseConfig({
         roleId: "staff",
-        employeeIds: ["alice", "bob"],
+        memberIds: ["alice", "bob"],
         shift: {
           id: "short",
           startTime: { hours: 10, minutes: 0 },
@@ -329,7 +329,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-05"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
@@ -339,7 +339,7 @@ describe("CP-SAT: time-off rule", () => {
 
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
-      expect(assignments).not.toContainEqual(expect.objectContaining({ employeeId: "alice" }));
+      expect(assignments).not.toContainEqual(expect.objectContaining({ memberId: "alice" }));
     }, 30_000);
   });
 
@@ -347,7 +347,7 @@ describe("CP-SAT: time-off rule", () => {
     it("MANDATORY prevents assignment even when sole option", async () => {
       const baseConfig = createBaseConfig({
         roleId: "staff",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
@@ -356,7 +356,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-05"],
           priority: "MANDATORY",
         },
@@ -368,7 +368,7 @@ describe("CP-SAT: time-off rule", () => {
     it("HIGH priority allows override when necessary", async () => {
       const baseConfig = createBaseConfig({
         roleId: "staff",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
@@ -377,7 +377,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-05"],
           priority: "HIGH",
         },
@@ -385,13 +385,13 @@ describe("CP-SAT: time-off rule", () => {
 
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
-      expect(assignments).toContainEqual(expect.objectContaining({ employeeId: "alice" }));
+      expect(assignments).toContainEqual(expect.objectContaining({ memberId: "alice" }));
     }, 30_000);
 
     it("MEDIUM priority allows override when necessary", async () => {
       const baseConfig = createBaseConfig({
         roleId: "staff",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-05" } },
         targetCount: 1,
       });
@@ -400,7 +400,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-05"],
           priority: "MEDIUM",
         },
@@ -408,7 +408,7 @@ describe("CP-SAT: time-off rule", () => {
 
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
-      expect(assignments).toContainEqual(expect.objectContaining({ employeeId: "alice" }));
+      expect(assignments).toContainEqual(expect.objectContaining({ memberId: "alice" }));
     }, 30_000);
   });
 
@@ -420,7 +420,7 @@ describe("CP-SAT: time-off rule", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["Feb 1, 2024"],
             priority: "MANDATORY",
           },
@@ -435,7 +435,7 @@ describe("CP-SAT: time-off rule", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             dateRange: { start: "2024/02/01", end: "2024/02/05" },
             priority: "MANDATORY",
           },
@@ -451,7 +451,7 @@ describe("CP-SAT: time-off rule", () => {
             name: "time-off",
             // @ts-expect-error: deliberately missing time scope to test runtime validation
             config: {
-              employeeIds: ["alice"],
+              memberIds: ["alice"],
               priority: "MANDATORY",
             },
           },
@@ -466,7 +466,7 @@ describe("CP-SAT: time-off rule", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-01"],
             startTime: { hours: 9, minutes: 0 },
             priority: "MANDATORY",
@@ -476,13 +476,13 @@ describe("CP-SAT: time-off rule", () => {
     });
   });
 
-  describe("multi-employee patterns", () => {
-    it("handles multiple employees with different time-off patterns", async () => {
+  describe("multi-member patterns", () => {
+    it("handles multiple members with different time-off patterns", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "emp1", roleIds: ["waiter"] },
-          { id: "emp2", roleIds: ["waiter"] },
-          { id: "emp3", roleIds: ["waiter"] },
+        members: [
+          { id: "emp1", roles: ["waiter"] },
+          { id: "emp2", roles: ["waiter"] },
+          { id: "emp3", roles: ["waiter"] },
         ],
         shifts: [
           {
@@ -507,14 +507,14 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["emp1"],
+          memberIds: ["emp1"],
           specificDates: ["2024-02-07"],
           priority: "MANDATORY",
         },
         {
           name: "time-off",
 
-          employeeIds: ["emp2"],
+          memberIds: ["emp2"],
           specificDates: ["2024-02-08", "2024-02-09"],
           startTime: { hours: 0, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
@@ -528,23 +528,22 @@ describe("CP-SAT: time-off rule", () => {
       const assignments = decodeAssignments(response.values);
 
       const emp1Wednesday = assignments.filter(
-        (a) => a?.employeeId === "emp1" && a?.day === "2024-02-07",
+        (a) => a?.memberId === "emp1" && a?.day === "2024-02-07",
       );
       expect(emp1Wednesday).toHaveLength(0);
 
       const emp2ThursdayMorning = assignments.filter(
-        (a) =>
-          a?.employeeId === "emp2" && a?.day === "2024-02-08" && a?.shiftPatternId === "morning",
+        (a) => a?.memberId === "emp2" && a?.day === "2024-02-08" && a?.shiftPatternId === "morning",
       );
       expect(emp2ThursdayMorning).toHaveLength(0);
     }, 60_000);
 
-    it("handles role-based time-off affecting multiple employees", async () => {
+    it("handles role-based time-off affecting multiple members", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "chef1", roleIds: ["chef"] },
-          { id: "chef2", roleIds: ["chef"] },
-          { id: "waiter1", roleIds: ["waiter"] },
+        members: [
+          { id: "chef1", roles: ["chef"] },
+          { id: "chef2", roles: ["chef"] },
+          { id: "waiter1", roles: ["waiter"] },
         ],
         shifts: [
           {
@@ -600,13 +599,12 @@ describe("CP-SAT: time-off rule", () => {
 
       const chefEveningAssignments = assignments.filter(
         (a) =>
-          (a?.employeeId === "chef1" || a?.employeeId === "chef2") &&
-          a?.shiftPatternId === "evening",
+          (a?.memberId === "chef1" || a?.memberId === "chef2") && a?.shiftPatternId === "evening",
       );
       expect(chefEveningAssignments).toHaveLength(0);
 
       const waiterEvening = assignments.filter(
-        (a) => a?.employeeId === "waiter1" && a?.shiftPatternId === "evening",
+        (a) => a?.memberId === "waiter1" && a?.shiftPatternId === "evening",
       );
       expect(waiterEvening).toHaveLength(1);
     }, 30_000);
@@ -648,12 +646,12 @@ describe("CP-SAT: time-off rule", () => {
   });
 
   describe("skill-scoped time-off", () => {
-    it("blocks employees with matching skill", async () => {
+    it("blocks members with matching skill", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["waiter"], skillIds: ["keyholder"] },
-          { id: "charlie", roleIds: ["waiter"] },
+        members: [
+          { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
+          { id: "bob", roles: ["waiter"], skills: ["keyholder"] },
+          { id: "charlie", roles: ["waiter"] },
         ],
         shift: {
           id: "day",
@@ -679,12 +677,12 @@ describe("CP-SAT: time-off rule", () => {
       expect(response.status).toBe("INFEASIBLE");
     }, 30_000);
 
-    it("allows non-skilled employees to work", async () => {
+    it("allows non-skilled members to work", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["waiter"] },
-          { id: "charlie", roleIds: ["waiter"] },
+        members: [
+          { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
+          { id: "bob", roles: ["waiter"] },
+          { id: "charlie", roles: ["waiter"] },
         ],
         shift: {
           id: "day",
@@ -711,7 +709,7 @@ describe("CP-SAT: time-off rule", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(2);
-      const assignedIds = assignments.map((a) => a?.employeeId).toSorted();
+      const assignedIds = assignments.map((a) => a?.memberId).toSorted();
       expect(assignedIds).toEqual(["bob", "charlie"]);
     }, 30_000);
   });
@@ -719,9 +717,9 @@ describe("CP-SAT: time-off rule", () => {
   describe("combined with other rules", () => {
     it("combines time-off with max-hours-week constraint", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["worker"] },
-          { id: "bob", roleIds: ["worker"] },
+        members: [
+          { id: "alice", roles: ["worker"] },
+          { id: "bob", roles: ["worker"] },
         ],
         shift: {
           id: "day",
@@ -738,7 +736,7 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "time-off",
 
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dateRange: { start: "2024-02-07", end: "2024-02-08" },
           priority: "MANDATORY",
         },
@@ -756,7 +754,7 @@ describe("CP-SAT: time-off rule", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
 
-      const aliceAssignments = assignments.filter((a) => a?.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a?.memberId === "alice");
       expect(aliceAssignments.length).toBeLessThanOrEqual(4);
 
       const aliceWedThu = aliceAssignments.filter(
@@ -767,9 +765,9 @@ describe("CP-SAT: time-off rule", () => {
 
     it("combines time-off with min-rest-between-shifts", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["nurse"] },
-          { id: "bob", roleIds: ["nurse"] },
+        members: [
+          { id: "alice", roles: ["nurse"] },
+          { id: "bob", roles: ["nurse"] },
         ],
         shiftPatterns: [
           {
@@ -804,7 +802,7 @@ describe("CP-SAT: time-off rule", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-06"],
             priority: "MANDATORY",
           },
@@ -818,7 +816,7 @@ describe("CP-SAT: time-off rule", () => {
       const assignments = decodeAssignments(response.values);
 
       const aliceTuesday = assignments.filter(
-        (a) => a?.employeeId === "alice" && a?.day === "2024-02-06",
+        (a) => a?.memberId === "alice" && a?.day === "2024-02-06",
       );
       expect(aliceTuesday).toHaveLength(0);
 

@@ -12,7 +12,7 @@ describe("ValidationReporterImpl", () => {
       const reporter = new ValidationReporterImpl();
 
       reporter.excludeFromCoverage({
-        employeeId: "alice",
+        memberId: "alice",
         day: "2024-02-01",
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
@@ -21,7 +21,7 @@ describe("ValidationReporterImpl", () => {
       const exclusions = reporter.getExclusions();
       expect(exclusions).toHaveLength(1);
       expect(exclusions[0]).toEqual({
-        employeeId: "alice",
+        memberId: "alice",
         day: "2024-02-01",
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
@@ -32,7 +32,7 @@ describe("ValidationReporterImpl", () => {
       const reporter = new ValidationReporterImpl();
 
       reporter.excludeFromCoverage({
-        employeeId: "alice",
+        memberId: "alice",
         day: "2024-02-01",
       });
 
@@ -51,8 +51,8 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roleIds: ["barista"],
-        reason: "No eligible employees available",
-        suggestions: ["Add employees with role barista"],
+        reason: "No eligible members available",
+        suggestions: ["Add members with role barista"],
       });
 
       const validation = reporter.getValidation();
@@ -63,8 +63,8 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roleIds: ["barista"],
-        reason: "No eligible employees available",
-        suggestions: ["Add employees with role barista"],
+        reason: "No eligible members available",
+        suggestions: ["Add members with role barista"],
       });
       expect(reporter.hasErrors()).toBe(true);
     });
@@ -75,7 +75,7 @@ describe("ValidationReporterImpl", () => {
       reporter.reportRuleError({
         rule: "time-off",
         reason: "Conflicting time-off requests",
-        context: { employeeIds: ["alice", "bob"] },
+        context: { memberIds: ["alice", "bob"] },
         suggestions: ["Resolve the conflict"],
       });
 
@@ -86,7 +86,7 @@ describe("ValidationReporterImpl", () => {
         type: "rule",
         rule: "time-off",
         reason: "Conflicting time-off requests",
-        context: { employeeIds: ["alice", "bob"] },
+        context: { memberIds: ["alice", "bob"] },
         suggestions: ["Resolve the conflict"],
       });
     });
@@ -145,7 +145,7 @@ describe("ValidationReporterImpl", () => {
       reporter.reportRuleViolation({
         rule: "time-off",
         reason: "Time-off for alice on 2024-02-01 could not be honored",
-        context: { employeeIds: ["alice"], days: ["2024-02-01"] },
+        context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
 
       const validation = reporter.getValidation();
@@ -155,7 +155,7 @@ describe("ValidationReporterImpl", () => {
         type: "rule",
         rule: "time-off",
         reason: "Time-off for alice on 2024-02-01 could not be honored",
-        context: { employeeIds: ["alice"], days: ["2024-02-01"] },
+        context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
     });
   });
@@ -189,7 +189,7 @@ describe("ValidationReporterImpl", () => {
       reporter.reportRulePassed({
         rule: "time-off",
         description: "Alice's Monday time-off honored",
-        context: { employeeIds: ["alice"], days: ["2024-02-01"] },
+        context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
 
       const validation = reporter.getValidation();
@@ -199,7 +199,7 @@ describe("ValidationReporterImpl", () => {
         type: "rule",
         rule: "time-off",
         description: "Alice's Monday time-off honored",
-        context: { employeeIds: ["alice"], days: ["2024-02-01"] },
+        context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
     });
   });
@@ -214,7 +214,7 @@ describe("ValidationReporterImpl", () => {
         timeSlots: ["09:00-13:00", "14:00-18:00"],
         roleIds: ["barista"],
         skillIds: ["espresso", "latte"],
-        reason: "No eligible employees available",
+        reason: "No eligible members available",
       };
 
       reporter1.reportCoverageError(errorData);
@@ -234,7 +234,7 @@ describe("ValidationReporterImpl", () => {
       const violationData = {
         rule: "max-hours-week",
         reason: "Weekly hours exceeded",
-        context: { employeeIds: ["bob", "alice"], days: ["2024-02-01", "2024-02-02"] },
+        context: { memberIds: ["bob", "alice"], days: ["2024-02-01", "2024-02-02"] },
       };
 
       reporter1.reportRuleViolation(violationData);
@@ -256,13 +256,13 @@ describe("ValidationReporterImpl", () => {
       reporter1.reportRulePassed({
         rule: "time-off",
         description: "All time-off honored",
-        context: { employeeIds: ["charlie", "alice", "bob"], days: ["2024-02-03", "2024-02-01"] },
+        context: { memberIds: ["charlie", "alice", "bob"], days: ["2024-02-03", "2024-02-01"] },
       });
 
       reporter2.reportRulePassed({
         rule: "time-off",
         description: "All time-off honored",
-        context: { employeeIds: ["alice", "bob", "charlie"], days: ["2024-02-01", "2024-02-03"] },
+        context: { memberIds: ["alice", "bob", "charlie"], days: ["2024-02-01", "2024-02-03"] },
       });
 
       const id1 = reporter1.getValidation().passed[0]?.id;
@@ -640,7 +640,7 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:00"],
           roleIds: ["barista"],
-          reason: "No eligible employees",
+          reason: "No eligible members",
           groupKey: key,
         },
       ],

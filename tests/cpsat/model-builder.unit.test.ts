@@ -2,11 +2,7 @@ import assert from "node:assert";
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import type {
-  CoverageRequirement,
-  SchedulingEmployee,
-  ShiftPattern,
-} from "../../src/cpsat/types.js";
+import type { CoverageRequirement, SchedulingMember, ShiftPattern } from "../../src/cpsat/types.js";
 
 function baseCoverage(override: Partial<CoverageRequirement> = {}): CoverageRequirement {
   return {
@@ -23,7 +19,7 @@ function baseCoverage(override: Partial<CoverageRequirement> = {}): CoverageRequ
 describe("ModelBuilder (CP-SAT)", () => {
   it("builds a no-op request for empty inputs", () => {
     const builder = new ModelBuilder({
-      employees: [],
+      members: [],
       shiftPatterns: [],
       schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
       coverage: [],
@@ -38,7 +34,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
   it("propagates solver timeout and solution limits into the request", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "e1", roleIds: ["role"] }],
+      members: [{ id: "e1", roles: ["role"] }],
       shiftPatterns: [
         {
           id: "p1",
@@ -69,9 +65,9 @@ describe("ModelBuilder (CP-SAT)", () => {
   });
 
   it("compiles coverage and core constraints into a solver request", () => {
-    const employees = [
-      { id: "e1", roleIds: ["server"] },
-      { id: "e2", roleIds: ["server"] },
+    const members = [
+      { id: "e1", roles: ["server"] },
+      { id: "e2", roles: ["server"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -95,7 +91,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage,
@@ -127,7 +123,7 @@ describe("ModelBuilder (CP-SAT)", () => {
   });
 
   it("applies rule compilation for max-hours and rest constraints", () => {
-    const employees = [{ id: "emp", roleIds: ["nurse"] }];
+    const members = [{ id: "emp", roles: ["nurse"] }];
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "early",
@@ -144,7 +140,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -180,23 +176,23 @@ describe("ModelBuilder (CP-SAT)", () => {
     expect(penaltyTerm?.coeff).toBeGreaterThan(0);
   });
 
-  it("rejects employee IDs containing colons", () => {
+  it("rejects member IDs containing colons", () => {
     expect(
       () =>
         new ModelBuilder({
-          employees: [{ id: "emp:1", roleIds: ["role"] }],
+          members: [{ id: "emp:1", roles: ["role"] }],
           shiftPatterns: [],
           schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
           coverage: [],
         }),
-    ).toThrow('Employee ID "emp:1" cannot contain colons');
+    ).toThrow('Member ID "emp:1" cannot contain colons');
   });
 
   it("rejects shift pattern IDs containing colons", () => {
     expect(
       () =>
         new ModelBuilder({
-          employees: [],
+          members: [],
           shiftPatterns: [
             {
               id: "shift:morning",
@@ -211,10 +207,10 @@ describe("ModelBuilder (CP-SAT)", () => {
     ).toThrow('Shift pattern ID "shift:morning" cannot contain colons');
   });
 
-  it("allows any employee to work a shift pattern with no roleIds", () => {
-    const employees = [
-      { id: "alice", roleIds: ["server"] },
-      { id: "bob", roleIds: ["chef"] },
+  it("allows any member to work a shift pattern with no roleIds", () => {
+    const members = [
+      { id: "alice", roles: ["server"] },
+      { id: "bob", roles: ["chef"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -227,7 +223,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -236,16 +232,16 @@ describe("ModelBuilder (CP-SAT)", () => {
     const { request } = builder.compile();
     const variableNames = new Set(request.variables.map((v) => v.name));
 
-    // Both employees should have assignment variables
+    // Both members should have assignment variables
     expect(variableNames.has("assign:alice:generic_shift:2024-01-01")).toBe(true);
     expect(variableNames.has("assign:bob:generic_shift:2024-01-01")).toBe(true);
   });
 
-  it("allows employees with any matching role to work multi-role shift patterns", () => {
-    const employees = [
-      { id: "alice", roleIds: ["server"] },
-      { id: "bob", roleIds: ["runner"] },
-      { id: "charlie", roleIds: ["chef"] },
+  it("allows members with any matching role to work multi-role shift patterns", () => {
+    const members = [
+      { id: "alice", roles: ["server"] },
+      { id: "bob", roles: ["runner"] },
+      { id: "charlie", roles: ["chef"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -258,7 +254,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -273,10 +269,10 @@ describe("ModelBuilder (CP-SAT)", () => {
     expect(variableNames.has("assign:charlie:floor_shift:2024-01-01")).toBe(false);
   });
 
-  it("restricts shift pattern with single roleId to matching employees only", () => {
-    const employees = [
-      { id: "alice", roleIds: ["server"] },
-      { id: "bob", roleIds: ["chef"] },
+  it("restricts shift pattern with single roleId to matching members only", () => {
+    const members = [
+      { id: "alice", roles: ["server"] },
+      { id: "bob", roles: ["chef"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -289,7 +285,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -304,9 +300,9 @@ describe("ModelBuilder (CP-SAT)", () => {
   });
 
   it("treats empty roleIds array same as undefined - anyone can work", () => {
-    const employees = [
-      { id: "alice", roleIds: ["server"] },
-      { id: "bob", roleIds: ["chef"] },
+    const members = [
+      { id: "alice", roles: ["server"] },
+      { id: "bob", roles: ["chef"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -319,7 +315,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -328,15 +324,15 @@ describe("ModelBuilder (CP-SAT)", () => {
     const { request } = builder.compile();
     const variableNames = new Set(request.variables.map((v) => v.name));
 
-    // Both employees can work
+    // Both members can work
     expect(variableNames.has("assign:alice:open_shift:2024-01-01")).toBe(true);
     expect(variableNames.has("assign:bob:open_shift:2024-01-01")).toBe(true);
   });
 
-  it("allows multi-role employee to work shift if any of their roles match", () => {
-    const employees = [
-      { id: "alice", roleIds: ["server", "host"] }, // Multi-role employee
-      { id: "bob", roleIds: ["chef"] },
+  it("allows multi-role member to work shift if any of their roles match", () => {
+    const members = [
+      { id: "alice", roles: ["server", "host"] }, // Multi-role member
+      { id: "bob", roles: ["chef"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -349,7 +345,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -364,9 +360,9 @@ describe("ModelBuilder (CP-SAT)", () => {
   });
 
   it("handles mixed shift patterns - some with roleIds, some without", () => {
-    const employees = [
-      { id: "alice", roleIds: ["server"] },
-      { id: "bob", roleIds: ["chef"] },
+    const members = [
+      { id: "alice", roles: ["server"] },
+      { id: "bob", roles: ["chef"] },
     ];
 
     const shiftPatterns: ShiftPattern[] = [
@@ -385,7 +381,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ];
 
     const builder = new ModelBuilder({
-      employees,
+      members,
       shiftPatterns,
       schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
       coverage: [],
@@ -410,7 +406,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("accepts coverage with roleIds only", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "shift",
@@ -436,7 +432,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("accepts coverage with skillIds only", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"], skillIds: ["keyholder"] }],
+        members: [{ id: "alice", roles: ["server"], skills: ["keyholder"] }],
         shiftPatterns: [
           {
             id: "shift",
@@ -462,7 +458,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("accepts coverage with both roleId and skillIds", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"], skillIds: ["keyholder"] }],
+        members: [{ id: "alice", roles: ["server"], skills: ["keyholder"] }],
         shiftPatterns: [
           {
             id: "shift",
@@ -487,17 +483,17 @@ describe("ModelBuilder (CP-SAT)", () => {
       expect(() => builder.compile()).not.toThrow();
     });
 
-    describe("employeesForCoverage", () => {
-      const employees: SchedulingEmployee[] = [
-        { id: "alice", roleIds: ["server"], skillIds: ["keyholder", "senior"] },
-        { id: "bob", roleIds: ["server"], skillIds: ["senior"] },
-        { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
-        { id: "dave", roleIds: ["server"] }, // no skills
+    describe("membersForCoverage", () => {
+      const members: SchedulingMember[] = [
+        { id: "alice", roles: ["server"], skills: ["keyholder", "senior"] },
+        { id: "bob", roles: ["server"], skills: ["senior"] },
+        { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
+        { id: "dave", roles: ["server"] }, // no skills
       ];
 
       const createBuilder = () =>
         new ModelBuilder({
-          employees,
+          members,
           shiftPatterns: [
             {
               id: "shift",
@@ -520,7 +516,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
       it("filters by role only", () => {
         const builder = createBuilder();
-        const matched = builder.employeesForCoverage({
+        const matched = builder.membersForCoverage({
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -535,7 +531,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
       it("filters by single skill only", () => {
         const builder = createBuilder();
-        const matched = builder.employeesForCoverage({
+        const matched = builder.membersForCoverage({
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -550,7 +546,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
       it("filters by multiple skills with AND logic", () => {
         const builder = createBuilder();
-        const matched = builder.employeesForCoverage({
+        const matched = builder.membersForCoverage({
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -565,7 +561,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
       it("filters by role AND skills combined", () => {
         const builder = createBuilder();
-        const matched = builder.employeesForCoverage({
+        const matched = builder.membersForCoverage({
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -579,9 +575,9 @@ describe("ModelBuilder (CP-SAT)", () => {
         expect(ids).toEqual(["alice"]);
       });
 
-      it("returns empty array when no employees match skill requirement", () => {
+      it("returns empty array when no members match skill requirement", () => {
         const builder = createBuilder();
-        const matched = builder.employeesForCoverage({
+        const matched = builder.membersForCoverage({
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -593,9 +589,9 @@ describe("ModelBuilder (CP-SAT)", () => {
         expect(matched).toEqual([]);
       });
 
-      it("returns empty array when no employees match role + skill combination", () => {
+      it("returns empty array when no members match role + skill combination", () => {
         const builder = createBuilder();
-        const matched = builder.employeesForCoverage({
+        const matched = builder.membersForCoverage({
           day: "2024-01-01",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -611,9 +607,9 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("creates coverage constraint for skill-only requirement", () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "bob", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -656,10 +652,10 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("creates coverage constraint for role + skills requirement", () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["server"] },
-          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "bob", roles: ["server"] },
+          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -719,7 +715,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("reports coverage error when no eligible team members exist", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [baseCoverage({ roleIds: ["barista"] })],
@@ -736,7 +732,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("reports coverage error when mandatory time-off blocks everyone", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["barista"] }],
+        members: [{ id: "alice", roles: ["barista"] }],
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [baseCoverage()],
@@ -744,7 +740,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-01"],
             priority: "MANDATORY",
           },
@@ -762,7 +758,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("tracks soft coverage constraints for post-solve analysis", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["barista"] }],
+        members: [{ id: "alice", roles: ["barista"] }],
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [baseCoverage({ priority: "HIGH", targetCount: 2 })],
@@ -780,7 +776,7 @@ describe("ModelBuilder (CP-SAT)", () => {
   });
 
   describe("schedulingPeriod", () => {
-    const baseEmployees = [{ id: "e1", roleIds: ["server"] }];
+    const baseMembers = [{ id: "e1", roles: ["server"] }];
     const baseShiftPatterns: ShiftPattern[] = [
       {
         id: "day_shift",
@@ -792,7 +788,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("accepts schedulingPeriod with dateRange", () => {
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-05" },
@@ -806,7 +802,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     it("accepts schedulingPeriod with dateRange and dayOfWeek filter", () => {
       // 2025-02-03 is Monday, 2025-02-09 is Sunday
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-09" },
@@ -827,7 +823,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("accepts schedulingPeriod with dates filter", () => {
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-05", end: "2025-02-10" },
@@ -842,7 +838,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("creates assignment variables for resolved days", () => {
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-04" },
@@ -862,7 +858,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     it("restaurant closed Mon/Tue use case works with coverage", () => {
       // 2025-02-03 is Monday
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-09" },
@@ -895,7 +891,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
     it("handles empty scheduling period gracefully", () => {
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-03" },
@@ -914,7 +910,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     it("dayOfWeek filter excludes days from all constraint generation", () => {
       // 2025-02-03 is Monday, 2025-02-04 is Tuesday
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-07" },
@@ -961,7 +957,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       // 2025-02-03 is Monday - filtered out by dayOfWeek
       // Coverage for this day has no overlapping shift patterns, so no constraints generated
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-03", end: "2025-02-07" },
@@ -991,7 +987,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     it("weekends-only schedule filters correctly", () => {
       // 2025-02-01 is Saturday, 2025-02-02 is Sunday, then weekdays...
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-01", end: "2025-02-09" },
@@ -1007,7 +1003,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     it("single day filter works across multiple weeks", () => {
       // Every Monday in February 2025
       const builder = new ModelBuilder({
-        employees: baseEmployees,
+        members: baseMembers,
         shiftPatterns: baseShiftPatterns,
         schedulingPeriod: {
           dateRange: { start: "2025-02-01", end: "2025-02-28" },

@@ -11,7 +11,7 @@ import { getSolverClient, decodeAssignments, solveWithRules, createBaseConfig } 
  * enforced via:
  * 1. Role restrictions on shift patterns
  * 2. Time-off rules scoped by skillIds
- * 3. Employee assignment priority rules scoped by skillIds
+ * 3. member assignment priority rules scoped by skillIds
  *
  * These tests demonstrate skill-based scheduling patterns using these mechanisms.
  */
@@ -22,12 +22,12 @@ describe("Skill-based scheduling (integration)", () => {
     client = getSolverClient();
   });
 
-  it("uses time-off by skill to restrict non-skilled employees from shifts", async () => {
+  it("uses time-off by skill to restrict non-skilled members from shifts", async () => {
     // Scenario: Opening requires keyholder - block non-keyholders via time-off
     const baseConfig = createBaseConfig({
-      employees: [
-        { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
-        { id: "bob", roleIds: ["waiter"] }, // No keyholder skill
+      members: [
+        { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
+        { id: "bob", roles: ["waiter"] }, // No keyholder skill
       ],
       shift: {
         id: "opening",
@@ -38,11 +38,11 @@ describe("Skill-based scheduling (integration)", () => {
       targetCount: 1,
     });
 
-    // Block employees WITHOUT keyholder skill from morning (inverse of what we want)
-    // Actually, time-off blocks by skillIds means "employees WITH these skills are off"
+    // Block members WITHOUT keyholder skill from morning (inverse of what we want)
+    // Actually, time-off blocks by skillIds means "members WITH these skills are off"
     // So we need the opposite - this demonstrates the pattern limitation
 
-    // For now, test that we can block skilled employees
+    // For now, test that we can block skilled members
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "time-off",
@@ -60,15 +60,15 @@ describe("Skill-based scheduling (integration)", () => {
 
     // Alice (keyholder) should be blocked, bob should be assigned
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]?.employeeId).toBe("bob");
+    expect(assignments[0]?.memberId).toBe("bob");
   }, 30_000);
 
-  it("uses employee-assignment-priority by skill to prefer skilled employees", async () => {
+  it("uses member-assignment-priority by skill to prefer skilled members", async () => {
     // Scenario: Prefer keyholders for opening shifts
     const baseConfig = createBaseConfig({
-      employees: [
-        { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
-        { id: "bob", roleIds: ["waiter"] },
+      members: [
+        { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
+        { id: "bob", roles: ["waiter"] },
       ],
       shift: {
         id: "opening",
@@ -81,7 +81,7 @@ describe("Skill-based scheduling (integration)", () => {
 
     const rules: CpsatRuleConfigEntry[] = [
       {
-        name: "employee-assignment-priority",
+        name: "assignment-priority",
 
         skillIds: ["keyholder"],
         preference: "high",
@@ -95,15 +95,15 @@ describe("Skill-based scheduling (integration)", () => {
 
     // Alice (keyholder, high priority) should be preferred
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]?.employeeId).toBe("alice");
+    expect(assignments[0]?.memberId).toBe("alice");
   }, 30_000);
 
   it("role-restricted shift patterns limit assignments by role", async () => {
     // Scenario: Kitchen shift only for chefs
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["waiter"] },
-        { id: "bob", roleIds: ["chef"] },
+      members: [
+        { id: "alice", roles: ["waiter"] },
+        { id: "bob", roles: ["chef"] },
       ],
       shiftPatterns: [
         {
@@ -134,14 +134,14 @@ describe("Skill-based scheduling (integration)", () => {
 
     // Only Bob (chef) can work kitchen shift
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]?.employeeId).toBe("bob");
+    expect(assignments[0]?.memberId).toBe("bob");
   }, 30_000);
 
-  it("multi-role employees can work shifts matching any of their roles", async () => {
+  it("multi-role members can work shifts matching any of their roles", async () => {
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["waiter", "host"] }, // Multi-role
-        { id: "bob", roleIds: ["chef"] },
+      members: [
+        { id: "alice", roles: ["waiter", "host"] }, // Multi-role
+        { id: "bob", roles: ["chef"] },
       ],
       shiftPatterns: [
         {
@@ -172,14 +172,14 @@ describe("Skill-based scheduling (integration)", () => {
 
     // Alice has waiter role, can work floor shift
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]?.employeeId).toBe("alice");
+    expect(assignments[0]?.memberId).toBe("alice");
   }, 30_000);
 
-  it("returns infeasible when no employees match required role", async () => {
+  it("returns infeasible when no members match required role", async () => {
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["chef"] },
-        { id: "bob", roleIds: ["chef"] },
+      members: [
+        { id: "alice", roles: ["chef"] },
+        { id: "bob", roles: ["chef"] },
       ],
       shiftPatterns: [
         {
@@ -211,10 +211,10 @@ describe("Skill-based scheduling (integration)", () => {
   it("combines role restrictions with skill-based assignment priority", async () => {
     // Scenario: Floor shift for waiters, prefer those with senior skill
     const baseConfig = createBaseConfig({
-      employees: [
-        { id: "alice", roleIds: ["waiter"], skillIds: ["senior"] },
-        { id: "bob", roleIds: ["waiter"] },
-        { id: "charlie", roleIds: ["waiter"], skillIds: ["senior"] },
+      members: [
+        { id: "alice", roles: ["waiter"], skills: ["senior"] },
+        { id: "bob", roles: ["waiter"] },
+        { id: "charlie", roles: ["waiter"], skills: ["senior"] },
       ],
       shiftPatterns: [
         {
@@ -239,7 +239,7 @@ describe("Skill-based scheduling (integration)", () => {
 
     const rules: CpsatRuleConfigEntry[] = [
       {
-        name: "employee-assignment-priority",
+        name: "assignment-priority",
 
         skillIds: ["senior"],
         preference: "high",
@@ -253,7 +253,7 @@ describe("Skill-based scheduling (integration)", () => {
 
     // Both seniors (alice and charlie) should definitely be assigned
     // Bob may or may not be assigned since coverage only requires >= 2
-    const assignedIds = assignments.map((a) => a?.employeeId).toSorted();
+    const assignedIds = assignments.map((a) => a?.memberId).toSorted();
     expect(assignedIds).toContain("alice");
     expect(assignedIds).toContain("charlie");
     expect(assignments.length).toBeGreaterThanOrEqual(2);

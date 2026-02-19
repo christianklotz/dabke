@@ -5,7 +5,7 @@ export type CreateCpsatRuleFunction<TConfig = any> = (config: TConfig) => Compil
 // Registry of built-in rule names to their config types
 export interface CpsatRuleRegistry {
   "assign-together": import("./assign-together.js").AssignTogetherConfig;
-  "employee-assignment-priority": import("./employee-assignment-priority.js").EmployeeAssignmentPriorityConfig;
+  "assignment-priority": import("./assignment-priority.js").AssignmentPriorityConfig;
   "location-preference": import("./location-preference.js").LocationPreferenceConfig;
   "max-consecutive-days": import("./max-consecutive-days.js").MaxConsecutiveDaysConfig;
   "max-hours-day": import("./max-hours-day.js").MaxHoursDayConfig;
@@ -48,7 +48,7 @@ export type CpsatRuleRegistryFromFactories<F extends CpsatRuleFactories> = {
  * A named rule configuration entry.
  *
  * Flat discriminated union: `name` is the discriminant and all config fields
- * (including scope fields like `employeeIds`, `dayOfWeek`, etc.) sit at the
+ * (including scope fields like `memberIds`, `dayOfWeek`, etc.) sit at the
  * same level. This eliminates the `{ name, config: { ... } }` nesting that
  * invited misplacement of scope fields.
  *
@@ -57,7 +57,7 @@ export type CpsatRuleRegistryFromFactories<F extends CpsatRuleFactories> = {
  * ```ts
  * const rules: CpsatRuleConfigEntry[] = [
  *   { name: "max-hours-week", hours: 40, priority: "MANDATORY" },
- *   { name: "time-off", employeeIds: ["alice"], dayOfWeek: ["monday"], priority: "MANDATORY" },
+ *   { name: "time-off", memberIds: ["alice"], dayOfWeek: ["monday"], priority: "MANDATORY" },
  * ];
  * ```
  */

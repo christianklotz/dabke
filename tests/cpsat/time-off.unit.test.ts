@@ -5,13 +5,13 @@ import type { RuleValidationContext } from "../../src/cpsat/model-builder.js";
 import type { ResolvedShiftAssignment } from "../../src/cpsat/response.js";
 
 function createAssignment(
-  employeeId: string,
+  memberId: string,
   day: string,
   startHours: number,
   endHours: number,
 ): ResolvedShiftAssignment {
   return {
-    employeeId,
+    memberId,
     day,
     startTime: { hours: startHours, minutes: 0 },
     endTime: { hours: endHours, minutes: 0 },
@@ -23,7 +23,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("requires at least one time scope", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           priority: "MANDATORY",
         } as any),
       ).toThrow("Must provide time scoping");
@@ -32,7 +32,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts specificDates", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           priority: "MANDATORY",
         }),
@@ -42,7 +42,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts dateRange", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dateRange: { start: "2024-02-01", end: "2024-02-05" },
           priority: "MANDATORY",
         }),
@@ -52,7 +52,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts dayOfWeek", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dayOfWeek: ["monday", "friday"],
           priority: "MANDATORY",
         }),
@@ -81,7 +81,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("validates specificDates format", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01", "Feb 2, 2024"],
           priority: "MANDATORY",
         }),
@@ -91,7 +91,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("validates dateRange start format", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dateRange: { start: "02/01/2024", end: "2024-02-05" },
           priority: "MANDATORY",
         }),
@@ -101,7 +101,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("validates dateRange end format", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dateRange: { start: "2024-02-01", end: "February 5" },
           priority: "MANDATORY",
         }),
@@ -111,7 +111,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts valid YYYY-MM-DD format in specificDates", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01", "2024-12-31"],
           priority: "MANDATORY",
         }),
@@ -121,7 +121,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts valid YYYY-MM-DD format in dateRange", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           dateRange: { start: "2024-02-01", end: "2024-12-31" },
           priority: "MANDATORY",
         }),
@@ -133,7 +133,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("requires both startTime and endTime together", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           startTime: { hours: 9, minutes: 0 },
           priority: "MANDATORY",
@@ -144,7 +144,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("rejects endTime without startTime", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           endTime: { hours: 17, minutes: 0 },
           priority: "MANDATORY",
@@ -155,7 +155,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts both startTime and endTime", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -167,7 +167,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("accepts neither startTime nor endTime (full day)", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           priority: "MANDATORY",
         }),
@@ -177,7 +177,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("validates startTime hours range", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           startTime: { hours: 25, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
@@ -189,7 +189,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("validates startTime minutes range", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           startTime: { hours: 9, minutes: 60 },
           endTime: { hours: 17, minutes: 0 },
@@ -200,10 +200,10 @@ describe("CP-SAT time-off rule: schema validation", () => {
   });
 
   describe("entity scoping", () => {
-    it("accepts employeeIds", () => {
+    it("accepts memberIds", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice", "bob"],
+          memberIds: ["alice", "bob"],
           specificDates: ["2024-02-01"],
           priority: "MANDATORY",
         }),
@@ -241,14 +241,14 @@ describe("CP-SAT time-off rule: schema validation", () => {
 
     it("rejects multiple entity scopes", () => {
       expect(() =>
-        // @ts-expect-error: deliberately passing both employeeIds and roleIds to test runtime validation
+        // @ts-expect-error: deliberately passing both memberIds and roleIds to test runtime validation
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           roleIds: ["student"],
           specificDates: ["2024-02-01"],
           priority: "MANDATORY",
         }),
-      ).toThrow(/Only one of employeeIds\/roleIds\/skillIds/);
+      ).toThrow(/Only one of memberIds\/roleIds\/skillIds/);
     });
   });
 
@@ -256,7 +256,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it.each(["LOW", "MEDIUM", "HIGH", "MANDATORY"] as const)("accepts priority %s", (priority) => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           priority,
         }),
@@ -266,7 +266,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
     it("rejects invalid priority", () => {
       expect(() =>
         createTimeOffRule({
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
           specificDates: ["2024-02-01"],
           priority: "CRITICAL" as any,
         }),
@@ -277,10 +277,10 @@ describe("CP-SAT time-off rule: schema validation", () => {
 
 describe("CP-SAT time-off rule: validate()", () => {
   const baseContext: RuleValidationContext = {
-    employees: [
-      { id: "alice", roleIds: ["barista"] },
-      { id: "bob", roleIds: ["barista"] },
-      { id: "charlie", roleIds: ["manager"] },
+    members: [
+      { id: "alice", roles: ["barista"] },
+      { id: "bob", roles: ["barista"] },
+      { id: "charlie", roles: ["manager"] },
     ],
     days: ["2024-02-01", "2024-02-02", "2024-02-03"],
     shiftPatterns: [
@@ -296,7 +296,7 @@ describe("CP-SAT time-off rule: validate()", () => {
   describe("MANDATORY priority", () => {
     it("does not report anything for MANDATORY time-off (hard constraint)", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         priority: "MANDATORY",
       });
@@ -313,9 +313,9 @@ describe("CP-SAT time-off rule: validate()", () => {
   });
 
   describe("soft priority violations", () => {
-    it("reports violation when employee works during requested time-off", () => {
+    it("reports violation when member works during requested time-off", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         priority: "LOW",
       });
@@ -336,9 +336,9 @@ describe("CP-SAT time-off rule: validate()", () => {
       }
     });
 
-    it("reports passed when employee does not work during requested time-off", () => {
+    it("reports passed when member does not work during requested time-off", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         priority: "HIGH",
       });
@@ -361,7 +361,7 @@ describe("CP-SAT time-off rule: validate()", () => {
 
     it("reports passed when no assignments exist", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         priority: "MEDIUM",
       });
@@ -379,7 +379,7 @@ describe("CP-SAT time-off rule: validate()", () => {
   describe("partial day time-off", () => {
     it("reports violation when shift overlaps with partial-day time-off", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         startTime: { hours: 10, minutes: 0 },
         endTime: { hours: 14, minutes: 0 },
@@ -398,7 +398,7 @@ describe("CP-SAT time-off rule: validate()", () => {
 
     it("reports passed when shift does not overlap with partial-day time-off", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         startTime: { hours: 14, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
@@ -418,7 +418,7 @@ describe("CP-SAT time-off rule: validate()", () => {
 
     it("detects boundary overlap (shift ends when time-off starts)", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01"],
         startTime: { hours: 13, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
@@ -438,7 +438,7 @@ describe("CP-SAT time-off rule: validate()", () => {
   });
 
   describe("role-based scoping", () => {
-    it("validates time-off for all employees with matching role", () => {
+    it("validates time-off for all members with matching role", () => {
       const rule = createTimeOffRule({
         roleIds: ["barista"],
         specificDates: ["2024-02-01"],
@@ -467,7 +467,7 @@ describe("CP-SAT time-off rule: validate()", () => {
       }
     });
 
-    it("ignores employees without matching role", () => {
+    it("ignores members without matching role", () => {
       const rule = createTimeOffRule({
         roleIds: ["barista"],
         specificDates: ["2024-02-01"],
@@ -490,7 +490,7 @@ describe("CP-SAT time-off rule: validate()", () => {
   describe("multiple days", () => {
     it("reports per-day violations and passed", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01", "2024-02-02"],
         priority: "LOW",
       });
@@ -520,7 +520,7 @@ describe("CP-SAT time-off rule: validate()", () => {
   describe("date range scoping", () => {
     it("validates all days in date range", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         dateRange: { start: "2024-02-01", end: "2024-02-03" },
         priority: "LOW",
       });
@@ -541,7 +541,7 @@ describe("CP-SAT time-off rule: validate()", () => {
   describe("context filtering", () => {
     it("only validates days present in context", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         specificDates: ["2024-02-01", "2024-02-10"], // 02-10 not in context
         priority: "LOW",
       });
@@ -558,9 +558,9 @@ describe("CP-SAT time-off rule: validate()", () => {
       expect(validation.passed[0]?.description).toContain("2024-02-01");
     });
 
-    it("only validates employees present in context", () => {
+    it("only validates members present in context", () => {
       const rule = createTimeOffRule({
-        employeeIds: ["alice", "unknown"], // unknown not in context
+        memberIds: ["alice", "unknown"], // unknown not in context
         specificDates: ["2024-02-01"],
         priority: "LOW",
       });
@@ -571,7 +571,7 @@ describe("CP-SAT time-off rule: validate()", () => {
       rule.validate?.(assignments, reporter, baseContext);
 
       const validation = reporter.getValidation();
-      // Only alice should be validated (unknown not in context.employees)
+      // Only alice should be validated (unknown not in context.members)
       expect(validation.passed).toHaveLength(1);
       expect(validation.passed[0]?.type).toBe("rule");
       expect(validation.passed[0]?.description).toContain("alice");

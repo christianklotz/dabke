@@ -4,7 +4,7 @@ import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 describe("Overnight coverage bucket lookups", () => {
   it("should find patterns for overnight coverage (18:00-06:00)", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         {
           id: "night_shift",
@@ -34,7 +34,7 @@ describe("Overnight coverage bucket lookups", () => {
 
   it("should find patterns for late-night coverage (22:00-07:00)", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         {
           id: "night_shift",
@@ -64,7 +64,7 @@ describe("Overnight coverage bucket lookups", () => {
 
   it("should handle coverage starting at midnight (00:00-06:00) with overnight pattern", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         {
           id: "night_shift",
@@ -94,9 +94,9 @@ describe("Overnight coverage bucket lookups", () => {
 
   it("should handle multiple overlapping overnight patterns", () => {
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["staff"] },
-        { id: "bob", roleIds: ["staff"] },
+      members: [
+        { id: "alice", roles: ["staff"] },
+        { id: "bob", roles: ["staff"] },
       ],
       shiftPatterns: [
         {

@@ -20,9 +20,9 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
     // Scenario: Cafe open weekdays 9-18, Saturday 9-14
     // Full shift available weekdays only, Saturday shift available Saturday only
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["staff"] },
-        { id: "bob", roleIds: ["staff"] },
+      members: [
+        { id: "alice", roles: ["staff"] },
+        { id: "bob", roles: ["staff"] },
       ],
       shiftPatterns: [
         // Full shift for weekdays only
@@ -77,7 +77,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
     // Resolve to get actual times
     const resolved = resolveAssignments(
       rawAssignments.map((a) => ({
-        employeeId: a.employeeId!,
+        memberId: a.memberId!,
         shiftPatternId: a.shiftPatternId!,
         day: a.day!,
       })),
@@ -100,13 +100,13 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
   it("realistic cafe scenario with different Saturday hours", async () => {
     // Based on cafeRealisticRota eval scenario
     const builder = new ModelBuilder({
-      employees: [
-        { id: "martina", roleIds: ["staff"] },
-        { id: "diana", roleIds: ["staff"] },
-        { id: "kholoud", roleIds: ["staff"], skillIds: ["student"] },
-        { id: "milroy", roleIds: ["staff"] },
-        { id: "shruti", roleIds: ["staff"] },
-        { id: "mauro", roleIds: ["staff"], skillIds: ["no_weekends"] },
+      members: [
+        { id: "martina", roles: ["staff"] },
+        { id: "diana", roles: ["staff"] },
+        { id: "kholoud", roles: ["staff"], skills: ["student"] },
+        { id: "milroy", roles: ["staff"] },
+        { id: "shruti", roles: ["staff"] },
+        { id: "mauro", roles: ["staff"], skills: ["no_weekends"] },
       ],
       shiftPatterns: [
         // Full shift for weekdays
@@ -226,7 +226,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
     const rawAssignments = decodeAssignments(response.values);
     const resolved = resolveAssignments(
       rawAssignments.map((a) => ({
-        employeeId: a.employeeId!,
+        memberId: a.memberId!,
         shiftPatternId: a.shiftPatternId!,
         day: a.day!,
       })),
@@ -240,7 +240,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
     for (const assignment of saturdayAssignments) {
       expect(assignment.endTime).toEqual({ hours: 14, minutes: 30 });
       // Mauro should not be assigned on Saturday (no_weekends skill)
-      expect(assignment.employeeId).not.toBe("mauro");
+      expect(assignment.memberId).not.toBe("mauro");
     }
 
     // Verify weekday assignments don't use Saturday shift
@@ -254,7 +254,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
 
   it("pattern without dayOfWeek can be used on any day", async () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         // Pattern available on any day
         {
@@ -297,7 +297,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
 
   it("reports infeasible when no patterns available for a day", async () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         // Only available on weekdays
         {

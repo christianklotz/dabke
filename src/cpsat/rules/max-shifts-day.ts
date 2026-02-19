@@ -7,7 +7,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -21,7 +21,7 @@ const MaxShiftsDaySchema = z
       z.literal("MANDATORY"),
     ]),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /**
@@ -30,7 +30,7 @@ const MaxShiftsDaySchema = z
  * - `shifts` (required): maximum number of shifts per day (at least 1)
  * - `priority` (required): how strictly the solver enforces this rule
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  * Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
  */
 export type MaxShiftsDayConfig = z.infer<typeof MaxShiftsDaySchema>;
@@ -68,12 +68,12 @@ export function createMaxShiftsDayRule(config: MaxShiftsDayConfig): CompilationR
 
   return {
     compile(b) {
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         for (const day of activeDays) {
           const terms: Term[] = [];
           for (const pattern of b.shiftPatterns) {

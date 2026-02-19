@@ -219,7 +219,7 @@ describe("rule functions", () => {
 
   it("preference", () => {
     const rule = preference("high", { appliesTo: "waiter" });
-    expect(rule._rule).toBe("employee-assignment-priority");
+    expect(rule._rule).toBe("assignment-priority");
     expect(rule.preference).toBe("high");
     expect(rule.appliesTo).toBe("waiter");
   });
@@ -396,26 +396,26 @@ describe("createSchedulerConfig()", () => {
       members,
     });
 
-    expect(config.employees).toHaveLength(4);
+    expect(config.members).toHaveLength(4);
     expect(config.shiftPatterns).toHaveLength(4);
     expect(config.weekStartsOn).toBe("monday");
   });
 
-  it("translates employees correctly", () => {
+  it("translates members correctly", () => {
     const config = schedule.createSchedulerConfig({
       schedulingPeriod: period,
       members,
     });
 
-    expect(config.employees[0]).toEqual({
+    expect(config.members[0]).toEqual({
       id: "alice",
-      roleIds: ["waiter"],
-      skillIds: ["senior"],
+      roles: ["waiter"],
+      skills: ["senior"],
     });
-    expect(config.employees[3]).toEqual({
+    expect(config.members[3]).toEqual({
       id: "mauro",
-      roleIds: ["manager"],
-      skillIds: ["keyholder"],
+      roles: ["manager"],
+      skills: ["keyholder"],
     });
   });
 
@@ -461,7 +461,7 @@ describe("createSchedulerConfig()", () => {
 
     // Global rule
     const globalRule = maxHoursWeekRules.find(
-      (r) => !("roleIds" in r) && !("skillIds" in r) && !("employeeIds" in r),
+      (r) => !("roleIds" in r) && !("skillIds" in r) && !("memberIds" in r),
     );
     expect(globalRule).toBeDefined();
 
@@ -555,7 +555,7 @@ describe("createSchedulerConfig()", () => {
       members,
     });
 
-    const prefRules = config.ruleConfigs!.filter((r) => r.name === "employee-assignment-priority");
+    const prefRules = config.ruleConfigs!.filter((r) => r.name === "assignment-priority");
     expect(prefRules.length).toBe(1);
   });
 
@@ -575,7 +575,7 @@ describe("createSchedulerConfig()", () => {
 
     const rule = config.ruleConfigs!.find((r) => r.name === "max-hours-day");
     expect(rule).toBeDefined();
-    expect(rule).toHaveProperty("employeeIds", ["alice"]);
+    expect(rule).toHaveProperty("memberIds", ["alice"]);
   });
 
   it("applies default priority of MANDATORY", () => {
@@ -818,7 +818,7 @@ describe("end-to-end config structure", () => {
     });
 
     // Verify structure
-    expect(config.employees).toHaveLength(3);
+    expect(config.members).toHaveLength(3);
     expect(config.shiftPatterns).toHaveLength(1);
     expect(config.shiftPatterns[0]!.id).toBe("lunch_shift");
     expect(config.coverage.length).toBeGreaterThan(0);

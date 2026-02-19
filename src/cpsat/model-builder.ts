@@ -13,7 +13,7 @@ import type {
   CoverageRequirement,
   ModelBuilderOptions,
   ShiftPattern,
-  SchedulingEmployee,
+  SchedulingMember,
   Term,
 } from "./types.js";
 import type { CpsatRuleConfigEntry, CpsatRuleFactories } from "./rules/rules.types.js";
@@ -32,7 +32,7 @@ import type { ShiftAssignment, ResolvedShiftAssignment } from "./response.js";
  * Context provided to rules during post-solve validation.
  */
 export interface RuleValidationContext {
-  readonly employees: SchedulingEmployee[];
+  readonly members: SchedulingMember[];
   readonly days: string[];
   readonly shiftPatterns: ShiftPattern[];
 }
@@ -56,7 +56,7 @@ export interface CompilationRule {
   /** Compute cost contribution for a solved schedule. */
   cost?(
     assignments: ShiftAssignment[],
-    employees: ReadonlyArray<SchedulingEmployee>,
+    members: ReadonlyArray<SchedulingMember>,
     shiftPatterns: ReadonlyArray<ShiftPattern>,
   ): CostContribution;
 }
@@ -81,7 +81,7 @@ export interface CostContext {
  * categories from {@link COST_CATEGORY}. Custom rules can use any string.
  */
 export interface CostEntry {
-  employeeId: string;
+  memberId: string;
   day: string;
   category: string;
   amount: number;
@@ -106,7 +106,7 @@ export interface CompilationResult {
  * @example Date range with day-of-week filtering (restaurant closed Mon/Tue)
  * ```typescript
  * const config: ModelBuilderConfig = {
- *   employees: [...],
+ *   members: [...],
  *   shiftPatterns: [...],
  *   coverage: [...],
  *   schedulingPeriod: {
@@ -118,8 +118,8 @@ export interface CompilationResult {
  */
 export interface ModelBuilderConfig extends ModelBuilderOptions {
   /** Team members available for scheduling. */
-  employees: SchedulingEmployee[];
-  /** Available shift patterns (time slots) that employees can be assigned to. */
+  members: SchedulingMember[];
+  /** Available shift patterns (time slots) that members can be assigned to. */
   shiftPatterns: ShiftPattern[];
   /**
    * Defines when scheduling should occur as a date range with optional
@@ -150,7 +150,7 @@ export interface ModelBuilderConfig extends ModelBuilderOptions {
  * and emits a `SolverRequest` for the Python CP-SAT solver service.
  */
 export class ModelBuilder {
-  readonly employees: SchedulingEmployee[];
+  readonly members: SchedulingMember[];
   readonly shiftPatterns: ShiftPattern[];
   readonly days: string[];
   readonly coverage: CoverageRequirement[];
@@ -174,9 +174,9 @@ export class ModelBuilder {
 
   constructor(config: ModelBuilderConfig) {
     // Validate IDs don't contain the separator character
-    for (const emp of config.employees) {
-      if (emp.id.includes(":")) {
-        throw new Error(`Employee ID "${emp.id}" cannot contain colons`);
+    for (const member of config.members) {
+      if (member.id.includes(":")) {
+        throw new Error(`Member ID "${member.id}" cannot contain colons`);
       }
     }
     for (const pattern of config.shiftPatterns) {
@@ -196,14 +196,14 @@ export class ModelBuilder {
       }
     }
 
-    this.employees = config.employees;
+    this.members = config.members;
     this.shiftPatterns = config.shiftPatterns;
     this.days = resolveDaysFromPeriod(config.schedulingPeriod);
     this.coverage = config.coverage;
     const compiledRuleConfigs = config.ruleConfigs
       ? buildCpsatRules(
           config.ruleConfigs,
-          this.employees,
+          this.members,
           config.ruleFactories ?? builtInCpsatRuleFactories,
         )
       : [];
@@ -248,8 +248,8 @@ export class ModelBuilder {
     return this.boolVar(`shift:${patternId}:${day}`);
   }
 
-  assignment(employeeId: string, patternId: string, day: string): string {
-    return this.boolVar(`assign:${employeeId}:${patternId}:${day}`);
+  assignment(memberId: string, patternId: string, day: string): string {
+    return this.boolVar(`assign:${memberId}:${patternId}:${day}`);
   }
 
   addLinear(terms: Term[], op: "<=" | ">=" | "==", rhs: number): void {
@@ -331,31 +331,29 @@ export class ModelBuilder {
     this.#objective.push({ var: varName, coeff: rounded });
   }
 
-  employeesWithRole(roleId: string): SchedulingEmployee[] {
-    return this.employees.filter((emp) => emp.roleIds.includes(roleId));
+  membersWithRole(roleId: string): SchedulingMember[] {
+    return this.members.filter((m) => m.roles.includes(roleId));
   }
 
   /**
    * Returns team members who can satisfy a coverage requirement.
    *
    * Matching logic:
-   * - If only roleId: must have that role
-   * - If only skillIds: must have ALL specified skills
-   * - If both: must have the role AND ALL specified skills
+   * - If only roleIds: must have ANY of those roles (OR)
+   * - If only skillIds: must have ALL specified skills (AND)
+   * - If both: must have a matching role AND ALL specified skills
    */
-  employeesForCoverage(cov: CoverageRequirement): SchedulingEmployee[] {
-    return this.employees.filter((emp) => {
-      // Check role requirement if specified (OR logic - must have ANY of the roles)
+  membersForCoverage(cov: CoverageRequirement): SchedulingMember[] {
+    return this.members.filter((m) => {
       if (cov.roleIds && cov.roleIds.length > 0) {
-        const hasMatchingRole = cov.roleIds.some((role) => emp.roleIds.includes(role));
+        const hasMatchingRole = cov.roleIds.some((role) => m.roles.includes(role));
         if (!hasMatchingRole) {
           return false;
         }
       }
-      // Check skill requirements if specified (AND logic - must have ALL skills)
       if (cov.skillIds && cov.skillIds.length > 0) {
-        const empSkills = emp.skillIds ?? [];
-        if (!cov.skillIds.every((skill) => empSkills.includes(skill))) {
+        const memberSkills = m.skills ?? [];
+        if (!cov.skillIds.every((skill) => memberSkills.includes(skill))) {
           return false;
         }
       }
@@ -363,13 +361,11 @@ export class ModelBuilder {
     });
   }
 
-  canAssign(employee: SchedulingEmployee, pattern: ShiftPattern): boolean {
-    // If pattern has no roleIds, anyone can work it
+  canAssign(member: SchedulingMember, pattern: ShiftPattern): boolean {
     if (!pattern.roleIds || pattern.roleIds.length === 0) {
       return true;
     }
-    // Otherwise, must have at least one matching role
-    return pattern.roleIds.some((roleId) => employee.roleIds.includes(roleId));
+    return pattern.roleIds.some((roleId) => member.roles.includes(roleId));
   }
 
   /**
@@ -422,7 +418,7 @@ export class ModelBuilder {
     const mandatoryExclusions = buildExclusionLookup(this.reporter.getExclusions());
 
     // 1. Assignment implies shift is active
-    for (const emp of this.employees) {
+    for (const emp of this.members) {
       for (const pattern of this.shiftPatterns) {
         if (!this.canAssign(emp, pattern)) continue;
         for (const day of this.days) {
@@ -437,7 +433,7 @@ export class ModelBuilder {
 
     // 1b. Build optional interval variables for assignments and prevent overlaps.
     // One optional interval per (person, pattern, day) assignment.
-    for (const emp of this.employees) {
+    for (const emp of this.members) {
       const empIntervals: string[] = [];
 
       for (const pattern of this.shiftPatterns) {
@@ -511,8 +507,8 @@ export class ModelBuilder {
           : `skills [${cov.skillIds?.join(", ")}]`;
       const coverageWindow = formatTimeRange(covStart, covEnd);
 
-      const eligibleEmployees = this.employeesForCoverage(cov);
-      if (eligibleEmployees.length === 0) {
+      const eligibleMembers = this.membersForCoverage(cov);
+      if (eligibleMembers.length === 0) {
         if (cov.priority === "MANDATORY" && cov.targetCount > 0) {
           this.reporter.reportCoverageError({
             day: cov.day,
@@ -571,16 +567,16 @@ export class ModelBuilder {
           continue;
         }
 
-        const assignableEmployees = new Set<string>();
-        for (const emp of eligibleEmployees) {
+        const assignableMembers = new Set<string>();
+        for (const emp of eligibleMembers) {
           for (const pattern of patterns) {
             if (!this.canAssign(emp, pattern)) continue;
-            assignableEmployees.add(emp.id);
+            assignableMembers.add(emp.id);
             break;
           }
         }
 
-        if (assignableEmployees.size === 0) {
+        if (assignableMembers.size === 0) {
           recordBucketIssue(
             bucketIssues,
             {
@@ -603,18 +599,18 @@ export class ModelBuilder {
           continue;
         }
 
-        const availableEmployees = new Set<string>();
-        for (const employeeId of assignableEmployees) {
-          const exclusions = mandatoryExclusions.get(`${employeeId}:${cov.day}`) ?? [];
+        const availableMembers = new Set<string>();
+        for (const memberId of assignableMembers) {
+          const exclusions = mandatoryExclusions.get(`${memberId}:${cov.day}`) ?? [];
           const blocked = exclusions.some((exclusion) =>
             rangesOverlap(exclusion.startMinutes, exclusion.endMinutes, bucketStart, bucketEnd),
           );
           if (!blocked) {
-            availableEmployees.add(employeeId);
+            availableMembers.add(memberId);
           }
         }
 
-        if (availableEmployees.size === 0) {
+        if (availableMembers.size === 0) {
           recordBucketIssue(
             bucketIssues,
             {
@@ -628,18 +624,18 @@ export class ModelBuilder {
             },
             bucketStart,
           );
-        } else if (availableEmployees.size < cov.targetCount) {
+        } else if (availableMembers.size < cov.targetCount) {
           recordBucketIssue(
             bucketIssues,
             {
-              key: `insufficient:${availableEmployees.size}`,
+              key: `insufficient:${availableMembers.size}`,
               severity: cov.priority === "MANDATORY" ? "impossible" : "warning",
-              reason: `only ${availableEmployees.size} team members available, need ${cov.targetCount}`,
+              reason: `only ${availableMembers.size} team members available, need ${cov.targetCount}`,
               suggestions: [
                 "Add more team members with the required role or skills",
-                `Reduce coverage target to ${availableEmployees.size}`,
+                `Reduce coverage target to ${availableMembers.size}`,
               ],
-              values: { required: cov.targetCount, available: availableEmployees.size },
+              values: { required: cov.targetCount, available: availableMembers.size },
             },
             bucketStart,
           );
@@ -647,7 +643,7 @@ export class ModelBuilder {
 
         const coveringVarsSet = new Set<string>();
         for (const pattern of patterns) {
-          for (const emp of eligibleEmployees) {
+          for (const emp of eligibleMembers) {
             if (!this.canAssign(emp, pattern)) continue;
             coveringVarsSet.add(this.assignment(emp.id, pattern.id, cov.day));
           }
@@ -687,7 +683,7 @@ export class ModelBuilder {
           skillIds: cov.skillIds,
           context: {
             days: [cov.day],
-            employeeIds: eligibleEmployees.map((e) => e.id),
+            memberIds: eligibleMembers.map((e) => e.id),
           },
           groupKey: cov.groupKey,
         });
@@ -744,11 +740,11 @@ export class ModelBuilder {
     //
     // The FAIRNESS weight (5) is weaker than ASSIGNMENT_PREFERENCE (10), so explicit
     // preferences like "prefer permanent staff over temps" will override fairness.
-    if (this.fairDistribution && this.employees.length > 1) {
+    if (this.fairDistribution && this.members.length > 1) {
       const maxPossibleAssignments = this.days.length * this.shiftPatterns.length;
       const maxAssignmentsVar = this.intVar("fairness:max_assignments", 0, maxPossibleAssignments);
 
-      for (const emp of this.employees) {
+      for (const emp of this.members) {
         const terms: Term[] = [];
         for (const pattern of this.shiftPatterns) {
           if (!this.canAssign(emp, pattern)) continue;
@@ -768,7 +764,7 @@ export class ModelBuilder {
     }
 
     // 3c. Minimize total assignments (tiebreaker)
-    for (const emp of this.employees) {
+    for (const emp of this.members) {
       for (const pattern of this.shiftPatterns) {
         if (!this.canAssign(emp, pattern)) continue;
         for (const day of this.days) {
@@ -796,7 +792,7 @@ export class ModelBuilder {
    */
   validateSolution(assignments: ResolvedShiftAssignment[]): void {
     const context: RuleValidationContext = {
-      employees: this.employees,
+      members: this.members,
       days: this.days,
       shiftPatterns: this.shiftPatterns,
     };
@@ -861,7 +857,7 @@ function buildExclusionLookup(exclusions: CoverageExclusion[]): Map<string, Excl
       ? timeOfDayToMinutes(exclusion.endTime)
       : MINUTES_PER_DAY;
     const endMinutes = normalizeEndMinutes(startMinutes, rawEndMinutes);
-    const key = `${exclusion.employeeId}:${exclusion.day}`;
+    const key = `${exclusion.memberId}:${exclusion.day}`;
     const existing = lookup.get(key);
     const window = { startMinutes, endMinutes };
     if (existing) {

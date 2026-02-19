@@ -57,7 +57,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     expect(result.assignments).toHaveLength(1);
 
     const cost = calculateScheduleCost(result.assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
@@ -65,14 +65,14 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     // 3 hours at 2000/hr = 6000 base
     // 3 hours * 2000 * 0.5 = 3000 multiplier premium
     // 3 hours * 100 = 300 surcharge premium
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(6000);
     expect(alice.categories.get(COST_CATEGORY.PREMIUM)).toBe(3300);
     expect(cost.total).toBe(9300);
     expect(cost.byDay.get("2026-02-14")).toBe(9300);
   }, 30_000);
 
-  it("solver prefers cheaper employee with cost optimization", async () => {
+  it("solver prefers cheaper member with cost optimization", async () => {
     const shop = defineSchedule({
       roles: ["clerk"],
       times: {
@@ -97,12 +97,12 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     expect(response.status).toBe("OPTIMAL");
 
     const result = parseSolverResponse(response);
-    const assignedEmployees = result.assignments.map((a) => a.employeeId);
-    expect(assignedEmployees).toContain("cheap");
-    expect(assignedEmployees).not.toContain("expensive");
+    const assignedMembers = result.assignments.map((a) => a.memberId);
+    expect(assignedMembers).toContain("cheap");
+    expect(assignedMembers).not.toContain("expensive");
 
     const cost = calculateScheduleCost(result.assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
@@ -134,14 +134,14 @@ describe("CP-SAT: end-to-end cost calculation", () => {
 
     const result = parseSolverResponse(response);
     const cost = calculateScheduleCost(result.assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Base: 3 * 2000 = 6000
     // Night surcharge: 1 hour (22:00-23:00) * 500 = 500
-    const mike = cost.byEmployee.get("mike")!;
+    const mike = cost.byMember.get("mike")!;
     expect(mike.categories.get(COST_CATEGORY.BASE)).toBe(6000);
     expect(mike.categories.get(COST_CATEGORY.PREMIUM)).toBe(500);
     expect(cost.total).toBe(6500);

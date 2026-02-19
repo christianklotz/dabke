@@ -32,7 +32,7 @@ export function groupKey(description: string): GroupKey {
 export interface ValidationContext {
   days?: string[];
   timeSlots?: string[];
-  employeeIds?: string[];
+  memberIds?: string[];
 }
 
 // =============================================================================
@@ -178,7 +178,7 @@ export interface TrackedConstraint {
  * Used during compile-time to determine coverage feasibility.
  */
 export interface CoverageExclusion {
-  employeeId: string;
+  memberId: string;
   day: string;
   startTime?: TimeOfDay;
   endTime?: TimeOfDay;

@@ -1,6 +1,6 @@
 import * as z from "zod";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingEmployee } from "../types.js";
+import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
 import { timeOfDayToMinutes, normalizeEndMinutes } from "../utils.js";
 import {
@@ -8,7 +8,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -16,13 +16,13 @@ const DayCostMultiplierSchema = z
   .object({
     factor: z.number().min(1),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /** Configuration for {@link createDayCostMultiplierRule}. */
 export type DayCostMultiplierConfig = z.infer<typeof DayCostMultiplierSchema>;
 
-function getHourlyRate(emp: SchedulingEmployee): number | undefined {
+function getHourlyRate(emp: SchedulingMember): number | undefined {
   if (!emp.pay) return undefined;
   if ("hourlyRate" in emp.pay) return emp.pay.hourlyRate;
   return undefined;
@@ -54,15 +54,15 @@ export function createDayCostMultiplierRule(config: DayCostMultiplierConfig): Co
       if (!b.costContext?.active) return;
       if (factor <= 1) return;
 
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const { normalizationFactor } = b.costContext;
       const extraFactor = factor - 1;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         const rate = getHourlyRate(emp);
         if (rate === undefined) continue;
 
@@ -81,19 +81,19 @@ export function createDayCostMultiplierRule(config: DayCostMultiplierConfig): Co
 
     cost(
       assignments: ShiftAssignment[],
-      employees: ReadonlyArray<SchedulingEmployee>,
+      members: ReadonlyArray<SchedulingMember>,
       shiftPatterns: ReadonlyArray<ShiftPattern>,
     ): CostContribution {
       if (factor <= 1) return { entries: [] };
 
-      const empMap = new Map(employees.map((e) => [e.id, e]));
+      const empMap = new Map(members.map((e) => [e.id, e]));
       const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
 
       // Resolve which days this rule applies to from assignments
       const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
       const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
       const targetEmpIds = new Set(
-        resolveEmployeesFromScope(entityScopeValue, [...empMap.values()]).map((e) => e.id),
+        resolveMembersFromScope(entityScopeValue, [...empMap.values()]).map((e) => e.id),
       );
 
       const entries: CostContribution["entries"] = [];
@@ -101,8 +101,8 @@ export function createDayCostMultiplierRule(config: DayCostMultiplierConfig): Co
 
       for (const a of assignments) {
         if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.employeeId)) continue;
-        const emp = empMap.get(a.employeeId);
+        if (!targetEmpIds.has(a.memberId)) continue;
+        const emp = empMap.get(a.memberId);
         if (!emp) continue;
         const rate = getHourlyRate(emp);
         if (rate === undefined) continue;
@@ -111,7 +111,7 @@ export function createDayCostMultiplierRule(config: DayCostMultiplierConfig): Co
         const duration = patternDurationMinutes(pattern);
         const amount = (rate * extraFactor * duration) / 60;
         entries.push({
-          employeeId: a.employeeId,
+          memberId: a.memberId,
           day: a.day,
           category: "premium",
           amount,

@@ -22,7 +22,7 @@ export const MINUTES_PER_DAY = 24 * 60;
  * ```ts
  * import { OBJECTIVE_WEIGHTS } from "dabke";
  *
- * // Prefer senior staff with same weight as employee-assignment-priority
+ * // Prefer senior staff with same weight as assignment-priority
  * b.addPenalty(assignment, -OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE);
  *
  * // Strong preference (2x normal)
@@ -36,7 +36,7 @@ export const OBJECTIVE_WEIGHTS = {
   COST: 100,
   /** Weight for per-assignment preferences (e.g., prefer/avoid certain team members) */
   ASSIGNMENT_PREFERENCE: 10,
-  /** Weight for fair distribution objective (minimizes max shifts per employee) */
+  /** Weight for fair distribution objective (minimizes max shifts per member) */
   FAIRNESS: 5,
   /** Base weight per assignment (tiebreaker) */
   ASSIGNMENT_BASE: 1,

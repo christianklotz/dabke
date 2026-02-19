@@ -9,7 +9,7 @@
  * empty arrays are compile-time errors.
  *
  * Two dimensions of scoping:
- * - **Entity scope**: who the rule applies to (employees, roles, or skills)
+ * - **Entity scope**: who the rule applies to (members, roles, or skills)
  * - **Time scope**: when the rule applies (date range, specific dates, day of week, or recurring)
  *
  * Each rule declares which scopes it supports via the `entityScope()`,
@@ -19,30 +19,30 @@
  * ```ts
  * // time-off: entity optional, time required
  * const TimeOffSchema = z.object({ priority: PrioritySchema })
- *   .and(entityScope(["employees", "roles", "skills"]))
+ *   .and(entityScope(["members", "roles", "skills"]))
  *   .and(requiredTimeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
  *
  * // max-hours-week: both optional
  * const MaxHoursWeekSchema = z.object({ hours: z.number(), priority: PrioritySchema })
- *   .and(entityScope(["employees", "roles", "skills"]))
+ *   .and(entityScope(["members", "roles", "skills"]))
  *   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
  *
- * // max-consecutive-days: only employee scoping, no time
+ * // max-consecutive-days: only member scoping, no time
  * const MaxConsecutiveDaysSchema = z.object({ days: z.number(), priority: PrioritySchema })
- *   .and(entityScope(["employees"]));
+ *   .and(entityScope(["members"]));
  * ```
  */
 
 import * as z from "zod";
 import { DayOfWeekSchema, type DayOfWeek } from "../../types.js";
-import type { SchedulingEmployee } from "../types.js";
+import type { SchedulingMember } from "../types.js";
 import { parseDayString } from "../utils.js";
 
 // ============================================================================
 // Scope Keys
 // ============================================================================
 
-export type EntityKey = "employees" | "roles" | "skills";
+export type EntityKey = "members" | "roles" | "skills";
 export type TimeKey = "dateRange" | "specificDates" | "dayOfWeek" | "recurring";
 
 // ============================================================================
@@ -54,7 +54,7 @@ export type TimeKey = "dateRange" | "specificDates" | "dayOfWeek" | "recurring";
  * Each variant adds a single field with a non-empty array.
  */
 type ActiveEntityFields = {
-  employees: { employeeIds: NonEmptyArray<string> };
+  members: { memberIds: NonEmptyArray<string> };
   roles: { roleIds: NonEmptyArray<string> };
   skills: { skillIds: NonEmptyArray<string> };
 };
@@ -64,7 +64,7 @@ type ActiveEntityFields = {
  * The field is typed as `?: never` so it cannot be provided.
  */
 type InactiveEntityFields = {
-  employees: { employeeIds?: never };
+  members: { memberIds?: never };
   roles: { roleIds?: never };
   skills: { skillIds?: never };
 };
@@ -121,10 +121,10 @@ type MergeValues<T> = { [K in keyof T]: (x: T[K]) => void } extends {
  * The active key's field is required; all others are `?: never`.
  *
  * @example
- * ExclusiveOne<ActiveEntityFields, InactiveEntityFields, "employees" | "roles">
+ * ExclusiveOne<ActiveEntityFields, InactiveEntityFields, "members" | "roles">
  * =
- *   | { employeeIds: [string, ...string[]]; roleIds?: never }
- *   | { roleIds: [string, ...string[]]; employeeIds?: never }
+ *   | { memberIds: [string, ...string[]]; roleIds?: never }
+ *   | { roleIds: [string, ...string[]]; memberIds?: never }
  */
 export type ExclusiveOne<
   Active extends Record<string, object>,
@@ -182,7 +182,7 @@ const recurringPeriodSchema = z.object({
 });
 
 const entityFieldSchemas = {
-  employees: { employeeIds: z.array(z.string()).nonempty() },
+  members: { memberIds: z.array(z.string()).nonempty() },
   roles: { roleIds: z.array(z.string()).nonempty() },
   skills: { skillIds: z.array(z.string()).nonempty() },
 } as const;
@@ -201,7 +201,7 @@ const timeFieldSchemas = {
 
 /** Maps entity keys to their field names. */
 const entityFieldNames = {
-  employees: "employeeIds",
+  members: "memberIds",
   roles: "roleIds",
   skills: "skillIds",
 } as const;
@@ -226,7 +226,7 @@ type TimeFieldName = (typeof timeFieldNames)[TimeKey];
  * Creates a Zod schema for optional entity scoping (at most one of the
  * specified entity variants).
  *
- * The returned schema accepts flat fields (`employeeIds`, `roleIds`, `skillIds`)
+ * The returned schema accepts flat fields (`memberIds`, `roleIds`, `skillIds`)
  * but the TypeScript type enforces mutual exclusivity via `?: never`.
  *
  * @param keys - Which entity scope variants to support
@@ -234,10 +234,10 @@ type TimeFieldName = (typeof timeFieldNames)[TimeKey];
  * @example
  * ```ts
  * // Supports all entity scopes
- * entityScope(["employees", "roles", "skills"])
+ * entityScope(["members", "roles", "skills"])
  *
- * // Only employee scoping
- * entityScope(["employees"])
+ * // Only member scoping
+ * entityScope(["members"])
  * ```
  */
 export function entityScope<const K extends readonly EntityKey[]>(
@@ -376,7 +376,7 @@ export function requiredTimeScope<const K extends readonly TimeKey[]>(
  */
 export type ParsedEntityScope =
   | { type: "global" }
-  | { type: "employees"; employeeIds: string[] }
+  | { type: "members"; memberIds: string[] }
   | { type: "roles"; roleIds: string[] }
   | { type: "skills"; skillIds: string[] };
 
@@ -393,7 +393,7 @@ export type ParsedTimeScope =
 
 /** Input shape accepted by {@link parseEntityScope}. */
 export interface EntityScopeInput {
-  employeeIds?: string[];
+  memberIds?: string[];
   roleIds?: string[];
   skillIds?: string[];
   [key: string]: unknown;
@@ -412,8 +412,8 @@ export interface TimeScopeInput {
  * Extracts the entity scope from a parsed flat config.
  */
 export function parseEntityScope(config: EntityScopeInput): ParsedEntityScope {
-  if (config.employeeIds && config.employeeIds.length > 0) {
-    return { type: "employees", employeeIds: config.employeeIds };
+  if (config.memberIds && config.memberIds.length > 0) {
+    return { type: "members", memberIds: config.memberIds };
   }
   if (config.roleIds && config.roleIds.length > 0) {
     return { type: "roles", roleIds: config.roleIds };
@@ -444,24 +444,24 @@ export function parseTimeScope(config: TimeScopeInput): ParsedTimeScope {
 }
 
 /**
- * Resolves which employees a rule applies to based on entity scope.
+ * Resolves which members a rule applies to based on entity scope.
  */
-export function resolveEmployeesFromScope(
+export function resolveMembersFromScope(
   scope: ParsedEntityScope,
-  employees: SchedulingEmployee[],
-): SchedulingEmployee[] {
+  members: SchedulingMember[],
+): SchedulingMember[] {
   switch (scope.type) {
-    case "employees": {
-      const idSet = new Set(scope.employeeIds);
-      return employees.filter((e) => idSet.has(e.id));
+    case "members": {
+      const idSet = new Set(scope.memberIds);
+      return members.filter((e) => idSet.has(e.id));
     }
     case "roles":
-      return employees.filter((e) => e.roleIds.some((r) => scope.roleIds.includes(r)));
+      return members.filter((e) => e.roles.some((r) => scope.roleIds.includes(r)));
     case "skills":
-      return employees.filter((e) => e.skillIds?.some((s) => scope.skillIds.includes(s)));
+      return members.filter((e) => e.skills?.some((s) => scope.skillIds.includes(s)));
     case "global":
     default:
-      return employees;
+      return members;
   }
 }
 

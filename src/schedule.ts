@@ -57,13 +57,7 @@ import type {
 import { defineSemanticTimes } from "./cpsat/semantic-time.js";
 import { resolveDaysFromPeriod } from "./datetime.utils.js";
 import type { ModelBuilderConfig } from "./cpsat/model-builder.js";
-import type {
-  SchedulingEmployee,
-  ShiftPattern,
-  Priority,
-  HourlyPay,
-  SalariedPay,
-} from "./cpsat/types.js";
+import type { SchedulingMember, ShiftPattern, Priority } from "./cpsat/types.js";
 import type { CpsatRuleConfigEntry } from "./cpsat/rules/rules.types.js";
 import type { RecurringPeriod } from "./cpsat/rules/scope.types.js";
 import type { OvertimeTier } from "./cpsat/rules/overtime-tiered-multiplier.js";
@@ -463,7 +457,7 @@ export function minRestBetweenShifts(hours: number, opts?: EntityOnlyRuleOptions
  * @param opts - Entity and time scoping (no priority; preference is the priority mechanism)
  */
 export function preference(level: "high" | "low", opts?: Omit<RuleOptions, "priority">): RuleEntry {
-  return makeRule("employee-assignment-priority", { preference: level, ...opts });
+  return makeRule("assignment-priority", { preference: level, ...opts });
 }
 
 /**
@@ -482,8 +476,8 @@ export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions)
  * Without this rule, cost modifiers only affect post-solve calculation.
  * When present, the solver actively prefers cheaper assignments.
  *
- * For hourly employees, penalizes each assignment proportionally to cost.
- * For salaried employees, adds a fixed weekly salary cost when they have
+ * For hourly members, penalizes each assignment proportionally to cost.
+ * For salaried members, adds a fixed weekly salary cost when they have
  * any assignment that week (zero marginal cost up to contracted hours).
  *
  * @param opts - Entity and time scoping
@@ -512,7 +506,7 @@ export function dayMultiplier(factor: number, opts?: CostRuleOptions): RuleEntry
 
 /**
  * Adds a flat extra amount per hour for assignments on specified days,
- * independent of the employee's base rate.
+ * independent of the member's base rate.
  *
  * @param amountPerHour - Flat surcharge per hour in smallest currency unit
  * @param opts - Entity and time scoping
@@ -566,7 +560,7 @@ export function overtimeMultiplier(
 
 /**
  * Hours beyond the threshold per week get a flat surcharge per hour,
- * independent of the employee's base rate.
+ * independent of the member's base rate.
  *
  * @param opts - Must include `after` (hours threshold) and `amount` (flat extra per hour)
  *
@@ -600,7 +594,7 @@ export function dailyOvertimeMultiplier(
 
 /**
  * Hours beyond the threshold per day get a flat surcharge per hour,
- * independent of the employee's base rate.
+ * independent of the member's base rate.
  *
  * @param opts - Must include `after` (hours threshold per day) and `amount`
  *
@@ -684,18 +678,6 @@ export function assignTogether(
 // ============================================================================
 // Schedule Definition
 // ============================================================================
-
-/** A team member available for scheduling. */
-export interface SchedulingMember {
-  /** Unique identifier. Must not contain colons or collide with role/skill names. */
-  id: string;
-  /** Roles this member can fill. Each must be a declared role. */
-  roles: string[];
-  /** Skills this member has. Each must be a declared skill. */
-  skills?: string[];
-  /** Base pay. Required when cost rules are used. */
-  pay?: HourlyPay | SalariedPay;
-}
 
 /** Runtime arguments passed to {@link ScheduleDefinition.createSchedulerConfig}. */
 export interface RuntimeArgs {
@@ -893,14 +875,6 @@ export function defineSchedule<
         }
       }
 
-      // Convert members to SchedulingEmployee
-      const employees: SchedulingEmployee[] = args.members.map((m) => ({
-        id: m.id,
-        roleIds: m.roles,
-        skillIds: m.skills,
-        pay: m.pay,
-      }));
-
       // Resolve rules
       const specRules = config.rules ?? [];
       const runtimeRules = args.runtimeRules ?? [];
@@ -940,7 +914,7 @@ export function defineSchedule<
       const resolvedCoverage = semanticTimes.resolve(coverageReqs, days);
 
       return {
-        employees,
+        members: args.members,
         shiftPatterns,
         schedulingPeriod: resolvedPeriod,
         coverage: resolvedCoverage,
@@ -1050,7 +1024,7 @@ function resolveAppliesTo(
   skills: Set<string>,
   memberIds: Set<string>,
 ): {
-  employeeIds?: [string, ...string[]];
+  memberIds?: [string, ...string[]];
   roleIds?: [string, ...string[]];
   skillIds?: [string, ...string[]];
 } {
@@ -1097,7 +1071,7 @@ function resolveAppliesTo(
     return { skillIds: resolvedSkills as [string, ...string[]] };
   }
   if (resolvedMembers.length > 0) {
-    return { employeeIds: resolvedMembers as [string, ...string[]] };
+    return { memberIds: resolvedMembers as [string, ...string[]] };
   }
   return {};
 }
@@ -1193,9 +1167,9 @@ function resolveRules(
           ...entityScope,
         };
 
-      case "employee-assignment-priority":
+      case "assignment-priority":
         return {
-          name: "employee-assignment-priority" as const,
+          name: "assignment-priority" as const,
           preference: rest.preference as "high" | "low",
           ...entityScope,
           ...resolveTimeScope(rest),
@@ -1256,7 +1230,7 @@ function resolveRules(
         }
         return {
           name: "assign-together" as const,
-          groupEmployeeIds: members,
+          groupMemberIds: members,
           priority: (rest.priority as Priority) ?? "MANDATORY",
         };
       }

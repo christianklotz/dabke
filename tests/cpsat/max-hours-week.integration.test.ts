@@ -9,10 +9,10 @@ describe("CP-SAT: max-hours-week rule", () => {
     client = getSolverClient();
   });
 
-  it("caps weekly assignments and shifts remaining work to other employees", async () => {
+  it("caps weekly assignments and shifts remaining work to other members", async () => {
     const baseConfig = createBaseConfig({
       roleIds: ["bartender"],
-      employeeIds: ["alice", "bob"],
+      memberIds: ["alice", "bob"],
       shift: {
         id: "swing",
         startTime: { hours: 10, minutes: 0 },
@@ -23,13 +23,13 @@ describe("CP-SAT: max-hours-week rule", () => {
 
     const preferenceRules: CpsatRuleConfigEntry[] = [
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["alice"],
+        name: "assignment-priority",
+        memberIds: ["alice"],
         preference: "high",
       },
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["bob"],
+        name: "assignment-priority",
+        memberIds: ["bob"],
         preference: "low",
       },
     ];
@@ -37,7 +37,7 @@ describe("CP-SAT: max-hours-week rule", () => {
     const baseline = await solveWithRules(client, baseConfig, preferenceRules);
     expect(baseline.status).toBe("OPTIMAL");
     const baselineAssignments = decodeAssignments(baseline.values);
-    expect(baselineAssignments.filter((a) => a.employeeId === "alice").length).toBe(4);
+    expect(baselineAssignments.filter((a) => a.memberId === "alice").length).toBe(4);
 
     const withWeeklyCap = await solveWithRules(client, baseConfig, [
       ...preferenceRules,
@@ -51,9 +51,7 @@ describe("CP-SAT: max-hours-week rule", () => {
 
     expect(withWeeklyCap.status).toBe("OPTIMAL");
     const cappedAssignments = decodeAssignments(withWeeklyCap.values);
-    expect(cappedAssignments.filter((a) => a.employeeId === "alice").length).toBeLessThanOrEqual(2);
-    expect(cappedAssignments.filter((a) => a.employeeId === "bob").length).toBeGreaterThanOrEqual(
-      2,
-    );
+    expect(cappedAssignments.filter((a) => a.memberId === "alice").length).toBeLessThanOrEqual(2);
+    expect(cappedAssignments.filter((a) => a.memberId === "bob").length).toBeGreaterThanOrEqual(2);
   }, 30_000);
 });

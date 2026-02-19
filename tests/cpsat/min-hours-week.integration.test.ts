@@ -12,7 +12,7 @@ describe("CP-SAT: min-hours-week rule", () => {
   it("adds shifts to meet weekly minimum minutes", async () => {
     const baseConfig = createBaseConfig({
       roleId: "barista",
-      employeeIds: ["alice"],
+      memberIds: ["alice"],
       shift: {
         id: "day",
         startTime: { hours: 8, minutes: 0 },

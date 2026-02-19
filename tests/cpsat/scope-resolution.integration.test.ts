@@ -10,13 +10,13 @@ describe("CP-SAT: scope resolution", () => {
   });
 
   describe("role-based scoping", () => {
-    it("applies role-scoped rules only to employees with that role", async () => {
+    it("applies role-scoped rules only to members with that role", async () => {
       // Setup: alice is a student (limited hours), bob is a manager (unlimited)
       // Coverage requires only 1 person per day so constraints are satisfiable
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["worker", "student"] },
-          { id: "bob", roleIds: ["worker", "manager"] },
+        members: [
+          { id: "alice", roles: ["worker", "student"] },
+          { id: "bob", roles: ["worker", "manager"] },
         ],
         roleIds: ["worker"],
         shift: {
@@ -27,19 +27,19 @@ describe("CP-SAT: scope resolution", () => {
         schedulingPeriod: {
           dateRange: { start: "2024-02-05", end: "2024-02-08" },
         }, // 4 days
-        targetCount: 1, // Only need 1 employee per day
+        targetCount: 1, // Only need 1 member per day
       });
 
       // Add preference rules so alice is preferred (will take all shifts without limits)
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["alice"],
+          name: "assignment-priority",
+          memberIds: ["alice"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["bob"],
+          name: "assignment-priority",
+          memberIds: ["bob"],
           preference: "low",
         },
       ];
@@ -48,8 +48,8 @@ describe("CP-SAT: scope resolution", () => {
       const baseline = await solveWithRules(client, baseConfig, preferenceRules);
       expect(baseline.status).toBe("OPTIMAL");
       const baselineAssignments = decodeAssignments(baseline.values);
-      expect(baselineAssignments.filter((a) => a.employeeId === "alice")).toHaveLength(4);
-      expect(baselineAssignments.filter((a) => a.employeeId === "bob")).toHaveLength(0);
+      expect(baselineAssignments.filter((a) => a.memberId === "alice")).toHaveLength(4);
+      expect(baselineAssignments.filter((a) => a.memberId === "bob")).toHaveLength(0);
 
       // Apply 16-hour weekly limit ONLY to students (alice)
       const withStudentLimit = await solveWithRules(client, baseConfig, [
@@ -67,19 +67,19 @@ describe("CP-SAT: scope resolution", () => {
       const limitedAssignments = decodeAssignments(withStudentLimit.values);
 
       // Alice (student) should be limited to 2 shifts
-      const aliceShifts = limitedAssignments.filter((a) => a.employeeId === "alice").length;
+      const aliceShifts = limitedAssignments.filter((a) => a.memberId === "alice").length;
       expect(aliceShifts).toBeLessThanOrEqual(2);
 
       // Bob should pick up the remaining shifts
-      const bobShifts = limitedAssignments.filter((a) => a.employeeId === "bob").length;
+      const bobShifts = limitedAssignments.filter((a) => a.memberId === "bob").length;
       expect(bobShifts).toBeGreaterThanOrEqual(2);
     }, 30_000);
 
-    it("role-scoped rules override global rules for matching employees", async () => {
+    it("role-scoped rules override global rules for matching members", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["worker", "student"] },
-          { id: "bob", roleIds: ["worker"] },
+        members: [
+          { id: "alice", roles: ["worker", "student"] },
+          { id: "bob", roles: ["worker"] },
         ],
         roleIds: ["worker"],
         shift: {
@@ -88,18 +88,18 @@ describe("CP-SAT: scope resolution", () => {
           endTime: { hours: 17, minutes: 0 }, // 8 hours
         },
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } }, // 3 days
-        targetCount: 1, // Only need 1 employee per day
+        targetCount: 1, // Only need 1 member per day
       });
 
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["alice"],
+          name: "assignment-priority",
+          memberIds: ["alice"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["bob"],
+          name: "assignment-priority",
+          memberIds: ["bob"],
           preference: "low",
         },
       ];
@@ -127,23 +127,23 @@ describe("CP-SAT: scope resolution", () => {
       const assignments = decodeAssignments(withOverride.values);
 
       // Alice (student) gets the student rule: max 1 shift
-      expect(assignments.filter((a) => a.employeeId === "alice").length).toBeLessThanOrEqual(1);
+      expect(assignments.filter((a) => a.memberId === "alice").length).toBeLessThanOrEqual(1);
 
       // Bob picks up the rest (2+ shifts)
-      expect(assignments.filter((a) => a.employeeId === "bob").length).toBeGreaterThanOrEqual(2);
+      expect(assignments.filter((a) => a.memberId === "bob").length).toBeGreaterThanOrEqual(2);
     }, 30_000);
   });
 
   describe("skill-based scoping", () => {
-    it("applies skill-scoped rules only to employees with that skill", async () => {
+    it("applies skill-scoped rules only to members with that skill", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["worker"], skillIds: ["certified"] },
-          { id: "bob", roleIds: ["worker"], skillIds: [] },
+        members: [
+          { id: "alice", roles: ["worker"], skills: ["certified"] },
+          { id: "bob", roles: ["worker"], skills: [] },
           {
             id: "charlie",
-            roleIds: ["worker"],
-            skillIds: ["certified", "senior"],
+            roles: ["worker"],
+            skills: ["certified", "senior"],
           },
         ],
         roleIds: ["worker"],
@@ -155,35 +155,35 @@ describe("CP-SAT: scope resolution", () => {
         schedulingPeriod: {
           dateRange: { start: "2024-02-05", end: "2024-02-08" },
         },
-        targetCount: 1, // Only need 1 employee per day
+        targetCount: 1, // Only need 1 member per day
       });
 
-      // Prefer certified employees
+      // Prefer certified members
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["alice"],
+          name: "assignment-priority",
+          memberIds: ["alice"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["charlie"],
+          name: "assignment-priority",
+          memberIds: ["charlie"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["bob"],
+          name: "assignment-priority",
+          memberIds: ["bob"],
           preference: "low",
         },
       ];
 
-      // Apply hour limit only to certified employees (alice and charlie)
+      // Apply hour limit only to certified members (alice and charlie)
       const withSkillLimit = await solveWithRules(client, baseConfig, [
         ...preferenceRules,
         {
           name: "max-hours-week",
 
-          hours: 8, // 1 shift max per certified employee
+          hours: 8, // 1 shift max per certified member
           priority: "MANDATORY",
           skillIds: ["certified"],
         },
@@ -193,20 +193,20 @@ describe("CP-SAT: scope resolution", () => {
       const assignments = decodeAssignments(withSkillLimit.values);
 
       // Alice and Charlie (certified) should be limited to 1 shift each
-      expect(assignments.filter((a) => a.employeeId === "alice").length).toBeLessThanOrEqual(1);
-      expect(assignments.filter((a) => a.employeeId === "charlie").length).toBeLessThanOrEqual(1);
+      expect(assignments.filter((a) => a.memberId === "alice").length).toBeLessThanOrEqual(1);
+      expect(assignments.filter((a) => a.memberId === "charlie").length).toBeLessThanOrEqual(1);
 
       // Bob (not certified) should pick up the remaining shifts
-      expect(assignments.filter((a) => a.employeeId === "bob").length).toBeGreaterThanOrEqual(2);
+      expect(assignments.filter((a) => a.memberId === "bob").length).toBeGreaterThanOrEqual(2);
     }, 30_000);
   });
 
   describe("scope precedence", () => {
-    it("employee scope takes precedence over role scope", async () => {
+    it("member scope takes precedence over role scope", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["worker", "student"] },
-          { id: "bob", roleIds: ["worker", "student"] },
+        members: [
+          { id: "alice", roles: ["worker", "student"] },
+          { id: "bob", roles: ["worker", "student"] },
         ],
         roleIds: ["worker"],
         shift: {
@@ -215,24 +215,24 @@ describe("CP-SAT: scope resolution", () => {
           endTime: { hours: 17, minutes: 0 },
         },
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } }, // 3 days
-        targetCount: 1, // Only need 1 employee per day
+        targetCount: 1, // Only need 1 member per day
       });
 
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["alice"],
+          name: "assignment-priority",
+          memberIds: ["alice"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["bob"],
+          name: "assignment-priority",
+          memberIds: ["bob"],
           preference: "low",
         },
       ];
 
       // Role rule for students: 16 hours (2 shifts)
-      // Employee rule for alice: 8 hours (1 shift) - more specific, should override
+      // member rule for alice: 8 hours (1 shift) - more specific, should override
       const withPrecedence = await solveWithRules(client, baseConfig, [
         ...preferenceRules,
         {
@@ -247,25 +247,25 @@ describe("CP-SAT: scope resolution", () => {
 
           hours: 8,
           priority: "MANDATORY",
-          employeeIds: ["alice"],
+          memberIds: ["alice"],
         },
       ] satisfies CpsatRuleConfigEntry[]);
 
       expect(withPrecedence.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(withPrecedence.values);
 
-      // Alice gets employee-specific rule: max 1 shift
-      expect(assignments.filter((a) => a.employeeId === "alice").length).toBeLessThanOrEqual(1);
+      // Alice gets member-specific rule: max 1 shift
+      expect(assignments.filter((a) => a.memberId === "alice").length).toBeLessThanOrEqual(1);
 
       // Bob gets role rule: max 2 shifts (and picks up remaining)
-      expect(assignments.filter((a) => a.employeeId === "bob").length).toBeGreaterThanOrEqual(2);
+      expect(assignments.filter((a) => a.memberId === "bob").length).toBeGreaterThanOrEqual(2);
     }, 30_000);
 
     it("role scope takes precedence over global scope", async () => {
       const baseConfig = createBaseConfig({
-        employees: [
-          { id: "alice", roleIds: ["worker", "intern"] },
-          { id: "bob", roleIds: ["worker"] },
+        members: [
+          { id: "alice", roles: ["worker", "intern"] },
+          { id: "bob", roles: ["worker"] },
         ],
         roleIds: ["worker"],
         shift: {
@@ -276,18 +276,18 @@ describe("CP-SAT: scope resolution", () => {
         schedulingPeriod: {
           dateRange: { start: "2024-02-05", end: "2024-02-08" },
         },
-        targetCount: 1, // Only need 1 employee per day
+        targetCount: 1, // Only need 1 member per day
       });
 
       const preferenceRules: CpsatRuleConfigEntry[] = [
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["alice"],
+          name: "assignment-priority",
+          memberIds: ["alice"],
           preference: "high",
         },
         {
-          name: "employee-assignment-priority",
-          employeeIds: ["bob"],
+          name: "assignment-priority",
+          memberIds: ["bob"],
           preference: "low",
         },
       ];
@@ -315,10 +315,10 @@ describe("CP-SAT: scope resolution", () => {
       const assignments = decodeAssignments(withPrecedence.values);
 
       // Alice (intern) gets role rule: max 2 shifts
-      expect(assignments.filter((a) => a.employeeId === "alice").length).toBeLessThanOrEqual(2);
+      expect(assignments.filter((a) => a.memberId === "alice").length).toBeLessThanOrEqual(2);
 
       // Bob picks up the remaining shifts
-      expect(assignments.filter((a) => a.employeeId === "bob").length).toBeGreaterThanOrEqual(2);
+      expect(assignments.filter((a) => a.memberId === "bob").length).toBeGreaterThanOrEqual(2);
     }, 30_000);
   });
 });

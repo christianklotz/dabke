@@ -9,10 +9,10 @@ describe("CP-SAT: assign-together rule", () => {
     client = getSolverClient();
   });
 
-  it("keeps paired employees on the same shifts", async () => {
+  it("keeps paired members on the same shifts", async () => {
     const baseConfig = createBaseConfig({
       roleIds: ["runner"],
-      employeeIds: ["alice", "bob"],
+      memberIds: ["alice", "bob"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },
@@ -23,13 +23,13 @@ describe("CP-SAT: assign-together rule", () => {
 
     const preferenceRules: CpsatRuleConfigEntry[] = [
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["alice"],
+        name: "assignment-priority",
+        memberIds: ["alice"],
         preference: "high",
       },
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["bob"],
+        name: "assignment-priority",
+        memberIds: ["bob"],
         preference: "low",
       },
     ];
@@ -37,25 +37,25 @@ describe("CP-SAT: assign-together rule", () => {
     const baseline = await solveWithRules(client, baseConfig, preferenceRules);
     expect(baseline.status).toBe("OPTIMAL");
     const baselineAssignments = decodeAssignments(baseline.values);
-    expect(baselineAssignments.filter((a) => a.employeeId === "alice").length).toBe(2);
-    expect(baselineAssignments.find((a) => a.employeeId === "bob")).toBeUndefined();
+    expect(baselineAssignments.filter((a) => a.memberId === "alice").length).toBe(2);
+    expect(baselineAssignments.find((a) => a.memberId === "bob")).toBeUndefined();
 
     const withPairing = await solveWithRules(client, baseConfig, [
       ...preferenceRules,
       {
         name: "assign-together",
-        groupEmployeeIds: ["alice", "bob"],
+        groupMemberIds: ["alice", "bob"],
         priority: "HIGH",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withPairing.status).toBe("OPTIMAL");
     const pairedAssignments = decodeAssignments(withPairing.values);
     const aliceDays = pairedAssignments
-      .filter((a) => a.employeeId === "alice")
+      .filter((a) => a.memberId === "alice")
       .map((a) => a.day)
       .toSorted();
     const bobDays = pairedAssignments
-      .filter((a) => a.employeeId === "bob")
+      .filter((a) => a.memberId === "bob")
       .map((a) => a.day)
       .toSorted();
     expect(bobDays).toEqual(aliceDays);
@@ -63,7 +63,7 @@ describe("CP-SAT: assign-together rule", () => {
   }, 30_000);
 
   it("overlapping groups create transitive constraints (all three must work together)", async () => {
-    // Scenario: 5 employees, need 2 per day
+    // Scenario: 5 members, need 2 per day
     // Rule 1: one and two should work together
     // Rule 2: two and three should work together
     // Question: Does this mean all three (one, two, three) must work together?
@@ -73,25 +73,25 @@ describe("CP-SAT: assign-together rule", () => {
 
     const baseConfig = createBaseConfig({
       roleId,
-      employeeIds: ["one", "two", "three", "four", "five"],
+      memberIds: ["one", "two", "three", "four", "five"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
       schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
-      targetCount: 2, // Only need 2 employees
+      targetCount: 2, // Only need 2 members
     });
 
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        groupEmployeeIds: ["one", "two"],
+        groupMemberIds: ["one", "two"],
         priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        groupEmployeeIds: ["two", "three"],
+        groupMemberIds: ["two", "three"],
         priority: "MANDATORY",
       },
     ];
@@ -112,13 +112,13 @@ describe("CP-SAT: assign-together rule", () => {
     const assignments = decodeAssignments(response.values);
     console.log("Assignments:", assignments);
 
-    const assignedEmployees = assignments.map((a) => a.employeeId).toSorted();
-    console.log("Assigned employees:", assignedEmployees);
+    const assignedMembers = assignments.map((a) => a.memberId).toSorted();
+    console.log("Assigned members:", assignedMembers);
 
     // If transitive: one, two, three all work together (but we only need 2)
-    const hasOne = assignedEmployees.includes("one");
-    const hasTwo = assignedEmployees.includes("two");
-    const hasThree = assignedEmployees.includes("three");
+    const hasOne = assignedMembers.includes("one");
+    const hasTwo = assignedMembers.includes("two");
+    const hasThree = assignedMembers.includes("three");
 
     console.log("Has one:", hasOne, "Has two:", hasTwo, "Has three:", hasThree);
 
@@ -130,32 +130,32 @@ describe("CP-SAT: assign-together rule", () => {
     expect(allAssigned || noneAssigned).toBe(true);
   }, 30_000);
 
-  it("overlapping groups with sufficient coverage allows all linked employees", async () => {
+  it("overlapping groups with sufficient coverage allows all linked members", async () => {
     // Same as above but with targetCount: 3 to allow all three to work
     const days = ["2024-02-01"];
     const roleId = "worker";
 
     const baseConfig = createBaseConfig({
       roleId,
-      employeeIds: ["one", "two", "three", "four", "five"],
+      memberIds: ["one", "two", "three", "four", "five"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
       schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
-      targetCount: 3, // Need 3 employees - enough for the transitive group
+      targetCount: 3, // Need 3 members - enough for the transitive group
     });
 
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        groupEmployeeIds: ["one", "two"],
+        groupMemberIds: ["one", "two"],
         priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        groupEmployeeIds: ["two", "three"],
+        groupMemberIds: ["two", "three"],
         priority: "MANDATORY",
       },
     ];
@@ -164,14 +164,14 @@ describe("CP-SAT: assign-together rule", () => {
     expect(response.status).toBe("OPTIMAL");
 
     const assignments = decodeAssignments(response.values);
-    const assignedEmployees = assignments.map((a) => a.employeeId).toSorted();
+    const assignedMembers = assignments.map((a) => a.memberId).toSorted();
 
-    console.log("With sufficient coverage, assigned:", assignedEmployees);
+    console.log("With sufficient coverage, assigned:", assignedMembers);
 
     // All three should be assigned together due to transitive constraints
-    expect(assignedEmployees).toContain("one");
-    expect(assignedEmployees).toContain("two");
-    expect(assignedEmployees).toContain("three");
+    expect(assignedMembers).toContain("one");
+    expect(assignedMembers).toContain("two");
+    expect(assignedMembers).toContain("three");
   }, 30_000);
 
   it("non-overlapping groups are independent", async () => {
@@ -184,7 +184,7 @@ describe("CP-SAT: assign-together rule", () => {
 
     const baseConfig = createBaseConfig({
       roleId,
-      employeeIds: ["one", "two", "three", "four", "five"],
+      memberIds: ["one", "two", "three", "four", "five"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },
@@ -197,12 +197,12 @@ describe("CP-SAT: assign-together rule", () => {
     const rules: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        groupEmployeeIds: ["one", "two"],
+        groupMemberIds: ["one", "two"],
         priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        groupEmployeeIds: ["four", "five"],
+        groupMemberIds: ["four", "five"],
         priority: "MANDATORY",
       },
     ];
@@ -211,19 +211,19 @@ describe("CP-SAT: assign-together rule", () => {
     expect(response.status).toBe("OPTIMAL");
 
     const assignments = decodeAssignments(response.values);
-    const assignedEmployees = new Set(assignments.map((a) => a.employeeId));
+    const assignedMembers = new Set(assignments.map((a) => a.memberId));
 
-    console.log("Non-overlapping groups, assigned:", [...assignedEmployees]);
+    console.log("Non-overlapping groups, assigned:", [...assignedMembers]);
 
     // Should get exactly one of the pairs (or possibly three if needed 2 workers)
-    const hasGroupA = assignedEmployees.has("one") && assignedEmployees.has("two");
-    const hasGroupB = assignedEmployees.has("four") && assignedEmployees.has("five");
+    const hasGroupA = assignedMembers.has("one") && assignedMembers.has("two");
+    const hasGroupB = assignedMembers.has("four") && assignedMembers.has("five");
 
     // At least one complete group should be assigned
     expect(hasGroupA || hasGroupB).toBe(true);
 
     // If one is assigned, two must be assigned (and vice versa)
-    expect(assignedEmployees.has("one")).toBe(assignedEmployees.has("two"));
-    expect(assignedEmployees.has("four")).toBe(assignedEmployees.has("five"));
+    expect(assignedMembers.has("one")).toBe(assignedMembers.has("two"));
+    expect(assignedMembers.has("four")).toBe(assignedMembers.has("five"));
   }, 30_000);
 });

@@ -1,7 +1,7 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
+import { entityScope, parseEntityScope, resolveMembersFromScope } from "./scope.types.js";
 
 const MinRestBetweenShiftsSchema = z
   .object({
@@ -13,7 +13,7 @@ const MinRestBetweenShiftsSchema = z
       z.literal("MANDATORY"),
     ]),
   })
-  .and(entityScope(["employees", "roles", "skills"]));
+  .and(entityScope(["members", "roles", "skills"]));
 
 /**
  * Configuration for {@link createMinRestBetweenShiftsRule}.
@@ -21,7 +21,7 @@ const MinRestBetweenShiftsSchema = z
  * - `hours` (required): minimum rest hours required between consecutive shifts
  * - `priority` (required): how strictly the solver enforces this rule
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  */
 export type MinRestBetweenShiftsConfig = z.infer<typeof MinRestBetweenShiftsSchema>;
 
@@ -44,9 +44,9 @@ export function createMinRestBetweenShiftsRule(
 
   return {
     compile(b) {
-      const employees = resolveEmployeesFromScope(scope, b.employees);
+      const members = resolveMembersFromScope(scope, b.members);
 
-      for (const emp of employees) {
+      for (const emp of members) {
         for (let i = 0; i < b.days.length; i++) {
           const day1 = b.days[i];
           if (!day1) continue;

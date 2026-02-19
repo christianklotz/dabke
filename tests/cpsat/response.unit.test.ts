@@ -21,12 +21,12 @@ describe("parseSolverResponse", () => {
     expect(result.status).toBe("OPTIMAL");
     expect(result.assignments).toHaveLength(2);
     expect(result.assignments).toContainEqual({
-      employeeId: "alice",
+      memberId: "alice",
       shiftPatternId: "morning",
       day: "2026-01-10",
     });
     expect(result.assignments).toContainEqual({
-      employeeId: "bob",
+      memberId: "bob",
       shiftPatternId: "evening",
       day: "2026-01-10",
     });
@@ -71,7 +71,7 @@ describe("parseSolverResponse", () => {
     expect(result.error).toBe("Something went wrong");
   });
 
-  it("should handle employee IDs with underscores", () => {
+  it("should handle member IDs with underscores", () => {
     const response: SolverResponse = {
       status: "OPTIMAL",
       values: {
@@ -83,7 +83,7 @@ describe("parseSolverResponse", () => {
 
     expect(result.assignments).toHaveLength(1);
     expect(result.assignments[0]).toEqual({
-      employeeId: "john_doe",
+      memberId: "john_doe",
       shiftPatternId: "morning_shift",
       day: "2026-01-10",
     });
@@ -177,21 +177,21 @@ describe("resolveAssignments", () => {
 
   it("should resolve assignments to concrete times", () => {
     const assignments = [
-      { employeeId: "alice", shiftPatternId: "morning", day: "2026-01-10" },
-      { employeeId: "bob", shiftPatternId: "evening", day: "2026-01-10" },
+      { memberId: "alice", shiftPatternId: "morning", day: "2026-01-10" },
+      { memberId: "bob", shiftPatternId: "evening", day: "2026-01-10" },
     ];
 
     const resolved = resolveAssignments(assignments, shiftPatterns);
 
     expect(resolved).toHaveLength(2);
     expect(resolved).toContainEqual({
-      employeeId: "alice",
+      memberId: "alice",
       day: "2026-01-10",
       startTime: { hours: 9, minutes: 0 },
       endTime: { hours: 13, minutes: 0 },
     });
     expect(resolved).toContainEqual({
-      employeeId: "bob",
+      memberId: "bob",
       day: "2026-01-10",
       startTime: { hours: 17, minutes: 0 },
       endTime: { hours: 21, minutes: 0 },
@@ -200,14 +200,14 @@ describe("resolveAssignments", () => {
 
   it("should skip assignments with unknown pattern IDs", () => {
     const assignments = [
-      { employeeId: "alice", shiftPatternId: "unknown", day: "2026-01-10" },
-      { employeeId: "bob", shiftPatternId: "morning", day: "2026-01-10" },
+      { memberId: "alice", shiftPatternId: "unknown", day: "2026-01-10" },
+      { memberId: "bob", shiftPatternId: "morning", day: "2026-01-10" },
     ];
 
     const resolved = resolveAssignments(assignments, shiftPatterns);
 
     expect(resolved).toHaveLength(1);
-    expect(resolved[0]?.employeeId).toBe("bob");
+    expect(resolved[0]?.memberId).toBe("bob");
   });
 
   it("should handle empty assignments", () => {
@@ -216,7 +216,7 @@ describe("resolveAssignments", () => {
   });
 
   it("should handle empty patterns", () => {
-    const assignments = [{ employeeId: "alice", shiftPatternId: "morning", day: "2026-01-10" }];
+    const assignments = [{ memberId: "alice", shiftPatternId: "morning", day: "2026-01-10" }];
 
     const resolved = resolveAssignments(assignments, []);
     expect(resolved).toHaveLength(0);

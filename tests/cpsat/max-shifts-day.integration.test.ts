@@ -9,10 +9,10 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     client = getSolverClient();
   });
 
-  it("limits employee to one shift per day when maxShifts is 1", async () => {
-    // Two employees, two shifts, but each can only work one shift
+  it("limits member to one shift per day when maxShifts is 1", async () => {
+    // Two members, two shifts, but each can only work one shift
     const baseConfig = createBaseConfig({
-      employeeIds: ["alice", "bob"],
+      memberIds: ["alice", "bob"],
       shifts: [
         {
           id: "morning",
@@ -43,12 +43,12 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     expect(response.status).toBe("OPTIMAL");
     const assignments = decodeAssignments(response.values);
 
-    // Each employee should only be assigned to one shift
+    // Each member should only be assigned to one shift
     const aliceAssignments = assignments.filter(
-      (a) => a?.employeeId === "alice" && a?.day === "2024-02-01",
+      (a) => a?.memberId === "alice" && a?.day === "2024-02-01",
     );
     const bobAssignments = assignments.filter(
-      (a) => a?.employeeId === "bob" && a?.day === "2024-02-01",
+      (a) => a?.memberId === "bob" && a?.day === "2024-02-01",
     );
     expect(aliceAssignments.length).toBeLessThanOrEqual(1);
     expect(bobAssignments.length).toBeLessThanOrEqual(1);
@@ -57,9 +57,9 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
     expect(assignments).toHaveLength(2);
   }, 30_000);
 
-  it("allows employee to work multiple shifts when maxShifts permits", async () => {
+  it("allows member to work multiple shifts when maxShifts permits", async () => {
     const baseConfig = createBaseConfig({
-      employeeIds: ["alice"],
+      memberIds: ["alice"],
       shifts: [
         {
           id: "morning",
@@ -92,14 +92,14 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
 
     // Alice can be assigned to both shifts (coverage requires it)
     const aliceAssignments = assignments.filter(
-      (a) => a?.employeeId === "alice" && a?.day === "2024-02-01",
+      (a) => a?.memberId === "alice" && a?.day === "2024-02-01",
     );
     expect(aliceAssignments).toHaveLength(2);
   }, 30_000);
 
-  it("without max-shifts-day rule, employees can work unlimited shifts", async () => {
+  it("without max-shifts-day rule, members can work unlimited shifts", async () => {
     const baseConfig = createBaseConfig({
-      employeeIds: ["alice"],
+      memberIds: ["alice"],
       shifts: [
         {
           id: "morning",
@@ -131,15 +131,15 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
 
     // Alice should be assigned to all 3 shifts to meet coverage
     const aliceAssignments = assignments.filter(
-      (a) => a?.employeeId === "alice" && a?.day === "2024-02-01",
+      (a) => a?.memberId === "alice" && a?.day === "2024-02-01",
     );
     expect(aliceAssignments).toHaveLength(3);
   }, 30_000);
 
   it("soft constraint allows exceeding limit with penalty", async () => {
-    // With only one employee and two required shifts, a soft limit should be exceeded
+    // With only one member and two required shifts, a soft limit should be exceeded
     const baseConfig = createBaseConfig({
-      employeeIds: ["alice"],
+      memberIds: ["alice"],
       shifts: [
         {
           id: "morning",
@@ -172,7 +172,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
 
     // Coverage is mandatory, so alice works both shifts despite soft limit
     const aliceAssignments = assignments.filter(
-      (a) => a?.employeeId === "alice" && a?.day === "2024-02-01",
+      (a) => a?.memberId === "alice" && a?.day === "2024-02-01",
     );
     expect(aliceAssignments).toHaveLength(2);
   }, 30_000);
@@ -180,7 +180,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
   it("hard constraint makes infeasible when cannot be satisfied", async () => {
     // Only alice available, two shifts need coverage, but max 1 shift allowed
     const baseConfig = createBaseConfig({
-      employeeIds: ["alice"],
+      memberIds: ["alice"],
       shifts: [
         {
           id: "morning",
@@ -208,7 +208,7 @@ describe("CP-SAT: max-shifts-day rule (integration)", () => {
 
     const response = await solveWithRules(client, baseConfig, rules);
 
-    // Should be infeasible: can't cover both shifts with max 1 shift per employee
+    // Should be infeasible: can't cover both shifts with max 1 shift per member
     expect(response.status).toBe("INFEASIBLE");
   }, 30_000);
 });

@@ -15,23 +15,23 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
   });
 
   it("solver prefers weekday assignments to avoid weekend multiplier", async () => {
-    // Mon-Sat schedule, need 1 person per day, only 1 employee.
+    // Mon-Sat schedule, need 1 person per day, only 1 member.
     // With weekend multiplier, the solver can't avoid Saturday
-    // (must cover every day), but with 2 employees and 1 coverage,
+    // (must cover every day), but with 2 members and 1 coverage,
     // the solver should avoid assigning the more expensive combination.
     //
-    // Setup: 2 employees, 2 days (Fri + Sat), coverage of 1 per day.
+    // Setup: 2 members, 2 days (Fri + Sat), coverage of 1 per day.
     // With 1.5x weekend multiplier + fair distribution turned off,
-    // solver should assign the cheaper employee to Saturday.
+    // solver should assign the cheaper member to Saturday.
     const period = {
       dateRange: { start: "2026-02-13", end: "2026-02-14" },
     };
     const days = resolveDaysFromPeriod(period);
 
     const config = {
-      employees: [
-        { id: "expensive", roleIds: ["waiter"], pay: { hourlyRate: 3000 } },
-        { id: "cheap", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
+      members: [
+        { id: "expensive", roles: ["waiter"], pay: { hourlyRate: 3000 } },
+        { id: "cheap", roles: ["waiter"], pay: { hourlyRate: 1000 } },
       ],
       shiftPatterns: [
         {
@@ -71,8 +71,8 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
     const assignments = decodeAssignments(response.values);
     const satAssignment = assignments.find((a) => a.day === "2026-02-14");
 
-    // Cheap employee on Saturday to minimize cost
-    expect(satAssignment?.employeeId).toBe("cheap");
+    // Cheap member on Saturday to minimize cost
+    expect(satAssignment?.memberId).toBe("cheap");
   }, 30_000);
 
   it("post-solve cost includes multiplier premium", async () => {
@@ -82,7 +82,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
     const days = resolveDaysFromPeriod(period);
 
     const config = {
-      employees: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
       shiftPatterns: [
         {
           id: "day",
@@ -119,13 +119,13 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
 
     const result = parseSolverResponse(response);
     const cost = calculateScheduleCost(result.assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // 8 hours * 2000 = 16000 base, 8 * 2000 * 0.5 = 8000 premium
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(16000);
     expect(alice.categories.get(COST_CATEGORY.PREMIUM)).toBe(8000);
     expect(cost.total).toBe(24000);

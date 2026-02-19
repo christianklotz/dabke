@@ -40,7 +40,7 @@ describe("CP-SAT: min-hours-day rule", () => {
       client,
       createBaseConfig({
         roleId: "server",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         shiftPatterns: [shiftPatterns[0]!],
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage,
@@ -56,7 +56,7 @@ describe("CP-SAT: min-hours-day rule", () => {
       client,
       createBaseConfig({
         roleId: "server",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         shiftPatterns,
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage,

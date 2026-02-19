@@ -37,7 +37,7 @@ describe("CP-SAT compilation integration", () => {
   it("reports infeasible status for conflicting mandatory rules", async () => {
     const baseConfig = createBaseConfig({
       roleIds: ["cook"],
-      employeeIds: ["solo"],
+      memberIds: ["solo"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },
@@ -76,9 +76,9 @@ describe("CP-SAT compilation integration", () => {
       // This forces the solver to use both shift patterns to cover all periods.
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "john", roleIds: ["staff"] },
-          { id: "mary", roleIds: ["staff"] },
+        members: [
+          { id: "john", roles: ["staff"] },
+          { id: "mary", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -144,9 +144,9 @@ describe("CP-SAT compilation integration", () => {
       // leaving 13:30-17:00 uncovered. Time-indexed coverage ensures we need both shifts.
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "john", roleIds: ["staff"] },
-          { id: "mary", roleIds: ["staff"] },
+        members: [
+          { id: "john", roles: ["staff"] },
+          { id: "mary", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -205,9 +205,9 @@ describe("CP-SAT compilation integration", () => {
       // (assuming they can cover the whole period with one shift or the overlap)
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "john", roleIds: ["staff"] },
-          { id: "mary", roleIds: ["staff"] },
+        members: [
+          { id: "john", roles: ["staff"] },
+          { id: "mary", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -240,12 +240,12 @@ describe("CP-SAT compilation integration", () => {
       expect(assignments).toHaveLength(1);
     }, 30_000);
 
-    it("allows one employee to cover split shifts without max-shifts-day rule", async () => {
-      // Only 1 employee but 2 coverage periods that need different shifts
+    it("allows one member to cover split shifts without max-shifts-day rule", async () => {
+      // Only 1 member but 2 coverage periods that need different shifts
       // Without max-shifts-day rule, one person CAN work both patterns
 
       const builder = new ModelBuilder({
-        employees: [{ id: "john", roleIds: ["staff"] }],
+        members: [{ id: "john", roles: ["staff"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -288,17 +288,17 @@ describe("CP-SAT compilation integration", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
       expect(assignments).toHaveLength(2);
-      expect(assignments.every((a) => a?.employeeId === "john")).toBe(true);
+      expect(assignments.every((a) => a?.memberId === "john")).toBe(true);
     }, 30_000);
 
     it("fails when max-shifts-day rule prevents covering split shifts", async () => {
-      // Only 1 employee but 2 coverage periods that need different shifts
+      // Only 1 member but 2 coverage periods that need different shifts
       // With max-shifts-day rule of 1, this becomes infeasible
 
       const response = await solveWithRules(
         client,
         {
-          employees: [{ id: "john", roleIds: ["staff"] }],
+          members: [{ id: "john", roles: ["staff"] }],
           shiftPatterns: [
             {
               id: "morning",
@@ -349,13 +349,13 @@ describe("CP-SAT compilation integration", () => {
 
     it("handles three coverage periods across the day with appropriate staff", async () => {
       // Extended scenario: opening, midday, closing - each needs 1 person
-      // Three employees, three non-overlapping shifts
+      // Three members, three non-overlapping shifts
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["staff"] },
-          { id: "bob", roleIds: ["staff"] },
-          { id: "charlie", roleIds: ["staff"] },
+        members: [
+          { id: "alice", roles: ["staff"] },
+          { id: "bob", roles: ["staff"] },
+          { id: "charlie", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -429,11 +429,11 @@ describe("CP-SAT compilation integration", () => {
       // Scenario: Restaurant with dinner service (5pm-10pm) needing 2 waiters,
       // and happy hour (5pm-6pm) needing 1 extra waiter (3 total during that hour)
       const builder = new ModelBuilder({
-        employees: [
-          { id: "waiter1", roleIds: ["waiter"] },
-          { id: "waiter2", roleIds: ["waiter"] },
-          { id: "waiter3", roleIds: ["waiter"] },
-          { id: "waiter4", roleIds: ["waiter"] },
+        members: [
+          { id: "waiter1", roles: ["waiter"] },
+          { id: "waiter2", roles: ["waiter"] },
+          { id: "waiter3", roles: ["waiter"] },
+          { id: "waiter4", roles: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -484,11 +484,11 @@ describe("CP-SAT compilation integration", () => {
       // Scenario: Dinner needs 2 servers + 1 bartender
       // Happy hour needs 2 bartenders (extra bartender during 5-6pm)
       const builder = new ModelBuilder({
-        employees: [
-          { id: "server1", roleIds: ["server"] },
-          { id: "server2", roleIds: ["server"] },
-          { id: "bartender1", roleIds: ["bartender"] },
-          { id: "bartender2", roleIds: ["bartender"] },
+        members: [
+          { id: "server1", roles: ["server"] },
+          { id: "server2", roles: ["server"] },
+          { id: "bartender1", roles: ["bartender"] },
+          { id: "bartender2", roles: ["bartender"] },
         ],
         shiftPatterns: [
           {
@@ -558,9 +558,9 @@ describe("CP-SAT compilation integration", () => {
       // - Lunch rush: 12pm-2pm, need 4 staff
       // - Peak hour: 12:30pm-1:30pm, need 6 staff
       const builder = new ModelBuilder({
-        employees: Array.from({ length: 6 }, (_, i) => ({
+        members: Array.from({ length: 6 }, (_, i) => ({
           id: `staff${i + 1}`,
-          roleIds: ["staff"],
+          roles: ["staff"],
         })),
         shiftPatterns: [
           {
@@ -614,13 +614,13 @@ describe("CP-SAT compilation integration", () => {
 
     it("should handle adjacent (non-overlapping) coverage requirements", async () => {
       // Scenario: Lunch (11am-2pm) and Dinner (5pm-10pm) - no overlap
-      // Without max-shifts-day rule, employees can work both shifts
+      // Without max-shifts-day rule, members can work both shifts
       const builder = new ModelBuilder({
-        employees: [
-          { id: "server1", roleIds: ["server"] },
-          { id: "server2", roleIds: ["server"] },
-          { id: "server3", roleIds: ["server"] },
-          { id: "server4", roleIds: ["server"] },
+        members: [
+          { id: "server1", roles: ["server"] },
+          { id: "server2", roles: ["server"] },
+          { id: "server3", roles: ["server"] },
+          { id: "server4", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -677,10 +677,10 @@ describe("CP-SAT compilation integration", () => {
     it("should return infeasible when overlapping coverage exceeds available staff", async () => {
       // Scenario: Need 5 waiters during peak but only have 3
       const builder = new ModelBuilder({
-        employees: [
-          { id: "waiter1", roleIds: ["waiter"] },
-          { id: "waiter2", roleIds: ["waiter"] },
-          { id: "waiter3", roleIds: ["waiter"] },
+        members: [
+          { id: "waiter1", roles: ["waiter"] },
+          { id: "waiter2", roles: ["waiter"] },
+          { id: "waiter3", roles: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -737,7 +737,7 @@ describe("CP-SAT compilation integration", () => {
 
       const baseConfig = createBaseConfig({
         roleIds: ["server"],
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -814,9 +814,9 @@ describe("CP-SAT compilation integration", () => {
       ];
 
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["staff"] },
-          { id: "bob", roleIds: ["staff"] },
+        members: [
+          { id: "alice", roles: ["staff"] },
+          { id: "bob", roles: ["staff"] },
         ],
         shiftPatterns: [
           {
@@ -854,7 +854,7 @@ describe("CP-SAT compilation integration", () => {
     it("covers Wednesday Feb 7 specifically when included in range", async () => {
       // Minimal test: just Wed Feb 7
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["staff"] }],
+        members: [{ id: "alice", roles: ["staff"] }],
         shiftPatterns: [
           {
             id: "day_shift",
@@ -887,12 +887,12 @@ describe("CP-SAT compilation integration", () => {
   });
 
   describe("NoOverlap prevents overlapping shift assignments", () => {
-    it("prevents employee from working two overlapping shifts on same day", async () => {
+    it("prevents member from working two overlapping shifts on same day", async () => {
       // Morning (8-12) and midday (10-14) shifts overlap
       // Coverage only requires 10-12 window (where both patterns work)
-      // Employee should only be assigned to ONE of them due to NoOverlap
+      // member should only be assigned to ONE of them due to NoOverlap
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -925,16 +925,16 @@ describe("CP-SAT compilation integration", () => {
       const assignments = decodeAssignments(response.values);
 
       // Alice should only have ONE assignment (not both overlapping shifts)
-      const aliceAssignments = assignments.filter((a) => a?.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a?.memberId === "alice");
       expect(aliceAssignments).toHaveLength(1);
     }, 30_000);
 
-    it("allows different employees to work overlapping shifts", async () => {
-      // Two employees can each work one of the overlapping shifts
+    it("allows different members to work overlapping shifts", async () => {
+      // Two members can each work one of the overlapping shifts
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"] },
-          { id: "bob", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["server"] },
+          { id: "bob", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -967,18 +967,18 @@ describe("CP-SAT compilation integration", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
 
-      // Both employees should be assigned (one to each shift)
+      // Both members should be assigned (one to each shift)
       expect(assignments).toHaveLength(2);
-      const employeeIds = assignments.map((a) => a?.employeeId);
-      expect(employeeIds).toContain("alice");
-      expect(employeeIds).toContain("bob");
+      const memberIds = assignments.map((a) => a?.memberId);
+      expect(memberIds).toContain("alice");
+      expect(memberIds).toContain("bob");
     }, 30_000);
 
-    it("returns infeasible when coverage requires overlapping shifts from single employee", async () => {
+    it("returns infeasible when coverage requires overlapping shifts from single member", async () => {
       // Coverage spans longer than any single pattern
-      // With only one employee and NoOverlap, this is infeasible
+      // With only one member and NoOverlap, this is infeasible
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -1013,10 +1013,10 @@ describe("CP-SAT compilation integration", () => {
   });
 
   describe("double shifts (non-overlapping)", () => {
-    it("allows employee to work two non-overlapping shifts on same day", async () => {
+    it("allows member to work two non-overlapping shifts on same day", async () => {
       // Split shift: morning (8-12) then evening (17-21) with gap
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -1064,7 +1064,7 @@ describe("CP-SAT compilation integration", () => {
       const assignments = decodeAssignments(response.values);
 
       // Alice should have TWO assignments (both shifts)
-      const aliceAssignments = assignments.filter((a) => a?.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a?.memberId === "alice");
       expect(aliceAssignments).toHaveLength(2);
 
       const patternIds = aliceAssignments.map((a) => a?.shiftPatternId);
@@ -1072,10 +1072,10 @@ describe("CP-SAT compilation integration", () => {
       expect(patternIds).toContain("evening");
     }, 30_000);
 
-    it("allows employee to work adjacent (touching) shifts", async () => {
+    it("allows member to work adjacent (touching) shifts", async () => {
       // Back-to-back shifts: morning ends at 14:00, afternoon starts at 14:00
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -1115,19 +1115,19 @@ describe("CP-SAT compilation integration", () => {
       const assignments = decodeAssignments(response.values);
 
       // Alice can work both adjacent shifts (they don't overlap)
-      const aliceAssignments = assignments.filter((a) => a?.employeeId === "alice");
+      const aliceAssignments = assignments.filter((a) => a?.memberId === "alice");
       expect(aliceAssignments).toHaveLength(2);
     }, 30_000);
   });
 
   describe("cross-midnight overlap prevention", () => {
-    it("prevents same employee from working overlapping cross-midnight shifts", async () => {
+    it("prevents same member from working overlapping cross-midnight shifts", async () => {
       // Night shift (22:00 Day1 - 06:00 Day2) overlaps with early (05:00 - 09:00 Day2)
-      // With two employees, one can do night and other can do early
+      // With two members, one can do night and other can do early
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"] },
-          { id: "bob", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["server"] },
+          { id: "bob", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -1176,20 +1176,20 @@ describe("CP-SAT compilation integration", () => {
         (a) => a?.shiftPatternId === "early" && a?.day === "2024-01-02",
       );
 
-      // Both should be assigned (we have 2 employees and need coverage)
+      // Both should be assigned (we have 2 members and need coverage)
       expect(nightAssignment).toBeDefined();
       expect(earlyAssignment).toBeDefined();
 
-      // They should be to different employees (due to NoOverlap)
+      // They should be to different members (due to NoOverlap)
       assert(nightAssignment);
       assert(earlyAssignment);
-      expect(nightAssignment.employeeId).not.toBe(earlyAssignment.employeeId);
+      expect(nightAssignment.memberId).not.toBe(earlyAssignment.memberId);
     }, 30_000);
 
-    it("returns infeasible when single employee must cover overlapping cross-midnight shifts", async () => {
-      // Only one employee, must cover both night and early which overlap
+    it("returns infeasible when single member must cover overlapping cross-midnight shifts", async () => {
+      // Only one member, must cover both night and early which overlap
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "night",
@@ -1236,7 +1236,7 @@ describe("CP-SAT compilation integration", () => {
     it("shift partially overlapping coverage window contributes to coverage", async () => {
       // 10-18 shift should contribute to 12-14 lunch coverage
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "full_day",
@@ -1269,9 +1269,9 @@ describe("CP-SAT compilation integration", () => {
     it("staggered shifts together satisfy continuous coverage", async () => {
       // Coverage 10-14, served by 10-12 shift + 12-14 shift
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"] },
-          { id: "bob", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["server"] },
+          { id: "bob", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -1310,7 +1310,7 @@ describe("CP-SAT compilation integration", () => {
 
     it("validates coverageBucketMinutes rejects invalid values", () => {
       const builder = new ModelBuilder({
-        employees: [],
+        members: [],
         shiftPatterns: [],
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage: [],
@@ -1325,7 +1325,7 @@ describe("CP-SAT compilation integration", () => {
     it("accepts valid bucket sizes", () => {
       for (const bucketSize of [5, 10, 15, 30, 60]) {
         const builder = new ModelBuilder({
-          employees: [],
+          members: [],
           shiftPatterns: [],
           schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
           coverage: [],

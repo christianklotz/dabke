@@ -2,11 +2,11 @@ import type { SolverResponse } from "../client.types.js";
 import type { ShiftPattern } from "./types.js";
 import type { TimeOfDay } from "../types.js";
 
-/** A raw assignment from the solver: which employee works which shift on which day. */
+/** A raw assignment from the solver: which member works which shift on which day. */
 export interface ShiftAssignment {
-  /** The assigned employee's ID. */
-  employeeId: string;
-  /** The shift pattern this employee is assigned to. */
+  /** The assigned member's ID. */
+  memberId: string;
+  /** The shift pattern this member is assigned to. */
   shiftPatternId: string;
   /** The date of the assignment (YYYY-MM-DD). */
   day: string;
@@ -16,8 +16,8 @@ export interface ShiftAssignment {
  * A shift assignment with resolved times.
  */
 export interface ResolvedShiftAssignment {
-  /** The assigned employee's ID. */
-  employeeId: string;
+  /** The assigned member's ID. */
+  memberId: string;
   /** The date of the assignment (YYYY-MM-DD). */
   day: string;
   /** When the shift starts. */
@@ -43,7 +43,7 @@ export interface SolverResult {
 /**
  * Extracts shift assignments from solver response.
  *
- * Parses variable names matching the pattern `assign:${employeeId}:${patternId}:${day}`
+ * Parses variable names matching the pattern `assign:${memberId}:${patternId}:${day}`
  * and returns assignments where the variable value is 1 (true).
  *
  * @remarks
@@ -60,7 +60,7 @@ export interface SolverResult {
  *
  * if (result.status === "OPTIMAL" || result.status === "FEASIBLE") {
  *   for (const assignment of result.assignments) {
- *     console.log(`${assignment.employeeId} works ${assignment.shiftPatternId} on ${assignment.day}`);
+ *     console.log(`${assignment.memberId} works ${assignment.shiftPatternId} on ${assignment.day}`);
  *   }
  * }
  * ```
@@ -81,16 +81,16 @@ export function parseSolverResponse(response: SolverResponse): SolverResult {
     if (value !== 1) continue;
     if (!varName.startsWith("assign:")) continue;
 
-    // Pattern: assign:${employeeId}:${patternId}:${day}
+    // Pattern: assign:${memberId}:${patternId}:${day}
     // IDs are validated to not contain colons, so splitting is unambiguous.
     const parts = varName.split(":");
     if (parts.length !== 4) continue;
 
-    const [, employeeId, shiftPatternId, day] = parts;
-    if (!employeeId || !shiftPatternId || !day) continue;
+    const [, memberId, shiftPatternId, day] = parts;
+    if (!memberId || !shiftPatternId || !day) continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
 
-    assignments.push({ employeeId, shiftPatternId, day });
+    assignments.push({ memberId, shiftPatternId, day });
   }
 
   return {
@@ -103,17 +103,17 @@ export function parseSolverResponse(response: SolverResponse): SolverResult {
 /**
  * Resolves shift assignments to concrete times using shift patterns.
  *
- * @param assignments - Raw assignments from parseScheduleResult
+ * @param assignments - Raw assignments from parseSolverResponse
  * @param shiftPatterns - The shift patterns used in the model
  * @returns Assignments with resolved start/end times
  *
  * @example
  * ```typescript
- * const result = parseScheduleResult(response);
+ * const result = parseSolverResponse(response);
  * const resolved = resolveAssignments(result.assignments, shiftPatterns);
  *
  * for (const shift of resolved) {
- *   console.log(`${shift.employeeId} works ${shift.day} from ${shift.startTime.hours}:${shift.startTime.minutes}`);
+ *   console.log(`${shift.memberId} works ${shift.day} from ${shift.startTime.hours}:${shift.startTime.minutes}`);
  * }
  * ```
  */
@@ -129,7 +129,7 @@ export function resolveAssignments(
       if (!pattern) return null;
 
       return {
-        employeeId: a.employeeId,
+        memberId: a.memberId,
         day: a.day,
         startTime: pattern.startTime,
         endTime: pattern.endTime,

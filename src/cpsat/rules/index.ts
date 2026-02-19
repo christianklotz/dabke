@@ -1,5 +1,5 @@
 export { createAssignTogetherRule } from "./assign-together.js";
-export { createEmployeeAssignmentPriorityRule } from "./employee-assignment-priority.js";
+export { createAssignmentPriorityRule } from "./assignment-priority.js";
 export { createLocationPreferenceRule } from "./location-preference.js";
 export { createMaxConsecutiveDaysRule } from "./max-consecutive-days.js";
 export { createMaxHoursDayRule } from "./max-hours-day.js";

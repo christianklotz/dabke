@@ -7,7 +7,7 @@ const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 describe("ShiftPattern dayOfWeek restriction", () => {
   it("should only create assignment variables for patterns available on that day", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         // Full shift only available on weekdays
         {
@@ -69,7 +69,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
 
   it("should report error when no patterns are available for coverage on a day", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         // Only weekday shift
         {
@@ -103,7 +103,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
 
   it("should allow patterns without dayOfWeek restriction on any day", () => {
     const builder = new ModelBuilder({
-      employees: [{ id: "alice", roleIds: ["staff"] }],
+      members: [{ id: "alice", roles: ["staff"] }],
       shiftPatterns: [
         // Pattern available any day (no dayOfWeek restriction)
         { id: "any_shift", startTime: t(9), endTime: t(17) },
@@ -145,9 +145,9 @@ describe("ShiftPattern dayOfWeek restriction", () => {
 
   it("should correctly filter patterns in coverage constraint building", () => {
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["staff"] },
-        { id: "bob", roleIds: ["staff"] },
+      members: [
+        { id: "alice", roles: ["staff"] },
+        { id: "bob", roles: ["staff"] },
       ],
       shiftPatterns: [
         // Full shift for weekdays only

@@ -213,7 +213,7 @@ Used for multi-location scheduling and location-based constraints.
 A named rule configuration entry.
 
 Flat discriminated union: `name` is the discriminant and all config fields
-(including scope fields like `employeeIds`, `dayOfWeek`, etc.) sit at the
+(including scope fields like `memberIds`, `dayOfWeek`, etc.) sit at the
 same level. This eliminates the `{ name, config: { ... } }` nesting that
 invited misplacement of scope fields.
 
@@ -221,7 +221,7 @@ invited misplacement of scope fields.
 ```ts
 const rules: CpsatRuleConfigEntry[] = [
   { name: "max-hours-week", hours: 40, priority: "MANDATORY" },
-  { name: "time-off", employeeIds: ["alice"], dayOfWeek: ["monday"], priority: "MANDATORY" },
+  { name: "time-off", memberIds: ["alice"], dayOfWeek: ["monday"], priority: "MANDATORY" },
 ];
 ```
 
@@ -235,7 +235,7 @@ const rules: CpsatRuleConfigEntry[] = [
 Each rule is a flat object in the `ruleConfigs` array with `name` as the discriminant.
 
 **Scoping fields** available on most rules:
-- Entity (at most one): `employeeIds`, `roleIds`, `skillIds`
+- Entity (at most one): `memberIds`, `roleIds`, `skillIds`
 - Time (at most one): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
 
 #### assign-together
@@ -245,8 +245,30 @@ For each pair of team members in the group, ensures they are assigned to the sam
 **Example:**
 ```ts
 { name: "assign-together",
-  groupEmployeeIds: ["alice", "bob", "charlie"],
+  groupMemberIds: ["alice", "bob", "charlie"],
   priority: "HIGH",
+}
+```
+
+#### assignment-priority
+Adds objective weight to prefer or avoid assigning team members.
+
+**Example:**
+Prefer specific team members
+```ts
+{ name: "assignment-priority",
+memberIds: ["alice", "bob"],
+preference: "high",
+}
+```
+
+**Example:**
+Avoid assigning students on weekdays
+```ts
+{ name: "assignment-priority",
+roleIds: ["student"],
+dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+preference: "low",
 }
 ```
 
@@ -263,32 +285,10 @@ but the `cost()` method still contributes to post-solve calculation.
 Creates a day-based flat surcharge rule.
 
 Adds a flat extra amount per hour for assignments on matching days,
-independent of the employee's base rate.
+independent of the member's base rate.
 
 When `minimizeCost()` is not present, no solver terms are emitted,
 but the `cost()` method still contributes to post-solve calculation.
-
-#### employee-assignment-priority
-Adds objective weight to prefer or avoid assigning team members.
-
-**Example:**
-Prefer specific team members
-```ts
-{ name: "employee-assignment-priority",
-employeeIds: ["alice", "bob"],
-preference: "high",
-}
-```
-
-**Example:**
-Avoid assigning students on weekdays
-```ts
-{ name: "employee-assignment-priority",
-roleIds: ["student"],
-dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-preference: "low",
-}
-```
 
 #### location-preference
 Prefers assigning a person to shift patterns matching a specific location.
@@ -298,7 +298,7 @@ Prefers assigning a person to shift patterns matching a specific location.
 { name: "location-preference",
   locationId: "terrace",
   priority: "HIGH",
-  employeeIds: ["alice"],
+  memberIds: ["alice"],
 }
 ```
 
@@ -417,14 +417,14 @@ Enforces a minimum rest period between any two shifts a person works.
 #### minimize-cost
 Creates the minimize-cost rule.
 
-**Hourly employees:** adds a penalty proportional to
+**Hourly members:** adds a penalty proportional to
 `hourlyRate * shiftDurationMinutes / 60` for each assignment.
 
-**Salaried employees:** zero marginal cost up to their contracted hours.
-A boolean variable tracks whether the employee has any assignment in a
+**Salaried members:** zero marginal cost up to their contracted hours.
+A boolean variable tracks whether the member has any assignment in a
 given week. When active, their full weekly salary (`annual / 52`) is
 added as a penalty. This causes the solver to load work onto salaried
-employees (who are "free" once activated) before hourly workers.
+members (who are "free" once activated) before hourly workers.
 
 `costContext` so modifier rules can use the same scale.
 
@@ -437,7 +437,7 @@ Same as the weekly variant but the threshold is per day instead of per week.
 Creates a daily overtime flat surcharge rule.
 
 Hours beyond the threshold per day get a flat surcharge per hour,
-independent of the employee's base rate.
+independent of the member's base rate.
 
 #### overtime-tiered-multiplier
 Creates a multi-threshold weekly overtime multiplier rule.
@@ -471,13 +471,13 @@ overtime variables via minimization.
 Creates a weekly overtime flat surcharge rule.
 
 Hours beyond the threshold per week get a flat surcharge per hour,
-independent of the employee's base rate.
+independent of the member's base rate.
 
 #### time-cost-surcharge
 Creates a time-of-day surcharge rule (e.g., night differential).
 
 Adds a flat surcharge per hour for the portion of a shift that overlaps
-a time-of-day window. Independent of the employee's base rate.
+a time-of-day window. Independent of the member's base rate.
 
 When `minimizeCost()` is not present, no solver terms are emitted,
 but the `cost()` method still contributes to post-solve calculation.
@@ -493,7 +493,7 @@ Optionally supports partial-day time-off with startTime/endTime.
 Full day vacation
 ```ts
 { name: "time-off",
-employeeIds: ["alice"],
+memberIds: ["alice"],
 dateRange: { start: "2024-02-01", end: "2024-02-05" },
 priority: "MANDATORY",
 }
@@ -515,7 +515,7 @@ priority: "MANDATORY",
 Specific date, partial day
 ```ts
 { name: "time-off",
-employeeIds: ["bob"],
+memberIds: ["bob"],
 specificDates: ["2024-03-15"],
 startTime: { hours: 16, minutes: 0 },
 endTime: { hours: 23, minutes: 59 },
@@ -613,24 +613,16 @@ Pay per hour in the caller's smallest currency unit (e.g., pence, cents).
 ### SalariedPay
 Annual salary with contracted weekly hours.
 
-Hours beyond `hoursPerWeek` are considered overtime when overtime rules are present.
+The solver treats salaried members as having a fixed weekly cost
+(`annual / 52`) that is incurred once they work any shift in a week.
+Additional shifts within the same week have zero marginal cost.
+
+Note: overtime rules currently apply only to hourly members.
+Salaried members are skipped by overtime multiplier/surcharge rules.
 
 **Properties:**
 - `annual: number` - Annual salary in smallest currency unit.
-- `hoursPerWeek: number` - Contracted hours per week.
-
-
-### SchedulingEmployee
-A team member available for scheduling.
-
-Employees are assigned to shift patterns by the solver based on
-coverage requirements, rules, and constraints.
-
-**Properties:**
-- `id: string` - Unique identifier for this employee. Must not contain colons.
-- `roleIds: string[]` - Roles this employee can fill (e.g. "waiter", "chef").
-- `skillIds?: string[] | undefined` - Skills this employee has (e.g. "senior", "trainer").
-- `pay?: HourlyPay | SalariedPay | undefined` - Base pay. Required when cost rules are used.
+- `hoursPerWeek: number` - Contracted hours per week. Reserved for future overtime support.
 
 
 ### Priority

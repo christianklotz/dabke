@@ -15,12 +15,12 @@ export interface HourlyPay {
 /**
  * Annual salary with contracted weekly hours.
  *
- * The solver treats salaried employees as having a fixed weekly cost
+ * The solver treats salaried members as having a fixed weekly cost
  * (`annual / 52`) that is incurred once they work any shift in a week.
  * Additional shifts within the same week have zero marginal cost.
  *
- * Note: overtime rules currently apply only to hourly employees.
- * Salaried employees are skipped by overtime multiplier/surcharge rules.
+ * Note: overtime rules currently apply only to hourly members.
+ * Salaried members are skipped by overtime multiplier/surcharge rules.
  *
  * @category Types
  */
@@ -44,26 +44,19 @@ export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 /**
  * A team member available for scheduling.
  *
- * Employees are assigned to shift patterns by the solver based on
+ * Members are assigned to shift patterns by the solver based on
  * coverage requirements, rules, and constraints.
- *
- * @category Types
  */
-export interface SchedulingEmployee {
-  /** Unique identifier for this employee. Must not contain colons. */
+export interface SchedulingMember {
+  /** Unique identifier for this member. Must not contain colons. */
   id: string;
-  /** Roles this employee can fill (e.g. "waiter", "chef"). */
-  roleIds: string[];
-  /** Skills this employee has (e.g. "senior", "trainer"). */
-  skillIds?: string[];
+  /** Roles this member can fill (e.g. "waiter", "chef"). */
+  roles: string[];
+  /** Skills this member has (e.g. "senior", "trainer"). */
+  skills?: string[];
   /** Base pay. Required when cost rules are used. */
   pay?: HourlyPay | SalariedPay;
 }
-
-/**
- * @deprecated Use SchedulingEmployee instead. This alias exists for backwards compatibility.
- */
-export type Employee = SchedulingEmployee;
 
 /**
  * A shift pattern defines WHEN people can work: the time slots available for assignment.
@@ -237,7 +230,7 @@ export interface ModelBuilderOptions {
    * any single person works, ensuring work is distributed evenly. Each person
    * works between floor(total/n) and ceil(total/n) shifts.
    *
-   * Disable this if you want other rules (like employee-assignment-priority)
+   * Disable this if you want other rules (like assignment-priority)
    * to have full control over shift distribution. Defaults to true.
    */
   fairDistribution?: boolean;

@@ -1,4 +1,4 @@
-import type { SchedulingEmployee } from "../types.js";
+import type { SchedulingMember } from "../types.js";
 import {
   parseEntityScope,
   parseTimeScope,
@@ -34,33 +34,33 @@ function entryConfig(entry: CpsatRuleConfigEntry): CpsatRuleRegistry[CpsatRuleNa
  * Gets the IDs that match an entity scope.
  * All scope types are expanded to concrete IDs.
  */
-export function getEmployeeIdsForScope(
+export function getMemberIdsForScope(
   entity: ParsedEntityScope,
-  employees: SchedulingEmployee[],
+  members: SchedulingMember[],
 ): string[] {
   switch (entity.type) {
-    case "employees": {
-      const validIds = new Set(employees.map((e) => e.id));
-      return entity.employeeIds.filter((id) => validIds.has(id));
+    case "members": {
+      const validIds = new Set(members.map((e) => e.id));
+      return entity.memberIds.filter((id) => validIds.has(id));
     }
     case "roles":
-      return employees
-        .filter((e) => e.roleIds.some((r) => entity.roleIds.includes(r)))
+      return members
+        .filter((e) => e.roles.some((r) => entity.roleIds.includes(r)))
         .map((e) => e.id);
     case "skills":
-      return employees
-        .filter((e) => e.skillIds?.some((s) => entity.skillIds.includes(s)))
+      return members
+        .filter((e) => e.skills?.some((s) => entity.skillIds.includes(s)))
         .map((e) => e.id);
     case "global":
     default:
-      return employees.map((e) => e.id);
+      return members.map((e) => e.id);
   }
 }
 
 /** Specificity ranking for entity scopes (higher = more specific). */
 function specificity(entity: ParsedEntityScope): number {
   switch (entity.type) {
-    case "employees":
+    case "members":
       return 4;
     case "roles":
       return 3;
@@ -114,7 +114,7 @@ const NON_SCOPED_RULES = new Set<string>(["assign-together"]);
  */
 export function resolveRuleScopes(
   entries: CpsatRuleConfigEntry[],
-  employees: SchedulingEmployee[],
+  members: SchedulingMember[],
 ): CpsatRuleConfigEntry[] {
   const resolved: CpsatRuleConfigEntry[] = [];
   const scopedEntries: Array<{ entry: CpsatRuleConfigEntry; index: number }> = [];
@@ -157,17 +157,17 @@ export function resolveRuleScopes(
       return b.index - a.index;
     });
 
-    const assignedEmployees = new Set<string>();
+    const assignedMembers = new Set<string>();
 
     for (const entry of sorted) {
-      const targetIds = getEmployeeIdsForScope(entry.entityScope, employees);
-      const remaining = subtractIds(targetIds, assignedEmployees);
+      const targetIds = getMemberIdsForScope(entry.entityScope, members);
+      const remaining = subtractIds(targetIds, assignedMembers);
       if (remaining.length === 0) continue;
 
-      remaining.forEach((id) => assignedEmployees.add(id));
+      remaining.forEach((id) => assignedMembers.add(id));
 
       const {
-        employeeIds: _employeeIds,
+        memberIds: _memberIds,
         roleIds: _roleIds,
         skillIds: _skillIds,
         ...configWithoutEntityScope
@@ -175,7 +175,7 @@ export function resolveRuleScopes(
       resolved.push({
         name: entry.name,
         ...configWithoutEntityScope,
-        employeeIds: remaining,
+        memberIds: remaining,
       } as CpsatRuleConfigEntry);
     }
   }
@@ -188,12 +188,12 @@ export function resolveRuleScopes(
  */
 export function buildCpsatRules(
   entries: CpsatRuleConfigEntry[],
-  employees: SchedulingEmployee[],
+  members: SchedulingMember[],
   factories: CpsatRuleFactories = builtInCpsatRuleFactories,
 ): CompilationRule[] {
   if (entries.length === 0) return [];
 
-  const resolved = resolveRuleScopes(entries, employees);
+  const resolved = resolveRuleScopes(entries, members);
 
   return resolved.map((entry) => {
     const factory = factories[entry.name];

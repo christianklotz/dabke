@@ -49,13 +49,13 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
 
     const preference: CpsatRuleConfigEntry[] = [
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["alice"],
+        name: "assignment-priority",
+        memberIds: ["alice"],
         preference: "high",
       },
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["bob"],
+        name: "assignment-priority",
+        memberIds: ["bob"],
         preference: "low",
       },
     ];
@@ -65,10 +65,10 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
     expect(baseline.status).toBe("OPTIMAL");
     const baselineAssignments = decodeAssignments(baseline.values);
     const aliceLateDay1 = baselineAssignments.some(
-      (a) => a.employeeId === "alice" && a.shiftPatternId === "late" && a.day === "2024-02-01",
+      (a) => a.memberId === "alice" && a.shiftPatternId === "late" && a.day === "2024-02-01",
     );
     const aliceEarlyDay2 = baselineAssignments.some(
-      (a) => a.employeeId === "alice" && a.shiftPatternId === "early" && a.day === "2024-02-02",
+      (a) => a.memberId === "alice" && a.shiftPatternId === "early" && a.day === "2024-02-02",
     );
     // Baseline should have alice working both conflicting shifts
     expect(aliceLateDay1 && aliceEarlyDay2).toBe(true);
@@ -85,10 +85,10 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
     expect(withRest.status).toBe("OPTIMAL");
     const restAssignments = decodeAssignments(withRest.values);
     const aliceLateDay1WithRest = restAssignments.some(
-      (a) => a.employeeId === "alice" && a.shiftPatternId === "late" && a.day === "2024-02-01",
+      (a) => a.memberId === "alice" && a.shiftPatternId === "late" && a.day === "2024-02-01",
     );
     const aliceEarlyDay2WithRest = restAssignments.some(
-      (a) => a.employeeId === "alice" && a.shiftPatternId === "early" && a.day === "2024-02-02",
+      (a) => a.memberId === "alice" && a.shiftPatternId === "early" && a.day === "2024-02-02",
     );
     // Rest rule should prevent alice from working BOTH conflicting shifts
     expect(aliceLateDay1WithRest && aliceEarlyDay2WithRest).toBe(false);

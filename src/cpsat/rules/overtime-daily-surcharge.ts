@@ -1,6 +1,6 @@
 import * as z from "zod";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingEmployee, Term } from "../types.js";
+import type { ShiftPattern, SchedulingMember, Term } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
@@ -14,7 +14,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -23,7 +23,7 @@ const OvertimeDailySurchargeSchema = z
     after: z.number().min(0),
     amount: z.number().min(0),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /** Configuration for {@link createOvertimeDailySurchargeRule}. */
@@ -39,7 +39,7 @@ function patternDurationMinutes(pattern: ShiftPattern): number {
  * Creates a daily overtime flat surcharge rule.
  *
  * Hours beyond the threshold per day get a flat surcharge per hour,
- * independent of the employee's base rate.
+ * independent of the member's base rate.
  */
 export function createOvertimeDailySurchargeRule(
   config: OvertimeDailySurchargeConfig,
@@ -54,15 +54,15 @@ export function createOvertimeDailySurchargeRule(
     compile(b) {
       if (amount <= 0) return;
 
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const hasCostContext = b.costContext?.active === true;
       const surchargePerMinute = amount / 60;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         for (const day of activeDays) {
           const dayRanges: Array<{ start: number; end: number }> = [];
           const terms: Term[] = [];
@@ -112,7 +112,7 @@ export function createOvertimeDailySurchargeRule(
 
     cost(
       assignments: ShiftAssignment[],
-      employees: ReadonlyArray<SchedulingEmployee>,
+      members: ReadonlyArray<SchedulingMember>,
       shiftPatterns: ReadonlyArray<ShiftPattern>,
     ): CostContribution {
       if (amount <= 0) return { entries: [] };
@@ -121,17 +121,17 @@ export function createOvertimeDailySurchargeRule(
       const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
       const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
       const targetEmpIds = new Set(
-        resolveEmployeesFromScope(entityScopeValue, [...employees]).map((e) => e.id),
+        resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
       );
 
       const dayMinutes = new Map<string, number>();
 
       for (const a of assignments) {
         if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.employeeId)) continue;
+        if (!targetEmpIds.has(a.memberId)) continue;
         const pattern = patternMap.get(a.shiftPatternId);
         if (!pattern) continue;
-        const key = `${a.employeeId}:${a.day}`;
+        const key = `${a.memberId}:${a.day}`;
         dayMinutes.set(key, (dayMinutes.get(key) ?? 0) + patternDurationMinutes(pattern));
       }
 
@@ -145,7 +145,7 @@ export function createOvertimeDailySurchargeRule(
         if (!empId || !day) continue;
 
         entries.push({
-          employeeId: empId,
+          memberId: empId,
           day,
           category: COST_CATEGORY.OVERTIME,
           amount: (amount * overtimeMinutes) / 60,

@@ -1,7 +1,7 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
+import { entityScope, parseEntityScope, resolveMembersFromScope } from "./scope.types.js";
 
 const MaxConsecutiveDaysSchema = z
   .object({
@@ -13,7 +13,7 @@ const MaxConsecutiveDaysSchema = z
       z.literal("MANDATORY"),
     ]),
   })
-  .and(entityScope(["employees", "roles", "skills"]));
+  .and(entityScope(["members", "roles", "skills"]));
 
 /**
  * Configuration for {@link createMaxConsecutiveDaysRule}.
@@ -21,7 +21,7 @@ const MaxConsecutiveDaysSchema = z
  * - `days` (required): maximum consecutive days allowed
  * - `priority` (required): how strictly the solver enforces this rule
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  */
 export type MaxConsecutiveDaysConfig = z.infer<typeof MaxConsecutiveDaysSchema>;
 
@@ -42,9 +42,9 @@ export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): 
 
   return {
     compile(b) {
-      const employees = resolveEmployeesFromScope(scope, b.employees);
+      const members = resolveMembersFromScope(scope, b.members);
 
-      for (const emp of employees) {
+      for (const emp of members) {
         for (let i = 0; i <= b.days.length - windowSize; i++) {
           const windowDays = b.days.slice(i, i + windowSize);
 

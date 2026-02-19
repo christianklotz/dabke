@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { createEmployeeAssignmentPriorityRule } from "../src/cpsat/rules/employee-assignment-priority.js";
+import { createAssignmentPriorityRule } from "../src/cpsat/rules/assignment-priority.js";
 
-describe("employee-assignment-priority schema validation", () => {
+describe("member-assignment-priority schema validation", () => {
   it("accepts valid high preference config", () => {
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
-        employeeIds: ["alice"],
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         preference: "high",
       }),
     ).not.toThrow();
@@ -13,8 +13,8 @@ describe("employee-assignment-priority schema validation", () => {
 
   it("accepts valid low preference config", () => {
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
-        employeeIds: ["alice"],
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         preference: "low",
       }),
     ).not.toThrow();
@@ -22,24 +22,24 @@ describe("employee-assignment-priority schema validation", () => {
 
   it("rejects invalid preference values", () => {
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
-        employeeIds: ["alice"],
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         // @ts-expect-error - testing invalid value
         preference: "mandatory",
       }),
     ).toThrow(/preference/i);
 
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
-        employeeIds: ["alice"],
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         // @ts-expect-error - testing invalid value
         preference: "MANDATORY",
       }),
     ).toThrow(/preference/i);
 
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
-        employeeIds: ["alice"],
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         // @ts-expect-error - testing invalid value
         preference: "medium",
       }),
@@ -48,7 +48,7 @@ describe("employee-assignment-priority schema validation", () => {
 
   it("accepts role-based scoping", () => {
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
+      createAssignmentPriorityRule({
         roleIds: ["senior"],
         preference: "high",
       }),
@@ -57,7 +57,7 @@ describe("employee-assignment-priority schema validation", () => {
 
   it("accepts skill-based scoping", () => {
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
+      createAssignmentPriorityRule({
         skillIds: ["keyholder"],
         preference: "high",
       }),
@@ -66,8 +66,8 @@ describe("employee-assignment-priority schema validation", () => {
 
   it("accepts time-based scoping", () => {
     expect(() =>
-      createEmployeeAssignmentPriorityRule({
-        employeeIds: ["alice"],
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         preference: "high",
         dayOfWeek: ["monday", "tuesday"],
       }),

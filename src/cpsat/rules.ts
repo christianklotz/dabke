@@ -1,6 +1,6 @@
 export {
   createAssignTogetherRule,
-  createEmployeeAssignmentPriorityRule,
+  createAssignmentPriorityRule,
   createLocationPreferenceRule,
   createMaxConsecutiveDaysRule,
   createMaxHoursDayRule,
@@ -24,4 +24,4 @@ export type {
   CpsatRuleConfigEntry,
 } from "./rules/rules.types.js";
 
-export { buildCpsatRules, getEmployeeIdsForScope, resolveRuleScopes } from "./rules/resolver.js";
+export { buildCpsatRules, getMemberIdsForScope, resolveRuleScopes } from "./rules/resolver.js";

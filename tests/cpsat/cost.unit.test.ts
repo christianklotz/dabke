@@ -367,7 +367,7 @@ describe("pay validation", () => {
 // ============================================================================
 
 describe("calculateScheduleCost", () => {
-  it("computes correct totals for hourly employees", () => {
+  it("computes correct totals for hourly members", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
       times: { lunch: time({ start: t(12), end: t(15) }) },
@@ -385,18 +385,18 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // 3 hours * 2000/hr = 6000
     expect(cost.total).toBe(6000);
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(6000);
     expect(alice.totalCost).toBe(6000);
     expect(alice.totalHours).toBe(3);
@@ -421,17 +421,17 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-14" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-14" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Base: 3 * 2000 = 6000, Premium: 3 * 2000 * 0.5 = 3000, Total: 9000
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(6000);
     expect(alice.categories.get(COST_CATEGORY.PREMIUM)).toBe(3000);
     expect(cost.total).toBe(9000);
@@ -455,17 +455,17 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-14" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-14" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Base: 3 * 2000 = 6000, Surcharge: 3 * 500 = 1500, Total: 7500
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(6000);
     expect(alice.categories.get(COST_CATEGORY.PREMIUM)).toBe(1500);
     expect(cost.total).toBe(7500);
@@ -489,18 +489,18 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "dinner_shift", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "dinner_shift", day: "2026-02-09" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Base: 5 * 2000 = 10000
     // Time surcharge: 1 hour overlap (22:00-23:00) * 300 = 300
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(10000);
     expect(alice.categories.get(COST_CATEGORY.PREMIUM)).toBe(300);
     expect(cost.total).toBe(10300);
@@ -528,22 +528,22 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-09" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-10" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-11" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-12" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-13" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-10" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-11" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-12" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-13" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Base: 40h * 2000 = 80000
     // Overtime: 20h * 2000 * 0.5 = 20000
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(80000);
     expect(alice.categories.get(COST_CATEGORY.OVERTIME)).toBe(20000);
     expect(cost.total).toBe(100000);
@@ -567,18 +567,18 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "long", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "long", day: "2026-02-09" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Base: 12h * 2000 = 24000
     // Daily overtime: 4h * 2000 * 0.5 = 4000
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(24000);
     expect(alice.categories.get(COST_CATEGORY.OVERTIME)).toBe(4000);
     expect(cost.total).toBe(28000);
@@ -614,15 +614,15 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-09" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-10" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-11" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-12" },
-      { employeeId: "alice", shiftPatternId: "day", day: "2026-02-13" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-10" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-11" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-12" },
+      { memberId: "alice", shiftPatternId: "day", day: "2026-02-13" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
@@ -630,7 +630,7 @@ describe("calculateScheduleCost", () => {
     // Base: 40h * 2000 = 80000
     // Tier 1: 16h * 2000 * 0.5 = 16000
     // Tier 2: 8h * 2000 * 1.0 = 16000
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(80000);
     expect(alice.categories.get(COST_CATEGORY.OVERTIME)).toBe(32000);
     expect(cost.total).toBe(112000);
@@ -657,19 +657,19 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "carol", shiftPatternId: "day", day: "2026-02-09" },
-      { employeeId: "carol", shiftPatternId: "day", day: "2026-02-10" },
-      { employeeId: "carol", shiftPatternId: "day", day: "2026-02-11" },
+      { memberId: "carol", shiftPatternId: "day", day: "2026-02-09" },
+      { memberId: "carol", shiftPatternId: "day", day: "2026-02-10" },
+      { memberId: "carol", shiftPatternId: "day", day: "2026-02-11" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Weekly salary: 5200000 / 52 = 100000
-    const carol = cost.byEmployee.get("carol")!;
+    const carol = cost.byMember.get("carol")!;
     expect(carol.categories.get(COST_CATEGORY.BASE)).toBe(100000);
     expect(carol.totalCost).toBe(100000);
     expect(carol.totalHours).toBe(24); // 3 days * 8 hours
@@ -696,13 +696,13 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
-      { employeeId: "bob", shiftPatternId: "lunch_shift", day: "2026-02-09" },
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-10" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
+      { memberId: "bob", shiftPatternId: "lunch_shift", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-10" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
@@ -732,17 +732,17 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     expect(cost.total).toBe(0);
-    expect(cost.byEmployee.size).toBe(0);
+    expect(cost.byMember.size).toBe(0);
   });
 
   it("uses open-ended category strings from custom rules", () => {
@@ -764,9 +764,7 @@ describe("calculateScheduleCost", () => {
       compile() {},
       cost() {
         return {
-          entries: [
-            { employeeId: "alice", day: "2026-02-09", category: "hazard-pay", amount: 500 },
-          ],
+          entries: [{ memberId: "alice", day: "2026-02-09", category: "hazard-pay", amount: 500 }],
         };
       },
     };
@@ -775,17 +773,17 @@ describe("calculateScheduleCost", () => {
     builder.compile();
 
     const assignments: ShiftAssignment[] = [
-      { employeeId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
+      { memberId: "alice", shiftPatternId: "lunch_shift", day: "2026-02-09" },
     ];
 
     const cost = calculateScheduleCost(assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: [...builder.rules, customRule],
     });
 
     // Base: 6000, custom: 500
-    const alice = cost.byEmployee.get("alice")!;
+    const alice = cost.byMember.get("alice")!;
     expect(alice.categories.get(COST_CATEGORY.BASE)).toBe(6000);
     expect(alice.categories.get("hazard-pay")).toBe(500);
     expect(alice.totalCost).toBe(6500);
@@ -866,7 +864,7 @@ describe("CostContext on ModelBuilder", () => {
     expect(builder.costContext!.normalizationFactor).toBeGreaterThan(0);
   });
 
-  it("costContext normalization accounts for salaried employees", () => {
+  it("costContext normalization accounts for salaried members", () => {
     const def = defineSchedule({
       roles: ["waiter", "manager"] as const,
       times: { work: time({ start: t(9), end: t(17) }) },
@@ -913,11 +911,11 @@ describe("CostContext on ModelBuilder", () => {
 });
 
 // ============================================================================
-// pay on SchedulingMember propagates to SchedulingEmployee
+// pay on SchedulingMember propagates to SchedulingMember
 // ============================================================================
 
 describe("pay propagation", () => {
-  it("hourly pay propagates to employee", () => {
+  it("hourly pay propagates to member", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
       times: { lunch: time({ start: t(12), end: t(15) }) },
@@ -930,10 +928,10 @@ describe("pay propagation", () => {
       members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
-    expect(config.employees[0]!.pay).toEqual({ hourlyRate: 2500 });
+    expect(config.members[0]!.pay).toEqual({ hourlyRate: 2500 });
   });
 
-  it("salaried pay propagates to employee", () => {
+  it("salaried pay propagates to member", () => {
     const def = defineSchedule({
       roles: ["manager"] as const,
       times: { lunch: time({ start: t(12), end: t(15) }) },
@@ -946,7 +944,7 @@ describe("pay propagation", () => {
       members: [{ id: "carol", roles: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
     });
 
-    expect(config.employees[0]!.pay).toEqual({ annual: 5200000, hoursPerWeek: 40 });
+    expect(config.members[0]!.pay).toEqual({ annual: 5200000, hoursPerWeek: 40 });
   });
 
   it("undefined pay propagates as undefined", () => {
@@ -962,6 +960,6 @@ describe("pay propagation", () => {
       members: [{ id: "alice", roles: ["waiter"] }],
     });
 
-    expect(config.employees[0]!.pay).toBeUndefined();
+    expect(config.members[0]!.pay).toBeUndefined();
   });
 });

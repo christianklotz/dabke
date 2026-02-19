@@ -13,7 +13,7 @@ describe("Validation diagnostics (integration)", () => {
   describe("Compile-time errors", () => {
     it("reports coverage error when no eligible team members exist", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["server"] }],
+        members: [{ id: "alice", roles: ["server"] }],
         shiftPatterns: [
           {
             id: "day",
@@ -43,9 +43,9 @@ describe("Validation diagnostics (integration)", () => {
       expect(diagnostics.validation.errors[0]?.reason).toContain("no eligible team members");
     });
 
-    it("reports coverage error when mandatory time-off blocks all employees", () => {
+    it("reports coverage error when mandatory time-off blocks all members", () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["barista"] }],
+        members: [{ id: "alice", roles: ["barista"] }],
         shiftPatterns: [
           {
             id: "day",
@@ -69,7 +69,7 @@ describe("Validation diagnostics (integration)", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-01"],
             priority: "MANDATORY",
           },
@@ -89,7 +89,7 @@ describe("Validation diagnostics (integration)", () => {
   describe("Solve-time violations", () => {
     it("returns coverage violations when soft coverage target cannot be fully met", async () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["barista"] }],
+        members: [{ id: "alice", roles: ["barista"] }],
         shiftPatterns: [
           {
             id: "day",
@@ -130,9 +130,9 @@ describe("Validation diagnostics (integration)", () => {
 
     it("marks coverage as passed when mandatory coverage is fully satisfied", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["barista"] },
-          { id: "bob", roleIds: ["barista"] },
+        members: [
+          { id: "alice", roles: ["barista"] },
+          { id: "bob", roles: ["barista"] },
         ],
         shiftPatterns: [
           {
@@ -178,7 +178,7 @@ describe("Validation diagnostics (integration)", () => {
   describe("Post-solve time-off validation", () => {
     it("detects when non-mandatory time-off preference is violated", async () => {
       const builder = new ModelBuilder({
-        employees: [{ id: "alice", roleIds: ["barista"] }],
+        members: [{ id: "alice", roles: ["barista"] }],
         shiftPatterns: [
           {
             id: "day",
@@ -202,7 +202,7 @@ describe("Validation diagnostics (integration)", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-01"],
             priority: "LOW",
           },
@@ -219,7 +219,7 @@ describe("Validation diagnostics (integration)", () => {
       const resolved = resolveAssignments(result.assignments, builder.shiftPatterns);
 
       expect(resolved.length).toBe(1);
-      expect(resolved[0]?.employeeId).toBe("alice");
+      expect(resolved[0]?.memberId).toBe("alice");
 
       // Run post-solve validation
       builder.reporter.analyzeSolution(response);
@@ -237,11 +237,11 @@ describe("Validation diagnostics (integration)", () => {
       }
     }, 30_000);
 
-    it("reports time-off as passed when employee is not scheduled during requested time", async () => {
+    it("reports time-off as passed when member is not scheduled during requested time", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["barista"] },
-          { id: "bob", roleIds: ["barista"] },
+        members: [
+          { id: "alice", roles: ["barista"] },
+          { id: "bob", roles: ["barista"] },
         ],
         shiftPatterns: [
           {
@@ -266,7 +266,7 @@ describe("Validation diagnostics (integration)", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-01"],
             priority: "HIGH",
           },
@@ -283,7 +283,7 @@ describe("Validation diagnostics (integration)", () => {
       const resolved = resolveAssignments(result.assignments, builder.shiftPatterns);
 
       expect(resolved.length).toBe(1);
-      expect(resolved[0]?.employeeId).toBe("bob");
+      expect(resolved[0]?.memberId).toBe("bob");
 
       // Run post-solve validation
       builder.reporter.analyzeSolution(response);
@@ -307,9 +307,9 @@ describe("Validation diagnostics (integration)", () => {
 
     it("validates time-off with role scoping", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["barista"] },
-          { id: "bob", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["barista"] },
+          { id: "bob", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -352,7 +352,7 @@ describe("Validation diagnostics (integration)", () => {
 
       // Alice is scheduled (only barista)
       expect(resolved.length).toBe(1);
-      expect(resolved[0]?.employeeId).toBe("alice");
+      expect(resolved[0]?.memberId).toBe("alice");
 
       builder.reporter.analyzeSolution(response);
       builder.validateSolution(resolved);
@@ -375,9 +375,9 @@ describe("Validation diagnostics (integration)", () => {
       // Coverage only requires morning shift, so Alice should work morning
       // and her afternoon time-off should pass
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["barista"] },
-          { id: "bob", roleIds: ["barista"] },
+        members: [
+          { id: "alice", roles: ["barista"] },
+          { id: "bob", roles: ["barista"] },
         ],
         shiftPatterns: [
           {
@@ -408,7 +408,7 @@ describe("Validation diagnostics (integration)", () => {
           {
             name: "time-off",
 
-            employeeIds: ["alice"],
+            memberIds: ["alice"],
             specificDates: ["2024-02-01"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
@@ -433,7 +433,7 @@ describe("Validation diagnostics (integration)", () => {
 
       // Alice's afternoon time-off should be honored (she only works morning)
       const aliceAfternoon = resolved.find(
-        (a) => a.employeeId === "alice" && a.startTime.hours === 14,
+        (a) => a.memberId === "alice" && a.startTime.hours === 14,
       );
       expect(aliceAfternoon).toBeUndefined();
 

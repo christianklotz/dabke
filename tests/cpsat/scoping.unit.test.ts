@@ -13,9 +13,9 @@ function configField(entry: CpsatRuleConfigEntry, field: string): unknown {
   return (entry as Record<string, unknown>)[field];
 }
 
-const employees = [
-  { id: "alice", roleIds: ["role"] },
-  { id: "bob", roleIds: ["role"] },
+const members = [
+  { id: "alice", roles: ["role"] },
+  { id: "bob", roles: ["role"] },
 ];
 
 describe("CP-SAT rule scoping resolver", () => {
@@ -32,20 +32,20 @@ describe("CP-SAT rule scoping resolver", () => {
 
         hours: 60,
         priority: "HIGH",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employees);
+    const resolved = resolveRuleScopes(entries, members);
 
     expect(resolved).toHaveLength(2);
 
     const specific = resolved.find((r) => {
-      const ids = configField(r, "employeeIds") as string[] | undefined;
+      const ids = configField(r, "memberIds") as string[] | undefined;
       return ids?.includes("alice");
     });
     const globalRemainder = resolved.find((r) => {
-      const ids = configField(r, "employeeIds") as string[] | undefined;
+      const ids = configField(r, "memberIds") as string[] | undefined;
       return ids?.length === 1 && ids?.[0] === "bob";
     });
 
@@ -60,23 +60,23 @@ describe("CP-SAT rule scoping resolver", () => {
   });
 
   it("later insertion wins for same specificity (last insert overrides)", () => {
-    // Both rules target the same employee with the same time scope - they compete
+    // Both rules target the same member with the same time scope - they compete
     const entries: CpsatRuleConfigEntry[] = [
       {
         name: "max-hours-day",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         hours: 8,
         priority: "HIGH",
       },
       {
         name: "max-hours-day",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         hours: 6,
         priority: "LOW",
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, [{ id: "alice", roleIds: ["r"] }]);
+    const resolved = resolveRuleScopes(entries, [{ id: "alice", roles: ["r"] }]);
     expect(resolved).toHaveLength(1);
 
     const rule = resolved[0]!;
@@ -99,7 +99,7 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employees);
+    const resolved = resolveRuleScopes(entries, members);
     expect(resolved).toHaveLength(1);
 
     const rule = resolved[0]!;
@@ -110,7 +110,7 @@ describe("CP-SAT rule scoping resolver", () => {
 
   it("builds compilation rules via factories using resolved scopes", () => {
     const factory = vi.fn(
-      (_config: { tag: string; scope?: { employeeIds?: string[] } }) =>
+      (_config: { tag: string; scope?: { memberIds?: string[] } }) =>
         ({ compile: vi.fn() }) satisfies CompilationRule,
     );
     const factories: CpsatRuleFactories = {
@@ -125,17 +125,17 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const rules = buildCpsatRules(entries, employees, factories);
+    const rules = buildCpsatRules(entries, members, factories);
     expect(rules).toHaveLength(1);
     expect(factory).toHaveBeenCalledTimes(1);
     expect(factory.mock.calls[0]?.[0]).toMatchObject({
       hours: 5,
       priority: "MANDATORY",
-      employeeIds: ["alice", "bob"],
+      memberIds: ["alice", "bob"],
     });
   });
 
-  it("expands role-scoped rules to employee IDs", () => {
+  it("expands role-scoped rules to member IDs", () => {
     const entries: CpsatRuleConfigEntry[] = [
       {
         name: "max-hours-day",
@@ -145,20 +145,20 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employees);
+    const resolved = resolveRuleScopes(entries, members);
     expect(resolved).toHaveLength(1);
 
     const rule = resolved[0]!;
-    // Role scope is expanded to concrete employee IDs
-    expect(configField(rule, "employeeIds")).toEqual(["alice", "bob"]);
+    // Role scope is expanded to concrete member IDs
+    expect(configField(rule, "memberIds")).toEqual(["alice", "bob"]);
     expect(configField(rule, "hours")).toBe(7);
   });
 
-  it("expands skill-scoped rules to employee IDs", () => {
-    const employeesWithSkills = [
-      { id: "alice", roleIds: ["role"], skillIds: ["first-aid"] },
-      { id: "bob", roleIds: ["role"], skillIds: [] },
-      { id: "charlie", roleIds: ["role"], skillIds: ["first-aid", "cpr"] },
+  it("expands skill-scoped rules to member IDs", () => {
+    const membersWithSkills = [
+      { id: "alice", roles: ["role"], skills: ["first-aid"] },
+      { id: "bob", roles: ["role"], skills: [] },
+      { id: "charlie", roles: ["role"], skills: ["first-aid", "cpr"] },
     ];
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -170,15 +170,15 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employeesWithSkills);
+    const resolved = resolveRuleScopes(entries, membersWithSkills);
     expect(resolved).toHaveLength(1);
 
     const rule = resolved[0]!;
-    // Skill scope is expanded to employees with that skill
-    expect(configField(rule, "employeeIds")).toEqual(["alice", "charlie"]);
+    // Skill scope is expanded to members with that skill
+    expect(configField(rule, "memberIds")).toEqual(["alice", "charlie"]);
   });
 
-  it("drops rules that match no employees", () => {
+  it("drops rules that match no members", () => {
     const entries: CpsatRuleConfigEntry[] = [
       {
         name: "max-hours-day",
@@ -188,17 +188,17 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employees);
+    const resolved = resolveRuleScopes(entries, members);
     expect(resolved).toHaveLength(0);
   });
 
-  it("drops rules with employeeIds that match no employees (case-sensitive)", () => {
-    // This is a regression test for a bug where providing employeeIds that don't match
-    // any employees (e.g., due to case mismatch) would cause the rule to fall back to
-    // global scope, affecting ALL employees instead of none.
-    const employeesWithCasing = [
-      { id: "Alice", roleIds: ["role"] }, // Capital A
-      { id: "Bob", roleIds: ["role"] }, // Capital B
+  it("drops rules with memberIds that match no members (case-sensitive)", () => {
+    // This is a regression test for a bug where providing memberIds that don't match
+    // any members (e.g., due to case mismatch) would cause the rule to fall back to
+    // global scope, affecting ALL members instead of none.
+    const membersWithCasing = [
+      { id: "Alice", roles: ["role"] }, // Capital A
+      { id: "Bob", roles: ["role"] }, // Capital B
     ];
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -206,20 +206,20 @@ describe("CP-SAT rule scoping resolver", () => {
         name: "time-off",
 
         priority: "MANDATORY",
-        employeeIds: ["alice"], // lowercase - won't match "Alice"
+        memberIds: ["alice"], // lowercase - won't match "Alice"
         dayOfWeek: ["saturday", "sunday"],
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employeesWithCasing);
+    const resolved = resolveRuleScopes(entries, membersWithCasing);
 
-    // The rule should be dropped entirely since no employees match,
+    // The rule should be dropped entirely since no members match,
     // NOT converted to a global rule affecting everyone
     expect(resolved).toHaveLength(0);
   });
 
-  it("does not fall back to global scope when explicit employeeIds match no one", () => {
-    // Verify that explicit employeeIds scope is preserved even when empty,
+  it("does not fall back to global scope when explicit memberIds match no one", () => {
+    // Verify that explicit memberIds scope is preserved even when empty,
     // rather than being converted to global scope
     const entries: CpsatRuleConfigEntry[] = [
       {
@@ -227,7 +227,7 @@ describe("CP-SAT rule scoping resolver", () => {
 
         hours: 4,
         priority: "MANDATORY",
-        employeeIds: ["nonexistent-employee"],
+        memberIds: ["nonexistent-member"],
       },
       {
         name: "max-hours-day",
@@ -238,21 +238,21 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employees);
+    const resolved = resolveRuleScopes(entries, members);
 
     // Should only have the global rule, not the specific one that matched no one
     expect(resolved).toHaveLength(1);
     const entry = resolved[0];
     assert(entry);
     expect(configField(entry, "hours")).toBe(8);
-    expect(configField(entry, "employeeIds")).toEqual(["alice", "bob"]);
+    expect(configField(entry, "memberIds")).toEqual(["alice", "bob"]);
   });
 
-  it("role-scoped rules claim employees before global rules", () => {
-    const employeesWithRoles = [
-      { id: "alice", roleIds: ["student"] },
-      { id: "bob", roleIds: ["manager"] },
-      { id: "charlie", roleIds: ["student", "manager"] },
+  it("role-scoped rules claim members before global rules", () => {
+    const membersWithRoles = [
+      { id: "alice", roles: ["student"] },
+      { id: "bob", roles: ["manager"] },
+      { id: "charlie", roles: ["student", "manager"] },
     ];
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -272,18 +272,18 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employeesWithRoles);
+    const resolved = resolveRuleScopes(entries, membersWithRoles);
     expect(resolved).toHaveLength(2);
 
     // Student rule claims alice and charlie
     const studentRule = resolved.find((r) => configField(r, "hours") === 20);
     assert(studentRule);
-    expect(configField(studentRule, "employeeIds")).toEqual(["alice", "charlie"]);
+    expect(configField(studentRule, "memberIds")).toEqual(["alice", "charlie"]);
 
     // Global rule gets only bob (the remainder)
     const globalRule = resolved.find((r) => configField(r, "hours") === 48);
     assert(globalRule);
-    expect(configField(globalRule, "employeeIds")).toEqual(["bob"]);
+    expect(configField(globalRule, "memberIds")).toEqual(["bob"]);
   });
 
   it("preserves time scopes such as date ranges and days of week", () => {
@@ -304,7 +304,7 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, employees);
+    const resolved = resolveRuleScopes(entries, members);
     expect(
       resolved.some((r) => {
         const dow = configField(r, "dayOfWeek") as string[] | undefined;
@@ -323,23 +323,23 @@ describe("CP-SAT rule scoping resolver", () => {
     const entries: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        groupEmployeeIds: ["alice", "bob"],
+        groupMemberIds: ["alice", "bob"],
         priority: "MANDATORY",
       },
       {
         name: "assign-together",
-        groupEmployeeIds: ["bob", "charlie"],
+        groupMemberIds: ["bob", "charlie"],
         priority: "HIGH",
       },
     ];
 
-    const employeesWithCharlie = [
-      { id: "alice", roleIds: ["role"] },
-      { id: "bob", roleIds: ["role"] },
-      { id: "charlie", roleIds: ["role"] },
+    const membersWithCharlie = [
+      { id: "alice", roles: ["role"] },
+      { id: "bob", roles: ["role"] },
+      { id: "charlie", roles: ["role"] },
     ];
 
-    const resolved = resolveRuleScopes(entries, employeesWithCharlie);
+    const resolved = resolveRuleScopes(entries, membersWithCharlie);
 
     // Both rules should pass through unchanged (no scope resolution)
     expect(resolved).toHaveLength(2);
@@ -350,24 +350,24 @@ describe("CP-SAT rule scoping resolver", () => {
 
     // First rule unchanged
     expect(first.name).toBe("assign-together");
-    expect(configField(first, "groupEmployeeIds")).toEqual(["alice", "bob"]);
+    expect(configField(first, "groupMemberIds")).toEqual(["alice", "bob"]);
     expect(configField(first, "priority")).toBe("MANDATORY");
 
     // Second rule unchanged
     expect(second.name).toBe("assign-together");
-    expect(configField(second, "groupEmployeeIds")).toEqual(["bob", "charlie"]);
+    expect(configField(second, "groupMemberIds")).toEqual(["bob", "charlie"]);
     expect(configField(second, "priority")).toBe("HIGH");
 
-    // Neither should have employeeIds added (not scoped)
-    expect(configField(first, "employeeIds")).toBeUndefined();
-    expect(configField(second, "employeeIds")).toBeUndefined();
+    // Neither should have memberIds added (not scoped)
+    expect(configField(first, "memberIds")).toBeUndefined();
+    expect(configField(second, "memberIds")).toBeUndefined();
   });
 
   it("mixes non-scoped and scoped rules correctly", () => {
     const entries: CpsatRuleConfigEntry[] = [
       {
         name: "assign-together",
-        groupEmployeeIds: ["alice", "bob"],
+        groupMemberIds: ["alice", "bob"],
         priority: "MANDATORY",
       },
       {
@@ -377,19 +377,19 @@ describe("CP-SAT rule scoping resolver", () => {
       },
       {
         name: "assign-together",
-        groupEmployeeIds: ["charlie", "diana"],
+        groupMemberIds: ["charlie", "diana"],
         priority: "HIGH",
       },
     ];
 
-    const allEmployees = [
-      { id: "alice", roleIds: ["role"] },
-      { id: "bob", roleIds: ["role"] },
-      { id: "charlie", roleIds: ["role"] },
-      { id: "diana", roleIds: ["role"] },
+    const allMembers = [
+      { id: "alice", roles: ["role"] },
+      { id: "bob", roles: ["role"] },
+      { id: "charlie", roles: ["role"] },
+      { id: "diana", roles: ["role"] },
     ];
 
-    const resolved = resolveRuleScopes(entries, allEmployees);
+    const resolved = resolveRuleScopes(entries, allMembers);
 
     expect(resolved).toHaveLength(3);
 
@@ -400,26 +400,26 @@ describe("CP-SAT rule scoping resolver", () => {
     const together1 = assignTogetherRules[1];
     assert(together0);
     assert(together1);
-    expect(configField(together0, "groupEmployeeIds")).toEqual(["alice", "bob"]);
-    expect(configField(together1, "groupEmployeeIds")).toEqual(["charlie", "diana"]);
+    expect(configField(together0, "groupMemberIds")).toEqual(["alice", "bob"]);
+    expect(configField(together1, "groupMemberIds")).toEqual(["charlie", "diana"]);
 
-    // Scoped rule gets all employees (global scope)
+    // Scoped rule gets all members (global scope)
     const maxHoursRule = resolved.find((r) => r.name === "max-hours-day");
     assert(maxHoursRule);
-    expect(configField(maxHoursRule, "employeeIds")).toEqual(["alice", "bob", "charlie", "diana"]);
+    expect(configField(maxHoursRule, "memberIds")).toEqual(["alice", "bob", "charlie", "diana"]);
   });
 });
 
 describe("CP-SAT rule validation", () => {
   it("rejects conflicting scope definitions", () => {
     expect(() =>
-      // @ts-expect-error: deliberately passing both employeeIds and roleIds to test runtime validation
+      // @ts-expect-error: deliberately passing both memberIds and roleIds to test runtime validation
       createMaxHoursDayRule({
         hours: 8,
         priority: "MANDATORY",
-        employeeIds: ["alice"],
+        memberIds: ["alice"],
         roleIds: ["role"],
       }),
-    ).toThrow(/Only one of employeeIds\/roleIds\/skillIds is allowed/);
+    ).toThrow(/Only one of memberIds\/roleIds\/skillIds is allowed/);
   });
 });

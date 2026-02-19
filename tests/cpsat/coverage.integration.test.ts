@@ -21,10 +21,10 @@ describe("Coverage requirements (integration)", () => {
       //           Happy hour (5pm-6pm) needs 2 bar staff
       // During 5-6pm overlap: should need max(2,2) = 2 (not 4)
       const builder = new ModelBuilder({
-        employees: [
-          { id: "bar1", roleIds: ["bar"] },
-          { id: "bar2", roleIds: ["bar"] },
-          { id: "bar3", roleIds: ["bar"] },
+        members: [
+          { id: "bar1", roles: ["bar"] },
+          { id: "bar2", roles: ["bar"] },
+          { id: "bar3", roles: ["bar"] },
         ],
         shiftPatterns: [
           {
@@ -65,10 +65,10 @@ describe("Coverage requirements (integration)", () => {
 
     it("handles overlapping coverage for different roles", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "waiter1", roleIds: ["waiter"] },
-          { id: "waiter2", roleIds: ["waiter"] },
-          { id: "bar1", roleIds: ["bar"] },
+        members: [
+          { id: "waiter1", roles: ["waiter"] },
+          { id: "waiter2", roles: ["waiter"] },
+          { id: "bar1", roles: ["bar"] },
         ],
         shiftPatterns: [
           {
@@ -106,8 +106,8 @@ describe("Coverage requirements (integration)", () => {
 
       expect(assignments).toHaveLength(3);
 
-      const waiterAssignments = assignments.filter((a) => a?.employeeId?.startsWith("waiter"));
-      const barAssignments = assignments.filter((a) => a?.employeeId?.startsWith("bar"));
+      const waiterAssignments = assignments.filter((a) => a?.memberId?.startsWith("waiter"));
+      const barAssignments = assignments.filter((a) => a?.memberId?.startsWith("bar"));
 
       expect(waiterAssignments).toHaveLength(2);
       expect(barAssignments).toHaveLength(1);
@@ -115,9 +115,9 @@ describe("Coverage requirements (integration)", () => {
 
     it("handles adjacent non-overlapping coverage periods", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "waiter1", roleIds: ["waiter"], skillIds: ["can_close"] },
-          { id: "waiter2", roleIds: ["waiter"] },
+        members: [
+          { id: "waiter1", roles: ["waiter"], skills: ["can_close"] },
+          { id: "waiter2", roles: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -159,10 +159,10 @@ describe("Coverage requirements (integration)", () => {
 
     it("handles staggered overlapping shifts", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "emp1", roleIds: ["waiter"] },
-          { id: "emp2", roleIds: ["waiter"] },
-          { id: "emp3", roleIds: ["waiter"] },
+        members: [
+          { id: "emp1", roles: ["waiter"] },
+          { id: "emp2", roles: ["waiter"] },
+          { id: "emp3", roles: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -208,10 +208,10 @@ describe("Coverage requirements (integration)", () => {
 
     it("handles fully contained coverage period", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "emp1", roleIds: ["waiter"] },
-          { id: "emp2", roleIds: ["waiter"] },
-          { id: "emp3", roleIds: ["waiter"] },
+        members: [
+          { id: "emp1", roles: ["waiter"] },
+          { id: "emp2", roles: ["waiter"] },
+          { id: "emp3", roles: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -252,12 +252,12 @@ describe("Coverage requirements (integration)", () => {
   });
 
   describe("Skill-based coverage", () => {
-    it("assigns employees matching skill-only coverage requirement", async () => {
+    it("assigns members matching skill-only coverage requirement", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["server"] },
-          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "bob", roles: ["server"] },
+          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -286,15 +286,15 @@ describe("Coverage requirements (integration)", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(1);
-      expect(["alice", "charlie"]).toContain(assignments[0]?.employeeId);
+      expect(["alice", "charlie"]).toContain(assignments[0]?.memberId);
     }, 30_000);
 
-    it("assigns employees matching role AND skills combination", async () => {
+    it("assigns members matching role AND skills combination", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["server"] },
-          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "bob", roles: ["server"] },
+          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -324,19 +324,19 @@ describe("Coverage requirements (integration)", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(1);
-      expect(assignments[0]?.employeeId).toBe("alice");
+      expect(assignments[0]?.memberId).toBe("alice");
     }, 30_000);
 
     it("requires ALL skills when multiple skills specified (AND logic)", async () => {
       const builder = new ModelBuilder({
-        employees: [
+        members: [
           {
             id: "alice",
-            roleIds: ["server"],
-            skillIds: ["keyholder", "senior"],
+            roles: ["server"],
+            skills: ["keyholder", "senior"],
           },
-          { id: "bob", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "charlie", roleIds: ["server"], skillIds: ["senior"] },
+          { id: "bob", roles: ["server"], skills: ["keyholder"] },
+          { id: "charlie", roles: ["server"], skills: ["senior"] },
         ],
         shiftPatterns: [
           {
@@ -365,14 +365,14 @@ describe("Coverage requirements (integration)", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(1);
-      expect(assignments[0]?.employeeId).toBe("alice");
+      expect(assignments[0]?.memberId).toBe("alice");
     }, 30_000);
 
-    it("returns infeasible when no employees match skill-only requirement", async () => {
+    it("returns infeasible when no members match skill-only requirement", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"] },
-          { id: "bob", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["server"] },
+          { id: "bob", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -400,11 +400,11 @@ describe("Coverage requirements (integration)", () => {
       expect(response.status).toBe("INFEASIBLE");
     }, 30_000);
 
-    it("returns infeasible when no employees match role + skills combination", async () => {
+    it("returns infeasible when no members match role + skills combination", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"] },
-          { id: "bob", roleIds: ["chef"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"] },
+          { id: "bob", roles: ["chef"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -435,10 +435,10 @@ describe("Coverage requirements (integration)", () => {
 
     it("handles mixed coverage - role-only, skill-only, and combined", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["server"] },
-          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "bob", roles: ["server"] },
+          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -479,9 +479,9 @@ describe("Coverage requirements (integration)", () => {
 
     it("skill-only coverage respects shift pattern role restrictions", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -511,14 +511,14 @@ describe("Coverage requirements (integration)", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(1);
-      expect(assignments[0]?.employeeId).toBe("alice");
+      expect(assignments[0]?.memberId).toBe("alice");
     }, 30_000);
 
     it("handles soft priority skill-only coverage", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"] },
-          { id: "bob", roleIds: ["server"], skillIds: ["keyholder"] },
+        members: [
+          { id: "alice", roles: ["server"] },
+          { id: "bob", roles: ["server"], skills: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -555,15 +555,15 @@ describe("Coverage requirements (integration)", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(1);
-      expect(assignments[0]?.employeeId).toBe("bob");
+      expect(assignments[0]?.memberId).toBe("bob");
     }, 30_000);
 
-    it("multiple employees can satisfy skill-only coverage with higher target count", async () => {
+    it("multiple members can satisfy skill-only coverage with higher target count", async () => {
       const builder = new ModelBuilder({
-        employees: [
-          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "bob", roleIds: ["server"], skillIds: ["keyholder"] },
-          { id: "charlie", roleIds: ["server"] },
+        members: [
+          { id: "alice", roles: ["server"], skills: ["keyholder"] },
+          { id: "bob", roles: ["server"], skills: ["keyholder"] },
+          { id: "charlie", roles: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -592,7 +592,7 @@ describe("Coverage requirements (integration)", () => {
       const assignments = decodeAssignments(response.values);
 
       expect(assignments).toHaveLength(2);
-      const assignedIds = assignments.map((a) => a?.employeeId).toSorted();
+      const assignedIds = assignments.map((a) => a?.memberId).toSorted();
       expect(assignedIds).toEqual(["alice", "bob"]);
     }, 30_000);
   });

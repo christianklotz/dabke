@@ -1,5 +1,5 @@
 import type { ShiftAssignment } from "./response.js";
-import type { SchedulingEmployee, ShiftPattern } from "./types.js";
+import type { SchedulingMember, ShiftPattern } from "./types.js";
 import type { CompilationRule, CostEntry } from "./model-builder.js";
 import { timeOfDayToMinutes, normalizeEndMinutes } from "./utils.js";
 
@@ -21,14 +21,14 @@ export const COST_CATEGORY = {
 } as const;
 
 /**
- * Per-employee cost breakdown.
+ * Per-member cost breakdown.
  *
  * Categories are open-ended strings. Built-in rules use categories
  * from {@link COST_CATEGORY}. Custom rules can introduce their own.
  *
  * @category Cost
  */
-export interface EmployeeCostDetail {
+export interface MemberCostDetail {
   /** Sum of all category costs. */
   totalCost: number;
   /** Total hours worked (computed from assignments, not from rules). */
@@ -45,8 +45,8 @@ export interface EmployeeCostDetail {
 export interface CostBreakdown {
   /** Total cost in the caller's currency unit. */
   total: number;
-  /** Cost per employee. */
-  byEmployee: ReadonlyMap<string, EmployeeCostDetail>;
+  /** Cost per member. */
+  byMember: ReadonlyMap<string, MemberCostDetail>;
   /** Cost per day. */
   byDay: ReadonlyMap<string, number>;
 }
@@ -58,7 +58,7 @@ export interface CostBreakdown {
  * or the relevant subset.
  */
 export interface CostCalculationConfig {
-  employees: ReadonlyArray<SchedulingEmployee>;
+  members: ReadonlyArray<SchedulingMember>;
   shiftPatterns: ReadonlyArray<ShiftPattern>;
   rules: ReadonlyArray<CompilationRule>;
 }
@@ -71,65 +71,64 @@ export interface CostCalculationConfig {
  * aggregates them into a {@link CostBreakdown}.
  *
  * @param assignments - Shift assignments from {@link parseSolverResponse}
- * @param config - Employees, shift patterns, and compiled rules
+ * @param config - Members, shift patterns, and compiled rules
  */
 export function calculateScheduleCost(
   assignments: ShiftAssignment[],
   config: CostCalculationConfig,
 ): CostBreakdown {
-  const { employees, shiftPatterns, rules } = config;
+  const { members, shiftPatterns, rules } = config;
 
   // Collect all cost entries from rules
   const allEntries: CostEntry[] = [];
   for (const rule of rules) {
     if (!rule.cost) continue;
-    const contribution = rule.cost(assignments, employees, shiftPatterns);
+    const contribution = rule.cost(assignments, members, shiftPatterns);
     allEntries.push(...contribution.entries);
   }
 
-  // Compute total hours per employee from assignments
+  // Compute total hours per member from assignments
   const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
-  const empHours = new Map<string, number>();
+  const memberHours = new Map<string, number>();
   for (const a of assignments) {
     const pattern = patternMap.get(a.shiftPatternId);
     if (!pattern) continue;
     const start = timeOfDayToMinutes(pattern.startTime);
     const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
     const hours = (end - start) / 60;
-    empHours.set(a.employeeId, (empHours.get(a.employeeId) ?? 0) + hours);
+    memberHours.set(a.memberId, (memberHours.get(a.memberId) ?? 0) + hours);
   }
 
-  // Build per-employee category maps
-  const empCategories = new Map<string, Map<string, number>>();
+  // Build per-member category maps
+  const memberCategories = new Map<string, Map<string, number>>();
   const dayTotals = new Map<string, number>();
 
   for (const entry of allEntries) {
-    // Per-employee category accumulation
-    let categories = empCategories.get(entry.employeeId);
+    // Per-member category accumulation
+    let categories = memberCategories.get(entry.memberId);
     if (!categories) {
       categories = new Map();
-      empCategories.set(entry.employeeId, categories);
+      memberCategories.set(entry.memberId, categories);
     }
     categories.set(entry.category, (categories.get(entry.category) ?? 0) + entry.amount);
 
-    // Per-day accumulation
     dayTotals.set(entry.day, (dayTotals.get(entry.day) ?? 0) + entry.amount);
   }
 
   let total = 0;
-  const byEmployee = new Map<string, EmployeeCostDetail>();
-  for (const [empId, categories] of empCategories) {
+  const byMember = new Map<string, MemberCostDetail>();
+  for (const [memberId, categories] of memberCategories) {
     let totalCost = 0;
     for (const amount of categories.values()) {
       totalCost += amount;
     }
     total += totalCost;
-    byEmployee.set(empId, {
+    byMember.set(memberId, {
       totalCost,
-      totalHours: empHours.get(empId) ?? 0,
+      totalHours: memberHours.get(memberId) ?? 0,
       categories,
     });
   }
 
-  return { total, byEmployee, byDay: dayTotals };
+  return { total, byMember, byDay: dayTotals };
 }

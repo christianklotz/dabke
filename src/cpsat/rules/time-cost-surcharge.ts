@@ -1,6 +1,6 @@
 import * as z from "zod";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingEmployee } from "../types.js";
+import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { TimeOfDay } from "../../types.js";
 import type { ShiftAssignment } from "../response.js";
 import { timeOfDayToMinutes, normalizeEndMinutes, MINUTES_PER_DAY } from "../utils.js";
@@ -9,7 +9,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -26,7 +26,7 @@ const TimeCostSurchargeSchema = z
       until: TimeOfDaySchema,
     }),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /** Configuration for {@link createTimeCostSurchargeRule}. */
@@ -78,7 +78,7 @@ function rangeOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number
  * Creates a time-of-day surcharge rule (e.g., night differential).
  *
  * Adds a flat surcharge per hour for the portion of a shift that overlaps
- * a time-of-day window. Independent of the employee's base rate.
+ * a time-of-day window. Independent of the member's base rate.
  *
  * When `minimizeCost()` is not present, no solver terms are emitted,
  * but the `cost()` method still contributes to post-solve calculation.
@@ -94,14 +94,14 @@ export function createTimeCostSurchargeRule(config: TimeCostSurchargeConfig): Co
       if (!b.costContext?.active) return;
       if (amountPerHour <= 0) return;
 
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const { normalizationFactor } = b.costContext;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         for (const pattern of b.shiftPatterns) {
           if (!b.canAssign(emp, pattern)) continue;
 
@@ -126,7 +126,7 @@ export function createTimeCostSurchargeRule(config: TimeCostSurchargeConfig): Co
 
     cost(
       assignments: ShiftAssignment[],
-      employees: ReadonlyArray<SchedulingEmployee>,
+      members: ReadonlyArray<SchedulingMember>,
       shiftPatterns: ReadonlyArray<ShiftPattern>,
     ): CostContribution {
       if (amountPerHour <= 0) return { entries: [] };
@@ -135,14 +135,14 @@ export function createTimeCostSurchargeRule(config: TimeCostSurchargeConfig): Co
       const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
       const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
       const targetEmpIds = new Set(
-        resolveEmployeesFromScope(entityScopeValue, [...employees]).map((e) => e.id),
+        resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
       );
 
       const entries: CostContribution["entries"] = [];
 
       for (const a of assignments) {
         if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.employeeId)) continue;
+        if (!targetEmpIds.has(a.memberId)) continue;
         const pattern = patternMap.get(a.shiftPatternId);
         if (!pattern) continue;
 
@@ -156,7 +156,7 @@ export function createTimeCostSurchargeRule(config: TimeCostSurchargeConfig): Co
 
         const amount = (amountPerHour * overlapMinutes) / 60;
         entries.push({
-          employeeId: a.employeeId,
+          memberId: a.memberId,
           day: a.day,
           category: "premium",
           amount,

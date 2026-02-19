@@ -8,7 +8,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -23,7 +23,7 @@ const MaxHoursWeekBase = z.object({
   weekStartsOn: DayOfWeekSchema.optional(),
 });
 
-const MaxHoursWeekSchema = MaxHoursWeekBase.and(entityScope(["employees", "roles", "skills"])).and(
+const MaxHoursWeekSchema = MaxHoursWeekBase.and(entityScope(["members", "roles", "skills"])).and(
   timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]),
 );
 
@@ -34,7 +34,7 @@ const MaxHoursWeekSchema = MaxHoursWeekBase.and(entityScope(["employees", "roles
  * - `priority` (required): how strictly the solver enforces this rule
  * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  * Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
  */
 export type MaxHoursWeekConfig = z.infer<typeof MaxHoursWeekSchema>;
@@ -69,14 +69,14 @@ export function createMaxHoursWeekRule(config: MaxHoursWeekConfig): CompilationR
 
   return {
     compile(b) {
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const weeks = splitIntoWeeks(activeDays, weekStartsOn ?? b.weekStartsOn);
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         for (const weekDays of weeks) {
           const terms: Term[] = [];
           for (const day of weekDays) {

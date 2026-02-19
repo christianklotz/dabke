@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
-import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
+import { entityScope, parseEntityScope, resolveMembersFromScope } from "./scope.types.js";
 
 const MinHoursDaySchema = z
   .object({
@@ -14,7 +14,7 @@ const MinHoursDaySchema = z
       z.literal("MANDATORY"),
     ]),
   })
-  .and(entityScope(["employees", "roles", "skills"]));
+  .and(entityScope(["members", "roles", "skills"]));
 
 /**
  * Configuration for {@link createMinHoursDayRule}.
@@ -22,7 +22,7 @@ const MinHoursDaySchema = z
  * - `hours` (required): minimum hours required per day when scheduled
  * - `priority` (required): how strictly the solver enforces this rule
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  */
 export type MinHoursDayConfig = z.infer<typeof MinHoursDaySchema>;
 
@@ -45,9 +45,9 @@ export function createMinHoursDayRule(config: MinHoursDayConfig): CompilationRul
     compile(b) {
       if (hours <= 0) return;
 
-      const employees = resolveEmployeesFromScope(scope, b.employees);
+      const members = resolveMembersFromScope(scope, b.members);
 
-      for (const emp of employees) {
+      for (const emp of members) {
         for (const day of b.days) {
           const terms: Term[] = [];
           for (const pattern of b.shiftPatterns) {

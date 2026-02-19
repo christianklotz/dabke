@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Priority } from "../types.js";
 import { OBJECTIVE_WEIGHTS } from "../utils.js";
-import { entityScope, parseEntityScope, resolveEmployeesFromScope } from "./scope.types.js";
+import { entityScope, parseEntityScope, resolveMembersFromScope } from "./scope.types.js";
 
 const LocationPreferenceSchema = z
   .object({
@@ -14,7 +14,7 @@ const LocationPreferenceSchema = z
       z.literal("MANDATORY"),
     ]),
   })
-  .and(entityScope(["employees", "roles", "skills"]));
+  .and(entityScope(["members", "roles", "skills"]));
 
 /**
  * Configuration for {@link createLocationPreferenceRule}.
@@ -22,7 +22,7 @@ const LocationPreferenceSchema = z
  * - `locationId` (required): the location ID to prefer for matching shift patterns
  * - `priority` (required): how strongly to prefer this location
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  */
 export type LocationPreferenceConfig = z.infer<typeof LocationPreferenceSchema>;
 
@@ -42,7 +42,7 @@ const PRIORITY_WEIGHTS: Record<Priority, number> = {
  * createLocationPreferenceRule({
  *   locationId: "terrace",
  *   priority: "HIGH",
- *   employeeIds: ["alice"],
+ *   memberIds: ["alice"],
  * });
  * ```
  */
@@ -56,9 +56,9 @@ export function createLocationPreferenceRule(config: LocationPreferenceConfig): 
     compile(b) {
       if (weight === 0) return;
 
-      const employees = resolveEmployeesFromScope(scope, b.employees);
+      const members = resolveMembersFromScope(scope, b.members);
 
-      for (const emp of employees) {
+      for (const emp of members) {
         for (const pattern of b.shiftPatterns) {
           if (!b.canAssign(emp, pattern)) continue;
           const isPreferred = pattern.locationId === locationId;

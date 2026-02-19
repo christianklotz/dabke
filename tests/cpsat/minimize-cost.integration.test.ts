@@ -13,11 +13,11 @@ describe("CP-SAT: minimize-cost rule", () => {
     client = getSolverClient();
   });
 
-  it("prefers cheaper hourly employee when coverage allows", async () => {
+  it("prefers cheaper hourly member when coverage allows", async () => {
     const config = createBaseConfig({
-      employees: [
-        { id: "expensive", roleIds: ["waiter"], pay: { hourlyRate: 3000 } },
-        { id: "cheap", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
+      members: [
+        { id: "expensive", roles: ["waiter"], pay: { hourlyRate: 3000 } },
+        { id: "cheap", roles: ["waiter"], pay: { hourlyRate: 1000 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       targetCount: 1,
@@ -32,19 +32,19 @@ describe("CP-SAT: minimize-cost rule", () => {
     expect(response.status).toBe("OPTIMAL");
 
     const assignments = decodeAssignments(response.values);
-    const cheapAssignments = assignments.filter((a) => a.employeeId === "cheap");
-    const expensiveAssignments = assignments.filter((a) => a.employeeId === "expensive");
+    const cheapAssignments = assignments.filter((a) => a.memberId === "cheap");
+    const expensiveAssignments = assignments.filter((a) => a.memberId === "expensive");
 
-    // Solver should prefer the cheaper employee
+    // Solver should prefer the cheaper member
     expect(cheapAssignments.length).toBeGreaterThan(0);
     expect(expensiveAssignments.length).toBe(0);
   }, 30_000);
 
-  it("assigns both employees when coverage requires it", async () => {
+  it("assigns both members when coverage requires it", async () => {
     const config = createBaseConfig({
-      employees: [
-        { id: "expensive", roleIds: ["waiter"], pay: { hourlyRate: 3000 } },
-        { id: "cheap", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
+      members: [
+        { id: "expensive", roles: ["waiter"], pay: { hourlyRate: 3000 } },
+        { id: "cheap", roles: ["waiter"], pay: { hourlyRate: 1000 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       targetCount: 2,
@@ -59,8 +59,8 @@ describe("CP-SAT: minimize-cost rule", () => {
     expect(response.status).toBe("OPTIMAL");
 
     const assignments = decodeAssignments(response.values);
-    const cheapAssigned = assignments.some((a) => a.employeeId === "cheap");
-    const expensiveAssigned = assignments.some((a) => a.employeeId === "expensive");
+    const cheapAssigned = assignments.some((a) => a.memberId === "cheap");
+    const expensiveAssigned = assignments.some((a) => a.memberId === "expensive");
 
     expect(cheapAssigned).toBe(true);
     expect(expensiveAssigned).toBe(true);
@@ -68,9 +68,9 @@ describe("CP-SAT: minimize-cost rule", () => {
 
   it("post-solve cost calculation matches expectations", async () => {
     const config = createBaseConfig({
-      employees: [
-        { id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } },
-        { id: "bob", roleIds: ["waiter"], pay: { hourlyRate: 1500 } },
+      members: [
+        { id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } },
+        { id: "bob", roles: ["waiter"], pay: { hourlyRate: 1500 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       targetCount: 1,
@@ -86,14 +86,14 @@ describe("CP-SAT: minimize-cost rule", () => {
 
     const result = parseSolverResponse(response);
     const cost = calculateScheduleCost(result.assignments, {
-      employees: config.employees,
+      members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
     });
 
     // Solver should prefer bob (cheaper). 1 day, 8 hours, 1500/hr = 12000
     expect(cost.total).toBe(12000);
-    expect(cost.byEmployee.get("bob")?.categories.get(COST_CATEGORY.BASE)).toBe(12000);
-    expect(cost.byEmployee.get("bob")?.totalHours).toBe(8);
+    expect(cost.byMember.get("bob")?.categories.get(COST_CATEGORY.BASE)).toBe(12000);
+    expect(cost.byMember.get("bob")?.totalHours).toBe(8);
   }, 30_000);
 });

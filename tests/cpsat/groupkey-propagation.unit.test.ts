@@ -36,9 +36,9 @@ describe("groupKey propagation", () => {
     const reporter = new ValidationReporterImpl();
 
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["staff"] },
-        { id: "bob", roleIds: ["staff"] },
+      members: [
+        { id: "alice", roles: ["staff"] },
+        { id: "bob", roles: ["staff"] },
       ],
       shiftPatterns: [{ id: "day_shift", startTime: t(9), endTime: t(18) }],
       schedulingPeriod: { dateRange: { start: "2026-02-02", end: "2026-02-03" } },
@@ -91,9 +91,9 @@ describe("groupKey propagation", () => {
     const reporter = new ValidationReporterImpl();
 
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["staff"] },
-        { id: "bob", roleIds: ["staff"] },
+      members: [
+        { id: "alice", roles: ["staff"] },
+        { id: "bob", roles: ["staff"] },
       ],
       shiftPatterns: [{ id: "day_shift", startTime: t(9), endTime: t(17) }],
       schedulingPeriod: { dateRange: { start: "2026-02-02", end: "2026-02-02" } },
@@ -141,9 +141,9 @@ describe("groupKey propagation", () => {
     const reporter = new ValidationReporterImpl();
 
     const builder = new ModelBuilder({
-      employees: [
-        { id: "alice", roleIds: ["staff"] },
-        { id: "bob", roleIds: ["staff"] },
+      members: [
+        { id: "alice", roles: ["staff"] },
+        { id: "bob", roles: ["staff"] },
       ],
       shiftPatterns: [{ id: "day_shift", startTime: t(9), endTime: t(17) }],
       schedulingPeriod: { dateRange: { start: "2026-02-02", end: "2026-02-04" } },

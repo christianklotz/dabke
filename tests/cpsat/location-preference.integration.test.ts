@@ -42,7 +42,7 @@ describe("CP-SAT: location-preference rule", () => {
       client,
       createBaseConfig({
         roleId: "waiter",
-        employeeIds: ["victoria"],
+        memberIds: ["victoria"],
         shiftPatterns: [shiftPatterns[0]!],
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage,
@@ -52,7 +52,7 @@ describe("CP-SAT: location-preference rule", () => {
     expect(control.status).toBe("OPTIMAL");
     const controlAssignments = decodeAssignments(control.values);
     expect(controlAssignments).toContainEqual(
-      expect.objectContaining({ employeeId: "victoria", shiftPatternId: "indoor" }),
+      expect.objectContaining({ memberId: "victoria", shiftPatternId: "indoor" }),
     );
 
     // With rule: both locations available, preference steers victoria to terrace
@@ -60,7 +60,7 @@ describe("CP-SAT: location-preference rule", () => {
       client,
       createBaseConfig({
         roleId: "waiter",
-        employeeIds: ["victoria"],
+        memberIds: ["victoria"],
         shiftPatterns,
         schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
         coverage,
@@ -71,14 +71,14 @@ describe("CP-SAT: location-preference rule", () => {
 
           locationId: "terrace",
           priority: "HIGH",
-          employeeIds: ["victoria"],
+          memberIds: ["victoria"],
         },
       ] satisfies CpsatRuleConfigEntry[],
     );
     expect(withPreference.status).toBe("OPTIMAL");
     const preferredAssignments = decodeAssignments(withPreference.values);
     expect(preferredAssignments).toContainEqual(
-      expect.objectContaining({ employeeId: "victoria", shiftPatternId: "terrace" }),
+      expect.objectContaining({ memberId: "victoria", shiftPatternId: "terrace" }),
     );
   }, 30_000);
 });

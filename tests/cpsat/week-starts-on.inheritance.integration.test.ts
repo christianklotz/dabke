@@ -20,7 +20,7 @@ describe("CP-SAT: weekStartsOn inheritance", () => {
 
     const baseConfig = createBaseConfig({
       roleIds: ["server"],
-      employeeIds: ["alice"],
+      memberIds: ["alice"],
       shift: {
         id: "day",
         startTime: { hours: 9, minutes: 0 },

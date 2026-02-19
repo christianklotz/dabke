@@ -864,7 +864,7 @@ function generateRulesReference(ruleDocs: RuleDoc[]): string {
   let content = `### Built-In Rules\n\n`;
   content += `Each rule is a flat object in the \`ruleConfigs\` array with \`name\` as the discriminant.\n\n`;
   content += `**Scoping fields** available on most rules:\n`;
-  content += `- Entity (at most one): \`employeeIds\`, \`roleIds\`, \`skillIds\`\n`;
+  content += `- Entity (at most one): \`memberIds\`, \`roleIds\`, \`skillIds\`\n`;
   content += `- Time (at most one): \`dateRange\`, \`specificDates\`, \`dayOfWeek\`, \`recurringPeriods\`\n\n`;
 
   for (const rule of ruleDocs) {

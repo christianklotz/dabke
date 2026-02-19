@@ -6,74 +6,72 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
-const EmployeeAssignmentPrioritySchema = z
+const AssignmentPrioritySchema = z
   .object({
     preference: z.union([z.literal("high"), z.literal("low")]),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /**
- * Configuration for {@link createEmployeeAssignmentPriorityRule}.
+ * Configuration for {@link createAssignmentPriorityRule}.
  *
  * - `preference` (required): `"high"` to prefer assigning or `"low"` to avoid assigning
  *
- * Entity scoping (at most one): `employeeIds`, `roleIds`, `skillIds`
+ * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
  * Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
  */
-export type EmployeeAssignmentPriorityConfig = z.infer<typeof EmployeeAssignmentPrioritySchema>;
+export type AssignmentPriorityConfig = z.infer<typeof AssignmentPrioritySchema>;
 
 /**
  * Adds objective weight to prefer or avoid assigning team members.
  *
- * @param config - See {@link EmployeeAssignmentPriorityConfig}
+ * @param config - See {@link AssignmentPriorityConfig}
  * @example Prefer specific team members
  * ```ts
- * createEmployeeAssignmentPriorityRule({
- *   employeeIds: ["alice", "bob"],
+ * createAssignmentPriorityRule({
+ *   memberIds: ["alice", "bob"],
  *   preference: "high",
  * });
  * ```
  *
  * @example Avoid assigning students on weekdays
  * ```ts
- * createEmployeeAssignmentPriorityRule({
+ * createAssignmentPriorityRule({
  *   roleIds: ["student"],
  *   dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
  *   preference: "low",
  * });
  * ```
  */
-export function createEmployeeAssignmentPriorityRule(
-  config: EmployeeAssignmentPriorityConfig,
-): CompilationRule {
-  const parsed = EmployeeAssignmentPrioritySchema.parse(config);
+export function createAssignmentPriorityRule(config: AssignmentPriorityConfig): CompilationRule {
+  const parsed = AssignmentPrioritySchema.parse(config);
   const { preference } = parsed;
   const entityScopeValue = parseEntityScope(parsed);
   const timeScopeValue = parseTimeScope(parsed);
 
   return {
     compile(b) {
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const weight =
         preference === "high"
           ? -OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE
           : OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE;
 
-      for (const emp of targetEmployees) {
+      for (const member of targetMembers) {
         for (const pattern of b.shiftPatterns) {
-          if (!b.canAssign(emp, pattern)) continue;
+          if (!b.canAssign(member, pattern)) continue;
           for (const day of activeDays) {
             if (!b.patternAvailableOnDay(pattern, day)) continue;
-            b.addPenalty(b.assignment(emp.id, pattern.id, day), weight);
+            b.addPenalty(b.assignment(member.id, pattern.id, day), weight);
           }
         }
       }

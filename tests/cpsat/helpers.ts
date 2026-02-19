@@ -3,11 +3,7 @@ import { HttpSolverClient } from "../../src/client.js";
 import type { CompilationRule, ModelBuilderConfig } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
-import type {
-  CoverageRequirement,
-  ShiftPattern,
-  SchedulingEmployee,
-} from "../../src/cpsat/types.js";
+import type { CoverageRequirement, ShiftPattern, SchedulingMember } from "../../src/cpsat/types.js";
 import type { TimeOfDay, SchedulingPeriod } from "../../src/types.js";
 import { resolveDaysFromPeriod } from "../../src/datetime.utils.js";
 
@@ -15,8 +11,8 @@ export const decodeAssignments = (values: Record<string, number> = {}) =>
   Object.entries(values)
     .filter(([name, value]) => value === 1 && name.startsWith("assign:"))
     .map(([name]) => {
-      const [, employeeId, shiftPatternId, day] = name.split(":");
-      return { employeeId, shiftPatternId, day };
+      const [, memberId, shiftPatternId, day] = name.split(":");
+      return { memberId, shiftPatternId, day };
     });
 
 export const solveWithRules = async (
@@ -65,20 +61,13 @@ const DEFAULT_PERIOD: SchedulingPeriod = {
 /**
  * Creates a minimal single-role config for simple test scenarios.
  *
- * Use this when all employees share the same role and you just need
+ * Use this when all members share the same role and you just need
  * basic coverage. For multi-role or complex scenarios, build the config
  * explicitly or use createBaseConfig.
- *
- * @example
- * const config = createSimpleConfig({
- *   roleId: "waiter",
- *   employeeIds: ["alice", "bob"],
- *   schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
- * });
  */
 export function createSimpleConfig(opts: {
   roleId: string;
-  employeeIds: string[];
+  memberIds: string[];
   shiftId?: string;
   shiftStart?: TimeOfDay;
   shiftEnd?: TimeOfDay;
@@ -93,7 +82,7 @@ export function createSimpleConfig(opts: {
   const roleIds: [string, ...string[]] = [opts.roleId];
 
   return {
-    employees: opts.employeeIds.map((id) => ({ id, roleIds: [opts.roleId] })),
+    members: opts.memberIds.map((id) => ({ id, roles: [opts.roleId] })),
     shiftPatterns: [
       {
         id: shiftId,
@@ -123,9 +112,9 @@ type BaseConfigOverrides = {
   roleId?: string;
   /** Multiple role IDs for coverage. Takes precedence over roleId. */
   roleIds?: [string, ...string[]];
-  employeeIds?: string[];
-  /** Provide full employee objects for more control over roles/skills */
-  employees?: SchedulingEmployee[];
+  memberIds?: string[];
+  /** Provide full member objects for more control over roles/skills */
+  members?: SchedulingMember[];
   shift?: {
     id?: string;
     startTime?: TimeOfDay;
@@ -153,24 +142,21 @@ type BaseConfigOverrides = {
  * Role derivation priority:
  * 1. Explicit `roleIds` parameter (array)
  * 2. Explicit `roleId` parameter (single)
- * 3. First role from first employee (if `employees` provided)
+ * 3. First role from first member (if `members` provided)
  * 4. Default "role"
- *
- * For complex multi-role scenarios, provide explicit `employees`, `shiftPatterns`,
- * and `coverage` to avoid implicit derivation issues.
  */
 export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScenarioConfig => {
-  // Derive roleIds: explicit roleIds > roleId > from employees > default
+  // Derive roleIds: explicit roleIds > roleId > from members > default
   const roleIds: [string, ...string[]] = overrides.roleIds ??
     (overrides.roleId ? [overrides.roleId] : null) ??
-    (overrides.employees?.[0]?.roleIds as [string, ...string[]] | undefined) ?? ["role"];
+    (overrides.members?.[0]?.roles as [string, ...string[]] | undefined) ?? ["role"];
 
-  // Use provided employees or create from employeeIds
-  const employees: SchedulingEmployee[] =
-    overrides.employees ??
-    (overrides.employeeIds ?? ["alice", "bob"]).map((id) => ({
+  // Use provided members or create from memberIds
+  const members: SchedulingMember[] =
+    overrides.members ??
+    (overrides.memberIds ?? ["alice", "bob"]).map((id) => ({
       id,
-      roleIds: [...roleIds],
+      roles: [...roleIds],
     }));
 
   let shiftPatterns: ShiftPattern[];
@@ -214,7 +200,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     );
 
   return {
-    employees,
+    members,
     shiftPatterns,
     schedulingPeriod,
     coverage,
@@ -230,18 +216,18 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
  * Use these for consistent, readable tests.
  */
 export const fixtures = {
-  /** Single day, single shift, two employees (alice, bob) */
-  twoEmployeesOneShift: (): BaseScenarioConfig =>
+  /** Single day, single shift, two members (alice, bob) */
+  twoMembersOneShift: (): BaseScenarioConfig =>
     createSimpleConfig({
       roleId: "staff",
-      employeeIds: ["alice", "bob"],
+      memberIds: ["alice", "bob"],
     }),
 
   /** Week of weekdays (Mon-Fri), single role */
-  weekdaySchedule: (opts: { roleId?: string; employeeIds?: string[] } = {}): BaseScenarioConfig =>
+  weekdaySchedule: (opts: { roleId?: string; memberIds?: string[] } = {}): BaseScenarioConfig =>
     createSimpleConfig({
       roleId: opts.roleId ?? "staff",
-      employeeIds: opts.employeeIds ?? ["alice", "bob", "charlie"],
+      memberIds: opts.memberIds ?? ["alice", "bob", "charlie"],
       schedulingPeriod: {
         dateRange: { start: "2024-02-05", end: "2024-02-09" },
         dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
@@ -250,11 +236,11 @@ export const fixtures = {
 
   /** Restaurant with morning and evening shifts */
   restaurantSplitShifts: (): BaseScenarioConfig => ({
-    employees: [
-      { id: "chef1", roleIds: ["chef"] },
-      { id: "chef2", roleIds: ["chef"] },
-      { id: "waiter1", roleIds: ["waiter"] },
-      { id: "waiter2", roleIds: ["waiter"] },
+    members: [
+      { id: "chef1", roles: ["chef"] },
+      { id: "chef2", roles: ["chef"] },
+      { id: "waiter1", roles: ["waiter"] },
+      { id: "waiter2", roles: ["waiter"] },
     ],
     shiftPatterns: [
       {

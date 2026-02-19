@@ -22,13 +22,13 @@ describe("CP-SAT: max-consecutive-days rule", () => {
 
     const preference: CpsatRuleConfigEntry[] = [
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["alice"],
+        name: "assignment-priority",
+        memberIds: ["alice"],
         preference: "high",
       },
       {
-        name: "employee-assignment-priority",
-        employeeIds: ["bob"],
+        name: "assignment-priority",
+        memberIds: ["bob"],
         preference: "low",
       },
     ];
@@ -36,7 +36,7 @@ describe("CP-SAT: max-consecutive-days rule", () => {
     const baseline = await solveWithRules(client, baseConfig, preference);
     expect(baseline.status).toBe("OPTIMAL");
     const baselineAssignments = decodeAssignments(baseline.values);
-    expect(baselineAssignments.filter((a) => a.employeeId === "alice").length).toBe(3);
+    expect(baselineAssignments.filter((a) => a.memberId === "alice").length).toBe(3);
 
     const withLimit = await solveWithRules(client, baseConfig, [
       ...preference,
@@ -48,11 +48,7 @@ describe("CP-SAT: max-consecutive-days rule", () => {
     ] satisfies CpsatRuleConfigEntry[]);
     expect(withLimit.status).toBe("OPTIMAL");
     const limitedAssignments = decodeAssignments(withLimit.values);
-    expect(limitedAssignments.filter((a) => a.employeeId === "alice").length).toBeLessThanOrEqual(
-      2,
-    );
-    expect(limitedAssignments.filter((a) => a.employeeId === "bob").length).toBeGreaterThanOrEqual(
-      1,
-    );
+    expect(limitedAssignments.filter((a) => a.memberId === "alice").length).toBeLessThanOrEqual(2);
+    expect(limitedAssignments.filter((a) => a.memberId === "bob").length).toBeGreaterThanOrEqual(1);
   }, 30_000);
 });

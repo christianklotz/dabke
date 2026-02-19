@@ -1,7 +1,7 @@
 import * as z from "zod";
 import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingEmployee, Term } from "../types.js";
+import type { ShiftPattern, SchedulingMember, Term } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
@@ -16,7 +16,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -33,13 +33,13 @@ const OvertimeTieredMultiplierSchema = z
     tiers: z.array(OvertimeTierSchema).nonempty(),
     weekStartsOn: DayOfWeekSchema.optional(),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /** Configuration for {@link createOvertimeTieredMultiplierRule}. */
 export type OvertimeTieredMultiplierConfig = z.infer<typeof OvertimeTieredMultiplierSchema>;
 
-function getHourlyRate(emp: SchedulingEmployee): number | undefined {
+function getHourlyRate(emp: SchedulingMember): number | undefined {
   if (!emp.pay) return undefined;
   if ("hourlyRate" in emp.pay) return emp.pay.hourlyRate;
   return undefined;
@@ -88,20 +88,20 @@ export function createOvertimeTieredMultiplierRule(
       resolvedWeekStartsOn = weekStartsOn ?? b.weekStartsOn;
       if (effectiveTiers.length === 0) return;
 
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const weeks = splitIntoWeeks(activeDays, weekStartsOn ?? b.weekStartsOn);
 
       const hasCostContext = b.costContext?.active === true;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         const rate = getHourlyRate(emp);
 
         for (const [weekIdx, weekDays] of weeks.entries()) {
-          // Build total minutes expression and compute per-employee week max
+          // Build total minutes expression and compute per-member week max
           // using time-range union per day (accounts for no-overlap constraints)
           let empWeekMaxMinutes = 0;
           const terms: Term[] = [];
@@ -224,18 +224,18 @@ export function createOvertimeTieredMultiplierRule(
 
     cost(
       assignments: ShiftAssignment[],
-      employees: ReadonlyArray<SchedulingEmployee>,
+      members: ReadonlyArray<SchedulingMember>,
       shiftPatterns: ReadonlyArray<ShiftPattern>,
     ): CostContribution {
       if (effectiveTiers.length === 0) return { entries: [] };
 
-      const empMap = new Map(employees.map((e) => [e.id, e]));
+      const memberMap = new Map(members.map((e) => [e.id, e]));
       const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
 
       const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
       const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
       const targetEmpIds = new Set(
-        resolveEmployeesFromScope(entityScopeValue, [...empMap.values()]).map((e) => e.id),
+        resolveMembersFromScope(entityScopeValue, [...memberMap.values()]).map((e) => e.id),
       );
 
       const activeDaysList = allDays.filter((d) => activeDays.has(d));
@@ -254,23 +254,23 @@ export function createOvertimeTieredMultiplierRule(
         for (const a of assignments) {
           if (!weekDaySet.has(a.day)) continue;
           if (!activeDays.has(a.day)) continue;
-          if (!targetEmpIds.has(a.employeeId)) continue;
+          if (!targetEmpIds.has(a.memberId)) continue;
 
           const pattern = patternMap.get(a.shiftPatternId);
           if (!pattern) continue;
           const duration = patternDurationMinutes(pattern);
 
-          let data = empWeekData.get(a.employeeId);
+          let data = empWeekData.get(a.memberId);
           if (!data) {
             data = { totalMinutes: 0, dayMinutes: new Map() };
-            empWeekData.set(a.employeeId, data);
+            empWeekData.set(a.memberId, data);
           }
           data.totalMinutes += duration;
           data.dayMinutes.set(a.day, (data.dayMinutes.get(a.day) ?? 0) + duration);
         }
 
         for (const [empId, data] of empWeekData) {
-          const emp = empMap.get(empId);
+          const emp = memberMap.get(empId);
           if (!emp) continue;
           const rate = getHourlyRate(emp);
           if (rate === undefined) continue;
@@ -306,7 +306,7 @@ export function createOvertimeTieredMultiplierRule(
           for (const [day, dayMinutes] of data.dayMinutes) {
             const proportion = dayMinutes / data.totalMinutes;
             entries.push({
-              employeeId: empId,
+              memberId: empId,
               day,
               category: COST_CATEGORY.OVERTIME,
               amount: totalOvertimeCost * proportion,

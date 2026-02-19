@@ -70,19 +70,19 @@ function coverageId(
 
 /**
  * Generates a deterministic ID for a rule-based validation item.
- * Format: {category}:rule:{rule}:{days}:{employeeIds}
+ * Format: {category}:rule:{rule}:{days}:{memberIds}
  */
 function ruleId(
   category: "error" | "violation" | "passed",
   rule: string,
-  context: { days?: readonly string[]; employeeIds?: readonly string[] },
+  context: { days?: readonly string[]; memberIds?: readonly string[] },
 ): string {
   const parts = [
     category,
     "rule",
     rule,
     context.days ? [...context.days].toSorted().join(",") : "_",
-    context.employeeIds ? [...context.employeeIds].toSorted().join(",") : "_",
+    context.memberIds ? [...context.memberIds].toSorted().join(",") : "_",
   ];
   return parts.join(":");
 }

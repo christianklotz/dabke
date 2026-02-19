@@ -1,6 +1,6 @@
 import * as z from "zod";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingEmployee, Term } from "../types.js";
+import type { ShiftPattern, SchedulingMember, Term } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
@@ -14,7 +14,7 @@ import {
   timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveEmployeesFromScope,
+  resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
 
@@ -23,13 +23,13 @@ const OvertimeDailyMultiplierSchema = z
     after: z.number().min(0),
     factor: z.number().min(1),
   })
-  .and(entityScope(["employees", "roles", "skills"]))
+  .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /** Configuration for {@link createOvertimeDailyMultiplierRule}. */
 export type OvertimeDailyMultiplierConfig = z.infer<typeof OvertimeDailyMultiplierSchema>;
 
-function getHourlyRate(emp: SchedulingEmployee): number | undefined {
+function getHourlyRate(emp: SchedulingMember): number | undefined {
   if (!emp.pay) return undefined;
   if ("hourlyRate" in emp.pay) return emp.pay.hourlyRate;
   return undefined;
@@ -60,14 +60,14 @@ export function createOvertimeDailyMultiplierRule(
     compile(b) {
       if (extraFactor <= 0) return;
 
-      const targetEmployees = resolveEmployeesFromScope(entityScopeValue, b.employees);
+      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
       const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
 
-      if (targetEmployees.length === 0 || activeDays.length === 0) return;
+      if (targetMembers.length === 0 || activeDays.length === 0) return;
 
       const hasCostContext = b.costContext?.active === true;
 
-      for (const emp of targetEmployees) {
+      for (const emp of targetMembers) {
         const rate = getHourlyRate(emp);
 
         for (const day of activeDays) {
@@ -123,29 +123,29 @@ export function createOvertimeDailyMultiplierRule(
 
     cost(
       assignments: ShiftAssignment[],
-      employees: ReadonlyArray<SchedulingEmployee>,
+      members: ReadonlyArray<SchedulingMember>,
       shiftPatterns: ReadonlyArray<ShiftPattern>,
     ): CostContribution {
       if (extraFactor <= 0) return { entries: [] };
 
-      const empMap = new Map(employees.map((e) => [e.id, e]));
+      const memberMap = new Map(members.map((e) => [e.id, e]));
       const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
 
       const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
       const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
       const targetEmpIds = new Set(
-        resolveEmployeesFromScope(entityScopeValue, [...empMap.values()]).map((e) => e.id),
+        resolveMembersFromScope(entityScopeValue, [...memberMap.values()]).map((e) => e.id),
       );
 
-      // Group assignments by (employee, day) and compute daily minutes
+      // Group assignments by (member, day) and compute daily minutes
       const dayMinutes = new Map<string, number>(); // key: "empId:day"
 
       for (const a of assignments) {
         if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.employeeId)) continue;
+        if (!targetEmpIds.has(a.memberId)) continue;
         const pattern = patternMap.get(a.shiftPatternId);
         if (!pattern) continue;
-        const key = `${a.employeeId}:${a.day}`;
+        const key = `${a.memberId}:${a.day}`;
         dayMinutes.set(key, (dayMinutes.get(key) ?? 0) + patternDurationMinutes(pattern));
       }
 
@@ -158,13 +158,13 @@ export function createOvertimeDailyMultiplierRule(
         const [empId, day] = key.split(":");
         if (!empId || !day) continue;
 
-        const emp = empMap.get(empId);
+        const emp = memberMap.get(empId);
         if (!emp) continue;
         const rate = getHourlyRate(emp);
         if (rate === undefined) continue;
 
         entries.push({
-          employeeId: empId,
+          memberId: empId,
           day,
           category: COST_CATEGORY.OVERTIME,
           amount: (rate * extraFactor * overtimeMinutes) / 60,

@@ -1,6 +1,6 @@
 import {
   createAssignTogetherRule,
-  createEmployeeAssignmentPriorityRule,
+  createAssignmentPriorityRule,
   createLocationPreferenceRule,
   createMaxConsecutiveDaysRule,
   createMaxHoursDayRule,
@@ -29,7 +29,7 @@ import type {
 
 export const builtInCpsatRuleFactories: BuiltInCpsatRuleFactories = {
   "assign-together": createAssignTogetherRule,
-  "employee-assignment-priority": createEmployeeAssignmentPriorityRule,
+  "assignment-priority": createAssignmentPriorityRule,
   "location-preference": createLocationPreferenceRule,
   "max-consecutive-days": createMaxConsecutiveDaysRule,
   "max-hours-day": createMaxHoursDayRule,
