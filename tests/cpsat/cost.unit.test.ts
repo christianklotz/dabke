@@ -122,7 +122,7 @@ describe("resolveRules for cost rules", () => {
   it("minimizeCost() maps to minimize-cost config entry", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost()],
@@ -139,7 +139,7 @@ describe("resolveRules for cost rules", () => {
   it("dayMultiplier() maps to day-cost-multiplier config entry", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost(), dayMultiplier(1.5, { dayOfWeek: weekend })],
@@ -158,7 +158,7 @@ describe("resolveRules for cost rules", () => {
   it("daySurcharge() maps to day-cost-surcharge config entry", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost(), daySurcharge(500, { dayOfWeek: weekend })],
@@ -177,7 +177,7 @@ describe("resolveRules for cost rules", () => {
   it("timeSurcharge() maps to time-cost-surcharge config entry", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { dinner: time({ start: t(17), end: t(22) }) },
+      times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
       coverage: [cover("dinner", "waiter", 1)],
       shiftPatterns: [shift("s", t(17), t(22))],
       rules: [minimizeCost(), timeSurcharge(200, { from: t(22), until: t(6) })],
@@ -196,7 +196,7 @@ describe("resolveRules for cost rules", () => {
   it("overtimeMultiplier() maps to overtime-weekly-multiplier config entry", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost(), overtimeMultiplier({ after: 40, factor: 1.5 })],
@@ -216,7 +216,7 @@ describe("resolveRules for cost rules", () => {
   it("tieredOvertimeMultiplier() maps to overtime-tiered-multiplier config entry", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [
@@ -252,7 +252,7 @@ describe("pay validation", () => {
   it("throws when cost rules present but members lack pay", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost()],
@@ -272,7 +272,7 @@ describe("pay validation", () => {
   it("throws listing all members missing pay", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [dayMultiplier(1.5)],
@@ -292,7 +292,7 @@ describe("pay validation", () => {
   it("throws when overtime rules present but members lack pay", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [overtimeMultiplier({ after: 40, factor: 1.5 })],
@@ -309,7 +309,7 @@ describe("pay validation", () => {
   it("allows salaried pay with cost rules", () => {
     const def = defineSchedule({
       roles: ["waiter", "manager"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost()],
@@ -329,7 +329,7 @@ describe("pay validation", () => {
   it("does not throw when all members have pay", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [minimizeCost()],
@@ -346,7 +346,7 @@ describe("pay validation", () => {
   it("does not throw when no cost rules present", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [],
@@ -369,7 +369,7 @@ describe("calculateScheduleCost", () => {
   it("computes correct totals for hourly members", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [minimizeCost()],
@@ -405,7 +405,7 @@ describe("calculateScheduleCost", () => {
   it("includes premium costs from dayMultiplier", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [minimizeCost(), dayMultiplier(1.5, { dayOfWeek: ["saturday"] })],
@@ -439,7 +439,7 @@ describe("calculateScheduleCost", () => {
   it("includes premium costs from daySurcharge", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [minimizeCost(), daySurcharge(500, { dayOfWeek: ["saturday"] })],
@@ -473,7 +473,7 @@ describe("calculateScheduleCost", () => {
   it("includes premium costs from timeSurcharge", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { dinner: time({ start: t(18), end: t(23) }) },
+      times: { dinner: time({ startTime: t(18), endTime: t(23) }) },
       coverage: [cover("dinner", "waiter", 1)],
       shiftPatterns: [shift("dinner_shift", t(18), t(23))],
       rules: [minimizeCost(), timeSurcharge(300, { from: t(22), until: t(6) })],
@@ -508,7 +508,7 @@ describe("calculateScheduleCost", () => {
   it("includes overtime costs from overtimeMultiplier", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { work: time({ start: t(9), end: t(17) }) },
+      times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
       rules: [minimizeCost(), overtimeMultiplier({ after: 20, factor: 1.5 })],
@@ -551,7 +551,7 @@ describe("calculateScheduleCost", () => {
   it("includes overtime costs from dailyOvertimeMultiplier", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { work: time({ start: t(8), end: t(20) }) },
+      times: { work: time({ startTime: t(8), endTime: t(20) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("long", t(8), t(20))],
       rules: [minimizeCost(), dailyOvertimeMultiplier({ after: 8, factor: 1.5 })],
@@ -586,7 +586,7 @@ describe("calculateScheduleCost", () => {
   it("includes overtime costs from tieredOvertimeMultiplier", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { work: time({ start: t(9), end: t(17) }) },
+      times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
       rules: [
@@ -638,7 +638,7 @@ describe("calculateScheduleCost", () => {
   it("computes salaried employee base cost", () => {
     const def = defineSchedule({
       roles: ["manager"] as const,
-      times: { work: time({ start: t(9), end: t(17) }) },
+      times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "manager", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
       rules: [minimizeCost()],
@@ -677,7 +677,7 @@ describe("calculateScheduleCost", () => {
   it("aggregates by day correctly", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 2)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [minimizeCost()],
@@ -716,7 +716,7 @@ describe("calculateScheduleCost", () => {
   it("returns empty breakdown when no cost rules present", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [],
@@ -747,7 +747,7 @@ describe("calculateScheduleCost", () => {
   it("uses open-ended category strings from custom rules", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [minimizeCost()],
@@ -797,7 +797,7 @@ describe("cost rule ordering", () => {
   it("minimize-cost is ordered before modifier rules", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [dayMultiplier(1.5, { dayOfWeek: weekend }), minimizeCost()],
@@ -817,7 +817,7 @@ describe("cost rule ordering", () => {
   it("minimize-cost is ordered before overtime rules", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [overtimeMultiplier({ after: 40, factor: 1.5 }), minimizeCost()],
@@ -844,7 +844,7 @@ describe("CostContext on ModelBuilder", () => {
   it("costContext is set after minimizeCost compiles", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [minimizeCost()],
@@ -866,7 +866,7 @@ describe("CostContext on ModelBuilder", () => {
   it("costContext normalization accounts for salaried members", () => {
     const def = defineSchedule({
       roles: ["waiter", "manager"] as const,
-      times: { work: time({ start: t(9), end: t(17) }) },
+      times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
       rules: [minimizeCost()],
@@ -892,7 +892,7 @@ describe("CostContext on ModelBuilder", () => {
   it("costContext is undefined when no minimizeCost rule", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
       rules: [],
@@ -917,7 +917,7 @@ describe("pay propagation", () => {
   it("hourly pay propagates to member", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
     });
@@ -933,7 +933,7 @@ describe("pay propagation", () => {
   it("salaried pay propagates to member", () => {
     const def = defineSchedule({
       roles: ["manager"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "manager", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
     });
@@ -949,7 +949,7 @@ describe("pay propagation", () => {
   it("undefined pay propagates as undefined", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
     });

@@ -15,12 +15,18 @@ export interface SemanticTimeDef {
 }
 
 /**
- * Variant of a semantic time that applies to specific days or dates.
+ * A time entry, optionally scoped to specific days or dates.
+ *
+ * Used both as an argument to {@link time} and as the internal variant type.
+ * An entry without `dayOfWeek` or `dates` is the default (applies when no
+ * scoped entry matches). At most one default is allowed per {@link time} call.
+ *
+ * Resolution precedence: `dates` > `dayOfWeek` > default.
  */
 export interface SemanticTimeVariant extends SemanticTimeDef {
-  /** Apply this variant only on these days of the week */
-  dayOfWeek?: DayOfWeek[];
-  /** Apply this variant only on these specific dates (YYYY-MM-DD) */
+  /** Restrict this entry to specific days of the week. */
+  dayOfWeek?: readonly DayOfWeek[];
+  /** Restrict this entry to specific dates (YYYY-MM-DD). */
   dates?: string[];
 }
 
@@ -172,12 +178,104 @@ export type ConcreteCoverageRequirement =
   | RoleBasedConcreteCoverageRequirement
   | SkillBasedConcreteCoverageRequirement;
 
+// ============================================================================
+// Variant Coverage Requirements
+// ============================================================================
+
 /**
- * Union type for coverage - either semantic (type-safe) or concrete.
+ * A day-specific count within a variant {@link cover} call.
+ *
+ * Each variant specifies a count and optional day/date scope. During
+ * resolution, the most specific matching variant wins for each day
+ * (`dates` > `dayOfWeek` > default), mirroring {@link SemanticTimeVariant}.
+ * At most one variant may be unscoped (the default).
+ *
+ * @example
+ * ```typescript
+ * // Default: 3 waiters. Christmas Eve: 1.
+ * cover("dinner", "waiter",
+ *   { count: 3 },
+ *   { count: 1, dates: ["2025-12-24"] },
+ * )
+ * ```
+ */
+export interface CoverageVariant {
+  /** Number of people needed. */
+  count: number;
+  /** Restrict this variant to specific days of the week. */
+  dayOfWeek?: readonly DayOfWeek[];
+  /** Restrict this variant to specific dates (YYYY-MM-DD). */
+  dates?: string[];
+  /** Defaults to `"MANDATORY"`. */
+  priority?: Priority;
+}
+
+/**
+ * Base fields shared by variant coverage requirement types.
+ */
+interface VariantCoverageRequirementBase<S extends string> {
+  semanticTime: S;
+  /** At least one variant is required. At most one may be unscoped (the default). */
+  variants: [CoverageVariant, ...CoverageVariant[]];
+  groupKey?: GroupKey;
+}
+
+/**
+ * Variant coverage requiring specific roles, optionally filtered by skills.
+ */
+interface RoleBasedVariantCoverageRequirement<
+  S extends string,
+> extends VariantCoverageRequirementBase<S> {
+  roles: [string, ...string[]];
+  skills?: [string, ...string[]];
+}
+
+/**
+ * Variant coverage requiring specific skills only (any role).
+ */
+interface SkillBasedVariantCoverageRequirement<
+  S extends string,
+> extends VariantCoverageRequirementBase<S> {
+  roles?: never;
+  skills: [string, ...string[]];
+}
+
+/**
+ * Coverage requirement with day-specific count overrides.
+ *
+ * Instead of a single `targetCount`, this type carries an array of
+ * {@link CoverageVariant} entries. For each scheduling day, the most
+ * specific matching variant is selected using the same precedence as
+ * {@link SemanticTimeVariant}: `dates` > `dayOfWeek` > default (unscoped).
+ *
+ * Only one constraint is emitted per day — variants do NOT stack.
+ *
+ * @example Decrease from default on a specific date
+ * ```typescript
+ * {
+ *   semanticTime: "dinner", roles: ["waiter"],
+ *   variants: [
+ *     { count: 3 },                              // default
+ *     { count: 1, dates: ["2025-12-24"] },        // Christmas Eve
+ *   ],
+ * }
+ * ```
+ */
+export type VariantCoverageRequirement<S extends string> =
+  | RoleBasedVariantCoverageRequirement<S>
+  | SkillBasedVariantCoverageRequirement<S>;
+
+// ============================================================================
+// Mixed Coverage Union
+// ============================================================================
+
+/**
+ * Union type for coverage — semantic (single count), concrete, or variant (day-specific counts).
  */
 export type MixedCoverageRequirement<S extends string> =
   | SemanticCoverageRequirement<S>
-  | ConcreteCoverageRequirement;
+  | ConcreteCoverageRequirement
+  | VariantCoverageRequirement<S>;
 
 /**
  * Type guard to check if a requirement is concrete (has explicit day/times).
@@ -189,12 +287,21 @@ export function isConcreteCoverage<S extends string>(
 }
 
 /**
+ * Type guard to check if a requirement uses variant-based resolution.
+ */
+export function isVariantCoverage<S extends string>(
+  req: MixedCoverageRequirement<S>,
+): req is VariantCoverageRequirement<S> {
+  return "variants" in req && "semanticTime" in req;
+}
+
+/**
  * Type guard to check if a requirement is semantic (references a named time).
  */
 export function isSemanticCoverage<S extends string>(
   req: MixedCoverageRequirement<S>,
 ): req is SemanticCoverageRequirement<S> {
-  return "semanticTime" in req;
+  return "semanticTime" in req && !("variants" in req);
 }
 
 /**
@@ -337,8 +444,37 @@ function resolveSemanticCoverage<S extends string>(
           ),
         );
       }
+    } else if (isVariantCoverage(req)) {
+      // Variant coverage - resolve most-specific variant per day
+      const entry = defs[req.semanticTime];
+      if (!entry) {
+        throw new Error(`Unknown semantic time: ${req.semanticTime}`);
+      }
+
+      const autoGroupKey = generateVariantGroupKey(req);
+
+      for (const day of days) {
+        const resolved = resolveTimeForDay(entry, day);
+        if (!resolved) continue;
+
+        const variant = resolveVariantForDay(req.variants, day);
+        if (!variant) continue;
+
+        result.push(
+          buildCoverageRequirement(
+            day,
+            resolved.startTime,
+            resolved.endTime,
+            req.roles,
+            req.skills,
+            variant.count,
+            variant.priority ?? "MANDATORY",
+            req.groupKey ?? autoGroupKey,
+          ),
+        );
+      }
     } else {
-      // Semantic requirement - resolve for each applicable day
+      // Simple semantic requirement - resolve for each applicable day
       const entry = defs[req.semanticTime];
       if (!entry) {
         throw new Error(`Unknown semantic time: ${req.semanticTime}`);
@@ -387,6 +523,49 @@ function generateSemanticGroupKey<S extends string>(req: SemanticCoverageRequire
   }
 
   return groupKey(base);
+}
+
+/**
+ * Generates a human-readable group key for a variant coverage requirement.
+ * Format: "{role/skills} during {semanticTime}" — shared across all days since
+ * the count varies per variant.
+ */
+function generateVariantGroupKey<S extends string>(req: VariantCoverageRequirement<S>): GroupKey {
+  const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
+  return groupKey(`${roleOrSkills} during ${req.semanticTime}`);
+}
+
+/**
+ * Resolve the most specific variant for a given day.
+ *
+ * Precedence: `dates` > `dayOfWeek` > default (unscoped).
+ * Returns null if no variant matches the day.
+ */
+function resolveVariantForDay(
+  variants: readonly CoverageVariant[],
+  day: string,
+): CoverageVariant | null {
+  const date = parseDayString(day);
+  const dayOfWeek = toDayOfWeekUTC(date);
+
+  let dateMatch: CoverageVariant | null = null;
+  let dowMatch: CoverageVariant | null = null;
+  let defaultMatch: CoverageVariant | null = null;
+
+  for (const variant of variants) {
+    if (variant.dates && variant.dates.includes(day)) {
+      dateMatch = variant;
+      break;
+    }
+    if (variant.dayOfWeek && variant.dayOfWeek.includes(dayOfWeek)) {
+      dowMatch = variant;
+    }
+    if (!variant.dates && !variant.dayOfWeek) {
+      defaultMatch = variant;
+    }
+  }
+
+  return dateMatch ?? dowMatch ?? defaultMatch;
 }
 
 /**

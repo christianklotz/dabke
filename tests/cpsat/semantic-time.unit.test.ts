@@ -3,6 +3,11 @@ import {
   defineSemanticTimes,
   isConcreteCoverage,
   isSemanticCoverage,
+  isVariantCoverage,
+} from "../../src/cpsat/semantic-time.js";
+import type {
+  MixedCoverageRequirement,
+  VariantCoverageRequirement,
 } from "../../src/cpsat/semantic-time.js";
 import type { TimeOfDay } from "../../src/types.js";
 
@@ -524,6 +529,302 @@ describe("defineSemanticTimes", () => {
 
       expect(resolved[0]?.roles).toEqual(["server"]);
       expect(resolved[0]?.skills).toEqual(["senior"]);
+    });
+  });
+
+  describe("variant coverage", () => {
+    it("resolves default variant on all days", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 3 }],
+        },
+      ];
+
+      const days = ["2026-01-12", "2026-01-13", "2026-01-14"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(3);
+      for (const r of resolved) {
+        expect(r.targetCount).toBe(3);
+        expect(r.startTime).toEqual(t(17));
+        expect(r.endTime).toEqual(t(22));
+      }
+    });
+
+    it("resolves date-specific variant over default", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 3 }, { count: 1, dates: ["2026-01-13"] }],
+        },
+      ];
+
+      const days = ["2026-01-12", "2026-01-13", "2026-01-14"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(3);
+      expect(resolved.find((r) => r.day === "2026-01-12")?.targetCount).toBe(3);
+      expect(resolved.find((r) => r.day === "2026-01-13")?.targetCount).toBe(1);
+      expect(resolved.find((r) => r.day === "2026-01-14")?.targetCount).toBe(3);
+    });
+
+    it("resolves dayOfWeek variant over default", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 2 }, { count: 4, dayOfWeek: ["saturday", "sunday"] }],
+        },
+      ];
+
+      // 2026-01-09 Fri, 2026-01-10 Sat, 2026-01-11 Sun, 2026-01-12 Mon
+      const days = ["2026-01-09", "2026-01-10", "2026-01-11", "2026-01-12"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(4);
+      expect(resolved.find((r) => r.day === "2026-01-09")?.targetCount).toBe(2);
+      expect(resolved.find((r) => r.day === "2026-01-10")?.targetCount).toBe(4);
+      expect(resolved.find((r) => r.day === "2026-01-11")?.targetCount).toBe(4);
+      expect(resolved.find((r) => r.day === "2026-01-12")?.targetCount).toBe(2);
+    });
+
+    it("resolves date-specific over dayOfWeek over default", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [
+            { count: 2 },
+            { count: 4, dayOfWeek: ["saturday"] },
+            { count: 6, dates: ["2026-01-10"] },
+          ],
+        },
+      ];
+
+      // 2026-01-09 Fri, 2026-01-10 Sat (has date override), 2026-01-17 Sat (dayOfWeek only)
+      const days = ["2026-01-09", "2026-01-10", "2026-01-17"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(3);
+      expect(resolved.find((r) => r.day === "2026-01-09")?.targetCount).toBe(2);
+      expect(resolved.find((r) => r.day === "2026-01-10")?.targetCount).toBe(6);
+      expect(resolved.find((r) => r.day === "2026-01-17")?.targetCount).toBe(4);
+    });
+
+    it("emits nothing for days without matching variant (no default)", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 4, dayOfWeek: ["saturday", "sunday"] }],
+        },
+      ];
+
+      // 2026-01-09 is Friday
+      const days = ["2026-01-09"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(0);
+    });
+
+    it("preserves per-variant priority", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [
+            { count: 3, priority: "MANDATORY" },
+            { count: 1, dates: ["2026-01-13"], priority: "HIGH" },
+          ],
+        },
+      ];
+
+      const days = ["2026-01-12", "2026-01-13"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved.find((r) => r.day === "2026-01-12")?.priority).toBe("MANDATORY");
+      expect(resolved.find((r) => r.day === "2026-01-13")?.priority).toBe("HIGH");
+    });
+
+    it("defaults priority to MANDATORY for variants without explicit priority", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 3 }],
+        },
+      ];
+
+      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      expect(resolved[0]?.priority).toBe("MANDATORY");
+    });
+
+    it("generates group key for variant coverage", () => {
+      const times = defineSemanticTimes({
+        dinner: { startTime: t(17), endTime: t(22) },
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 3 }, { count: 5, dates: ["2026-01-13"] }],
+        },
+      ];
+
+      const resolved = times.resolve(coverage, ["2026-01-12", "2026-01-13"]);
+      // All resolved entries from the same variant cover share a group key
+      expect(resolved[0]?.groupKey).toBe("waiter during dinner");
+      expect(resolved[1]?.groupKey).toBe("waiter during dinner");
+    });
+
+    it("resolves variant coverage with skill-only target", () => {
+      const times = defineSemanticTimes({
+        opening: { startTime: t(6), endTime: t(8) },
+      });
+
+      const coverage: MixedCoverageRequirement<"opening">[] = [
+        {
+          semanticTime: "opening",
+          skills: ["keyholder"],
+          variants: [{ count: 1 }, { count: 2, dayOfWeek: ["saturday", "sunday"] }],
+        },
+      ];
+
+      // 2026-01-09 Fri, 2026-01-10 Sat
+      const days = ["2026-01-09", "2026-01-10"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(2);
+      expect(resolved.find((r) => r.day === "2026-01-09")?.targetCount).toBe(1);
+      expect(resolved.find((r) => r.day === "2026-01-10")?.targetCount).toBe(2);
+      expect(resolved[0]?.skills).toEqual(["keyholder"]);
+      expect(resolved[0]?.roles).toBeUndefined();
+    });
+
+    it("works with semantic time variants", () => {
+      const times = defineSemanticTimes({
+        dinner: [
+          { startTime: t(17), endTime: t(21) },
+          { startTime: t(18), endTime: t(22), dayOfWeek: ["saturday", "sunday"] },
+        ],
+      });
+
+      const coverage: MixedCoverageRequirement<"dinner">[] = [
+        {
+          semanticTime: "dinner",
+          roles: ["waiter"],
+          variants: [{ count: 2 }, { count: 4, dayOfWeek: ["saturday", "sunday"] }],
+        },
+      ];
+
+      // 2026-01-09 Fri, 2026-01-10 Sat
+      const days = ["2026-01-09", "2026-01-10"];
+      const resolved = times.resolve(coverage, days);
+
+      expect(resolved).toHaveLength(2);
+      // Friday: default time (17-21), default count (2)
+      const fri = resolved.find((r) => r.day === "2026-01-09")!;
+      expect(fri.startTime).toEqual(t(17));
+      expect(fri.endTime).toEqual(t(21));
+      expect(fri.targetCount).toBe(2);
+      // Saturday: weekend time (18-22), weekend count (4)
+      const sat = resolved.find((r) => r.day === "2026-01-10")!;
+      expect(sat.startTime).toEqual(t(18));
+      expect(sat.endTime).toEqual(t(22));
+      expect(sat.targetCount).toBe(4);
+    });
+
+    it("throws for unknown semantic time in variant coverage", () => {
+      const times = defineSemanticTimes({
+        lunch: { startTime: t(11, 30), endTime: t(14) },
+      });
+
+      const coverage = [
+        {
+          semanticTime: "dinner" as "lunch",
+          roles: ["server"] as [string, ...string[]],
+          variants: [{ count: 2 }] as [{ count: number }],
+        },
+      ];
+
+      expect(() => times.resolve(coverage, ["2026-01-12"])).toThrow(
+        "Unknown semantic time: dinner",
+      );
+    });
+  });
+
+  describe("type guards", () => {
+    it("isVariantCoverage identifies variant coverage", () => {
+      const variant: VariantCoverageRequirement<"lunch"> = {
+        semanticTime: "lunch",
+        roles: ["waiter"],
+        variants: [{ count: 2 }],
+      };
+      expect(isVariantCoverage(variant)).toBe(true);
+    });
+
+    it("isVariantCoverage returns false for simple semantic coverage", () => {
+      expect(
+        isVariantCoverage({
+          semanticTime: "lunch",
+          roles: ["waiter"],
+          targetCount: 2,
+        }),
+      ).toBe(false);
+    });
+
+    it("isSemanticCoverage returns false for variant coverage", () => {
+      expect(
+        isSemanticCoverage({
+          semanticTime: "lunch",
+          roles: ["waiter"],
+          variants: [{ count: 2 }],
+        } as MixedCoverageRequirement<"lunch">),
+      ).toBe(false);
+    });
+
+    it("isVariantCoverage returns false for concrete coverage", () => {
+      expect(
+        isVariantCoverage({
+          day: "2026-01-12",
+          startTime: t(12),
+          endTime: t(15),
+          roles: ["waiter"],
+          targetCount: 2,
+        } as MixedCoverageRequirement<"lunch">),
+      ).toBe(false);
     });
   });
 });

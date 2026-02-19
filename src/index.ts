@@ -35,10 +35,10 @@
  *   skills: ["senior"],
  *
  *   times: {
- *     lunch: time({ start: t(12), end: t(15) }),
+ *     lunch: time({ startTime: t(12), endTime: t(15) }),
  *     dinner: time(
- *       { start: t(17), end: t(21) },
- *       { start: t(18), end: t(22), dayOfWeek: weekend },
+ *       { startTime: t(17), endTime: t(21) },
+ *       { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
  *     ),
  *   },
  *
@@ -249,9 +249,9 @@ export {
 } from "./schedule.js";
 
 export type {
-  TimeEntry,
   CoverageEntry,
   CoverageOptions,
+  CoverageVariant,
   RuleEntry,
   RuleOptions,
   EntityOnlyRuleOptions,

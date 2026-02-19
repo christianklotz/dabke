@@ -29,7 +29,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     const restaurant = defineSchedule({
       roles: ["waiter"],
       times: {
-        lunch: time({ start: t(12), end: t(15) }),
+        lunch: time({ startTime: t(12), endTime: t(15) }),
       },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -76,7 +76,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     const shop = defineSchedule({
       roles: ["clerk"],
       times: {
-        shift: time({ start: t(9), end: t(17) }),
+        shift: time({ startTime: t(9), endTime: t(17) }),
       },
       coverage: [cover("shift", "clerk", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
@@ -115,7 +115,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     const bar = defineSchedule({
       roles: ["bartender"],
       times: {
-        night: time({ start: t(20), end: t(23) }),
+        night: time({ startTime: t(20), endTime: t(23) }),
       },
       coverage: [cover("night", "bartender", 1)],
       shiftPatterns: [shift("evening", t(20), t(23))],

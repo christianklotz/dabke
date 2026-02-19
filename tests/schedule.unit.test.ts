@@ -55,7 +55,7 @@ describe("weekdays / weekend", () => {
 
 describe("time()", () => {
   it("creates a simple SemanticTimeDef from a single entry", () => {
-    const result = time({ start: t(12), end: t(15) });
+    const result = time({ startTime: t(12), endTime: t(15) });
     expect(result).toEqual({
       startTime: { hours: 12, minutes: 0 },
       endTime: { hours: 15, minutes: 0 },
@@ -64,8 +64,8 @@ describe("time()", () => {
 
   it("creates SemanticTimeVariant[] from multiple entries", () => {
     const result = time(
-      { start: t(17), end: t(21) },
-      { start: t(18), end: t(22), dayOfWeek: weekend },
+      { startTime: t(17), endTime: t(21) },
+      { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
     );
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(2);
@@ -75,15 +75,15 @@ describe("time()", () => {
   });
 
   it("creates variant array from a single scoped entry (no default)", () => {
-    const result = time({ start: t(16), end: t(18), dayOfWeek: ["friday"] });
+    const result = time({ startTime: t(16), endTime: t(18), dayOfWeek: ["friday"] });
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(1);
   });
 
   it("supports date-scoped entries", () => {
     const result = time(
-      { start: t(17), end: t(21) },
-      { start: t(15), end: t(19), dates: ["2024-12-24"] },
+      { startTime: t(17), endTime: t(21) },
+      { startTime: t(15), endTime: t(19), dates: ["2024-12-24"] },
     );
     expect(Array.isArray(result)).toBe(true);
     const variants = result as unknown as Array<Record<string, unknown>>;
@@ -95,9 +95,9 @@ describe("time()", () => {
   });
 
   it("throws on multiple default entries", () => {
-    expect(() => time({ start: t(12), end: t(15) }, { start: t(13), end: t(16) })).toThrow(
-      "at most one default entry",
-    );
+    expect(() =>
+      time({ startTime: t(12), endTime: t(15) }, { startTime: t(13), endTime: t(16) }),
+    ).toThrow("at most one default entry");
   });
 });
 
@@ -132,6 +132,60 @@ describe("cover()", () => {
   it("supports skills option", () => {
     const entry = cover("lunch", "waiter", 1, { skills: ["senior"] });
     expect(entry.options.skills).toEqual(["senior"]);
+  });
+
+  it("creates a variant coverage entry", () => {
+    const entry = cover("dinner", "waiter", { count: 3 }, { count: 1, dates: ["2025-12-24"] });
+    expect(entry._type).toBe("coverage");
+    expect(entry.timeName).toBe("dinner");
+    expect(entry.target).toBe("waiter");
+    expect(entry.variants).toHaveLength(2);
+    expect(entry.variants![0]).toEqual({ count: 3 });
+    expect(entry.variants![1]).toEqual({ count: 1, dates: ["2025-12-24"] });
+  });
+
+  it("creates variant entry with dayOfWeek scoping", () => {
+    const entry = cover(
+      "dinner",
+      "waiter",
+      { count: 2, dayOfWeek: weekdays },
+      { count: 4, dayOfWeek: weekend },
+      { count: 6, dates: ["2025-12-31"] },
+    );
+    expect(entry.variants).toHaveLength(3);
+  });
+
+  it("creates variant entry with array target", () => {
+    const entry = cover(
+      "lunch",
+      ["manager", "supervisor"],
+      { count: 1 },
+      { count: 2, dayOfWeek: weekend },
+    );
+    expect(entry.target).toEqual(["manager", "supervisor"]);
+    expect(entry.variants).toHaveLength(2);
+  });
+
+  it("throws on multiple default variants", () => {
+    expect(() => cover("lunch", "waiter", { count: 2 }, { count: 3 })).toThrow(
+      "at most one default variant",
+    );
+  });
+
+  it("allows a single default variant", () => {
+    const entry = cover("lunch", "waiter", { count: 2 });
+    expect(entry.variants).toHaveLength(1);
+    expect(entry.variants![0]).toEqual({ count: 2 });
+  });
+
+  it("allows no default variant (scoped-only)", () => {
+    const entry = cover(
+      "lunch",
+      "waiter",
+      { count: 2, dayOfWeek: weekdays },
+      { count: 3, dayOfWeek: weekend },
+    );
+    expect(entry.variants).toHaveLength(2);
   });
 });
 
@@ -270,7 +324,7 @@ describe("rule functions", () => {
 describe("defineSchedule() validation", () => {
   const minConfig = () => ({
     roles: ["waiter"] as const,
-    times: { lunch: time({ start: t(12), end: t(15) }) },
+    times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
     coverage: [cover("lunch", "waiter", 1)],
     shiftPatterns: [shift("lunch_shift", t(12), t(15))],
   });
@@ -304,7 +358,7 @@ describe("defineSchedule() validation", () => {
     expect(() =>
       defineSchedule({
         roles: ["waiter"] as const,
-        times: { lunch: time({ start: t(12), end: t(15) }) },
+        times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
         coverage: [cover("lunch", "chef" as "waiter", 1)],
         shiftPatterns: [shift("s", t(12), t(15))],
       }),
@@ -316,7 +370,7 @@ describe("defineSchedule() validation", () => {
       defineSchedule({
         roles: ["waiter"] as const,
         skills: ["senior"] as const,
-        times: { lunch: time({ start: t(12), end: t(15) }) },
+        times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
         // "senior" is a skill, not a role, so this should throw at runtime
         coverage: [cover("lunch", ["waiter", "senior"] as unknown as ["waiter", "waiter"], 1)],
         shiftPatterns: [shift("s", t(12), t(15))],
@@ -329,7 +383,7 @@ describe("defineSchedule() validation", () => {
       defineSchedule({
         roles: ["waiter"] as const,
         skills: ["senior"] as const,
-        times: { lunch: time({ start: t(12), end: t(15) }) },
+        times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
         coverage: [cover("lunch", "waiter", 1, { skills: ["unknown" as "senior"] })],
         shiftPatterns: [shift("s", t(12), t(15))],
       }),
@@ -347,8 +401,11 @@ describe("createSchedulerConfig()", () => {
     skills: ["senior", "keyholder"],
 
     times: {
-      lunch: time({ start: t(12), end: t(15) }),
-      dinner: time({ start: t(17), end: t(21) }, { start: t(18), end: t(22), dayOfWeek: weekend }),
+      lunch: time({ startTime: t(12), endTime: t(15) }),
+      dinner: time(
+        { startTime: t(17), endTime: t(21) },
+        { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
+      ),
     },
 
     coverage: [
@@ -486,7 +543,7 @@ describe("createSchedulerConfig()", () => {
   it("translates timeOff with from only", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [timeOff({ appliesTo: "alice", dayOfWeek: ["wednesday"], from: t(14) })],
@@ -505,7 +562,7 @@ describe("createSchedulerConfig()", () => {
   it("translates timeOff with until only", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [timeOff({ appliesTo: "alice", dayOfWeek: ["monday"], until: t(12) })],
@@ -524,7 +581,7 @@ describe("createSchedulerConfig()", () => {
   it("translates timeOff with both from and until", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [timeOff({ appliesTo: "bob", dayOfWeek: ["friday"], from: t(14), until: t(18) })],
@@ -563,7 +620,7 @@ describe("createSchedulerConfig()", () => {
   it("resolves appliesTo with member IDs", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [maxHoursPerDay(8, { appliesTo: "alice" })],
@@ -582,7 +639,7 @@ describe("createSchedulerConfig()", () => {
   it("omits priority when not specified (rule schema provides the default)", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [maxHoursPerDay(8)],
@@ -601,7 +658,7 @@ describe("createSchedulerConfig()", () => {
   it("merges runtime rules", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [maxHoursPerDay(10)],
@@ -626,7 +683,7 @@ describe("createSchedulerConfig()", () => {
   it("applies dayOfWeek filter from config", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
@@ -658,7 +715,7 @@ describe("runtime validation", () => {
   const def = defineSchedule({
     roles: ["waiter"] as const,
     skills: ["senior"] as const,
-    times: { lunch: time({ start: t(12), end: t(15) }) },
+    times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
     coverage: [cover("lunch", "waiter", 1)],
     shiftPatterns: [shift("s", t(12), t(15))],
     rules: [maxHoursPerDay(8, { appliesTo: "waiter" })],
@@ -687,7 +744,7 @@ describe("runtime validation", () => {
   it("throws if appliesTo target is unknown", () => {
     const def2 = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [maxHoursPerDay(8, { appliesTo: "nonexistent" })],
@@ -705,7 +762,7 @@ describe("runtime validation", () => {
     const def2 = defineSchedule({
       roles: ["waiter"] as const,
       skills: ["senior"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [maxHoursPerDay(8, { appliesTo: ["waiter", "senior"] })],
@@ -722,7 +779,7 @@ describe("runtime validation", () => {
   it("throws if assignTogether references unknown member ID", () => {
     const def2 = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [assignTogether(["alice", "bbo"], { priority: "HIGH" })],
@@ -772,7 +829,7 @@ describe("runtime validation", () => {
   it("throws if timeOff has no time scope", () => {
     const def2 = defineSchedule({
       roles: ["waiter"] as const,
-      times: { lunch: time({ start: t(12), end: t(15) }) },
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [timeOff({ appliesTo: "alice" })],
@@ -798,7 +855,7 @@ describe("end-to-end config structure", () => {
       skills: ["senior"],
 
       times: {
-        lunch: time({ start: t(12), end: t(15) }),
+        lunch: time({ startTime: t(12), endTime: t(15) }),
       },
 
       coverage: [cover("lunch", "waiter", 2), cover("lunch", "senior", 1)],
@@ -834,5 +891,201 @@ describe("end-to-end config structure", () => {
       (c) => "skills" in c && c.skills?.includes("senior"),
     );
     expect(skillCoverage.length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// Variant coverage through defineSchedule
+// ============================================================================
+
+describe("variant coverage", () => {
+  it("resolves variant coverage through defineSchedule", () => {
+    const def = defineSchedule({
+      roles: ["waiter"] as const,
+      times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
+      coverage: [cover("dinner", "waiter", { count: 3 }, { count: 1, dates: ["2025-02-05"] })],
+      shiftPatterns: [shift("evening", t(17), t(22))],
+    });
+
+    const config = def.createSchedulerConfig({
+      schedulingPeriod: {
+        dateRange: { start: "2025-02-03", end: "2025-02-07" },
+      },
+      members: [
+        { id: "alice", roles: ["waiter"] },
+        { id: "bob", roles: ["waiter"] },
+        { id: "charlie", roles: ["waiter"] },
+      ],
+    });
+
+    // 5 days of coverage
+    expect(config.coverage).toHaveLength(5);
+
+    // Feb 5 should have count=1, all others count=3
+    const feb5 = config.coverage.find((c) => c.day === "2025-02-05");
+    const others = config.coverage.filter((c) => c.day !== "2025-02-05");
+
+    expect(feb5?.targetCount).toBe(1);
+    for (const c of others) {
+      expect(c.targetCount).toBe(3);
+    }
+  });
+
+  it("resolves variant with dayOfWeek scoping", () => {
+    const def = defineSchedule({
+      roles: ["waiter"] as const,
+      times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
+      coverage: [
+        cover(
+          "dinner",
+          "waiter",
+          { count: 2, dayOfWeek: weekdays },
+          { count: 4, dayOfWeek: weekend },
+        ),
+      ],
+      shiftPatterns: [shift("evening", t(17), t(22))],
+    });
+
+    const config = def.createSchedulerConfig({
+      // 2025-02-03 is Monday
+      schedulingPeriod: { dateRange: { start: "2025-02-03", end: "2025-02-09" } },
+      members: [
+        { id: "a", roles: ["waiter"] },
+        { id: "b", roles: ["waiter"] },
+        { id: "c", roles: ["waiter"] },
+        { id: "d", roles: ["waiter"] },
+      ],
+    });
+
+    const weekdayCoverage = config.coverage.filter(
+      (c) => c.day >= "2025-02-03" && c.day <= "2025-02-07",
+    );
+    const weekendCoverage = config.coverage.filter(
+      (c) => c.day === "2025-02-08" || c.day === "2025-02-09",
+    );
+
+    for (const c of weekdayCoverage) {
+      expect(c.targetCount).toBe(2);
+    }
+    for (const c of weekendCoverage) {
+      expect(c.targetCount).toBe(4);
+    }
+  });
+
+  it("resolves variant with skill-only target", () => {
+    const def = defineSchedule({
+      roles: ["waiter"] as const,
+      skills: ["keyholder"] as const,
+      times: { opening: time({ startTime: t(6), endTime: t(8) }) },
+      coverage: [cover("opening", "keyholder", { count: 1 }, { count: 2, dayOfWeek: weekend })],
+      shiftPatterns: [shift("morning", t(6), t(8))],
+    });
+
+    const config = def.createSchedulerConfig({
+      // 2025-02-07 Fri, 2025-02-08 Sat
+      schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
+      members: [
+        { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
+        { id: "bob", roles: ["waiter"], skills: ["keyholder"] },
+      ],
+    });
+
+    expect(config.coverage).toHaveLength(2);
+
+    const fri = config.coverage.find((c) => c.day === "2025-02-07");
+    const sat = config.coverage.find((c) => c.day === "2025-02-08");
+
+    expect(fri?.targetCount).toBe(1);
+    expect(sat?.targetCount).toBe(2);
+    expect(fri?.skills).toEqual(["keyholder"]);
+  });
+
+  it("resolves variant with OR-role target", () => {
+    const def = defineSchedule({
+      roles: ["manager", "supervisor"] as const,
+      times: { service: time({ startTime: t(11), endTime: t(22) }) },
+      coverage: [
+        cover("service", ["manager", "supervisor"], { count: 1 }, { count: 2, dayOfWeek: weekend }),
+      ],
+      shiftPatterns: [shift("full", t(11), t(22))],
+    });
+
+    const config = def.createSchedulerConfig({
+      // 2025-02-07 Fri, 2025-02-08 Sat
+      schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
+      members: [
+        { id: "alice", roles: ["manager"] },
+        { id: "bob", roles: ["supervisor"] },
+      ],
+    });
+
+    expect(config.coverage).toHaveLength(2);
+
+    const fri = config.coverage.find((c) => c.day === "2025-02-07");
+    const sat = config.coverage.find((c) => c.day === "2025-02-08");
+
+    expect(fri?.targetCount).toBe(1);
+    expect(sat?.targetCount).toBe(2);
+    expect(fri?.roles).toEqual(["manager", "supervisor"]);
+  });
+
+  it("emits no coverage for days without matching variant", () => {
+    const def = defineSchedule({
+      roles: ["waiter"] as const,
+      times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
+      coverage: [cover("dinner", "waiter", { count: 4, dayOfWeek: weekend })],
+      shiftPatterns: [shift("evening", t(17), t(22))],
+    });
+
+    const config = def.createSchedulerConfig({
+      // 2025-02-03 is Monday
+      schedulingPeriod: { dateRange: { start: "2025-02-03", end: "2025-02-07" } },
+      members: [{ id: "alice", roles: ["waiter"] }],
+    });
+
+    // Only weekdays in range, variant only covers weekends — no coverage
+    expect(config.coverage).toHaveLength(0);
+  });
+
+  it("can mix variant and simple coverage for different roles", () => {
+    const def = defineSchedule({
+      roles: ["waiter", "manager"] as const,
+      times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
+      coverage: [
+        cover("dinner", "waiter", { count: 2 }, { count: 4, dayOfWeek: weekend }),
+        cover("dinner", "manager", 1),
+      ],
+      shiftPatterns: [shift("evening", t(17), t(22))],
+    });
+
+    const config = def.createSchedulerConfig({
+      // 2025-02-07 Fri, 2025-02-08 Sat
+      schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
+      members: [
+        { id: "a", roles: ["waiter"] },
+        { id: "b", roles: ["waiter"] },
+        { id: "c", roles: ["waiter"] },
+        { id: "d", roles: ["waiter"] },
+        { id: "m", roles: ["manager"] },
+      ],
+    });
+
+    // Variant waiter coverage: 2 entries (one per day)
+    // Simple manager coverage: 2 entries (one per day)
+    expect(config.coverage).toHaveLength(4);
+
+    const waiterFri = config.coverage.find(
+      (c) => c.day === "2025-02-07" && c.roles?.includes("waiter"),
+    );
+    const waiterSat = config.coverage.find(
+      (c) => c.day === "2025-02-08" && c.roles?.includes("waiter"),
+    );
+    const managerFri = config.coverage.find(
+      (c) => c.day === "2025-02-07" && c.roles?.includes("manager"),
+    );
+
+    expect(waiterFri?.targetCount).toBe(2);
+    expect(waiterSat?.targetCount).toBe(4);
+    expect(managerFri?.targetCount).toBe(1);
   });
 });

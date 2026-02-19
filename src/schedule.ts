@@ -18,10 +18,10 @@
  *   skills: ["senior"],
  *
  *   times: {
- *     lunch: time({ start: t(12), end: t(15) }),
+ *     lunch: time({ startTime: t(12), endTime: t(15) }),
  *     dinner: time(
- *       { start: t(17), end: t(21) },
- *       { start: t(18), end: t(22), dayOfWeek: weekend },
+ *       { startTime: t(17), endTime: t(21) },
+ *       { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
  *     ),
  *   },
  *
@@ -53,7 +53,10 @@ import type {
   SemanticTimeVariant,
   SemanticTimeEntry,
   MixedCoverageRequirement,
+  CoverageVariant,
 } from "./cpsat/semantic-time.js";
+
+export type { CoverageVariant } from "./cpsat/semantic-time.js";
 import { defineSemanticTimes } from "./cpsat/semantic-time.js";
 import { resolveDaysFromPeriod } from "./datetime.utils.js";
 import type { ModelBuilderConfig } from "./cpsat/model-builder.js";
@@ -66,7 +69,22 @@ import type { OvertimeTier } from "./cpsat/rules/overtime-tiered-multiplier.js";
 // Primitives
 // ============================================================================
 
-/** Creates a {@link TimeOfDay} value. */
+/**
+ * Creates a {@link TimeOfDay} value.
+ *
+ * @param hours - Hour component (0-23)
+ * @param minutes - Minute component (0-59)
+ *
+ * @example Hours only
+ * ```ts
+ * t(9)   // { hours: 9, minutes: 0 }
+ * ```
+ *
+ * @example Hours and minutes
+ * ```ts
+ * t(17, 30)  // { hours: 17, minutes: 30 }
+ * ```
+ */
 export function t(hours: number, minutes = 0): TimeOfDay {
   return { hours, minutes };
 }
@@ -87,51 +105,41 @@ export const weekend: readonly DayOfWeek[] = ["saturday", "sunday"] as const;
 // Semantic Times
 // ============================================================================
 
-/** A time entry within a {@link time} definition. */
-export interface TimeEntry {
-  /** When this time period starts. */
-  start: TimeOfDay;
-  /** When this time period ends. */
-  end: TimeOfDay;
-  /** Restrict this entry to specific days of the week. */
-  dayOfWeek?: readonly DayOfWeek[];
-  /** Restrict this entry to specific dates (YYYY-MM-DD). */
-  dates?: string[];
-}
-
 /**
  * Defines a semantic time period, optionally with day/date-scoped entries.
  *
  * @remarks
- * Every argument is a {@link TimeEntry} with the same shape. An entry without
- * `dayOfWeek`/`dates` is the default (applies when no scoped entry matches).
- * At most one default entry is allowed. If no default, the time only exists
- * on the scoped days.
+ * Every argument is a {@link SemanticTimeVariant} with `startTime`/`endTime`
+ * and optional `dayOfWeek`/`dates` scoping. An entry without scoping is the
+ * default (applies when no scoped entry matches). At most one default is
+ * allowed. If no default, the time only exists on the scoped days.
  *
  * Resolution precedence: `dates` > `dayOfWeek` > default.
  *
  * @example Every day
  * ```typescript
- * lunch: time({ start: t(12), end: t(15) }),
+ * lunch: time({ startTime: t(12), endTime: t(15) }),
  * ```
  *
  * @example Default with weekend variant
  * ```typescript
  * dinner: time(
- *   { start: t(17), end: t(21) },
- *   { start: t(18), end: t(22), dayOfWeek: weekend },
+ *   { startTime: t(17), endTime: t(21) },
+ *   { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
  * ),
  * ```
  *
  * @example No default (specific days only)
  * ```typescript
  * happy_hour: time(
- *   { start: t(16), end: t(18), dayOfWeek: ["monday", "tuesday"] },
- *   { start: t(17), end: t(19), dayOfWeek: ["friday"] },
+ *   { startTime: t(16), endTime: t(18), dayOfWeek: ["monday", "tuesday"] },
+ *   { startTime: t(17), endTime: t(19), dayOfWeek: ["friday"] },
  * ),
  * ```
  */
-export function time(...entries: [TimeEntry, ...TimeEntry[]]): SemanticTimeEntry {
+export function time(
+  ...entries: [SemanticTimeVariant, ...SemanticTimeVariant[]]
+): SemanticTimeEntry {
   // Validate: at most one default (no dayOfWeek and no dates)
   const defaults = entries.filter((e) => !e.dayOfWeek && !e.dates);
   if (defaults.length > 1) {
@@ -144,18 +152,18 @@ export function time(...entries: [TimeEntry, ...TimeEntry[]]): SemanticTimeEntry
   // Single entry without scoping: simple SemanticTimeDef
   if (entries.length === 1 && !entries[0].dayOfWeek && !entries[0].dates) {
     return {
-      startTime: entries[0].start,
-      endTime: entries[0].end,
+      startTime: entries[0].startTime,
+      endTime: entries[0].endTime,
     } satisfies SemanticTimeDef;
   }
 
-  // Multiple entries or scoped entries: SemanticTimeVariant[]
+  // Multiple entries or scoped entries: pass through directly
   return entries.map((entry): SemanticTimeVariant => {
     const variant: SemanticTimeVariant = {
-      startTime: entry.start,
-      endTime: entry.end,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
     };
-    if (entry.dayOfWeek) variant.dayOfWeek = entry.dayOfWeek as DayOfWeek[];
+    if (entry.dayOfWeek) variant.dayOfWeek = entry.dayOfWeek;
     if (entry.dates) variant.dates = entry.dates;
     return variant;
   });
@@ -165,7 +173,14 @@ export function time(...entries: [TimeEntry, ...TimeEntry[]]): SemanticTimeEntry
 // Coverage
 // ============================================================================
 
-/** Options for a {@link cover} call. */
+/**
+ * Options for a {@link cover} call (simple form).
+ *
+ * @remarks
+ * Day/date scoping controls which days this coverage entry applies to.
+ * An entry without `dayOfWeek` or `dates` applies every day in the
+ * scheduling period.
+ */
 export interface CoverageOptions {
   /** Additional skill filter (AND logic with the target role). */
   skills?: [string, ...string[]];
@@ -182,7 +197,8 @@ export interface CoverageOptions {
  *
  * @remarks
  * Carries the semantic time name and target type information for
- * compile-time validation by {@link defineSchedule}.
+ * compile-time validation by {@link defineSchedule}. This is an opaque
+ * token; pass it directly into the `coverage` array.
  */
 export interface CoverageEntry<T extends string = string, R extends string = string> {
   /** @internal */ readonly _type: "coverage";
@@ -190,30 +206,92 @@ export interface CoverageEntry<T extends string = string, R extends string = str
   /** @internal */ readonly target: R | R[];
   /** @internal */ readonly count: number;
   /** @internal */ readonly options: CoverageOptions;
+  /** @internal  When present, this entry uses variant-based resolution. */
+  readonly variants?: readonly CoverageVariant[];
 }
 
 /**
  * Defines a staffing requirement for a semantic time period.
  *
  * @remarks
- * The `target` parameter is resolved against declared `roles` and `skills`:
+ * **Simple form** `cover(time, target, count, opts?)` — a single count that
+ * applies on every day matched by the optional `dayOfWeek`/`dates` scope.
+ * Multiple simple entries for the same time/role produce independent
+ * constraints that all must be satisfied (they stack).
  *
- * - Single string: matched against roles first, then skills
- * - Array of strings: OR logic (any of the listed roles)
- * - With `skills` option: role AND skill(s) filter
+ * **Variant form** `cover(time, target, ...variants)` — day-specific counts
+ * with most-specific-wins resolution, mirroring {@link time} semantics.
+ * For each day, the single best-matching variant is selected using
+ * `dates` > `dayOfWeek` > default (unscoped). Only that variant's count is
+ * emitted — variants within a single `cover()` call never stack.
+ *
+ * Use the simple form for uniform coverage and the variant form when the
+ * same role needs different counts on different days (including decreasing
+ * below the default on specific dates).
+ *
+ * **Target resolution.** The `target` parameter is resolved against declared
+ * `roles` and `skills`:
+ *
+ * - Single string: matched against roles first, then skills.
+ * - Array of strings: OR logic (any of the listed roles).
+ * - With `skills` option (simple form only): role AND skill(s) filter.
  *
  * @param timeName - Name of a declared semantic time
  * @param target - Role name, skill name, or array of role names (OR)
- * @param count - Number of people needed
- * @param opts - See {@link CoverageOptions}
+ * @param countOrVariant - Number of people (simple form) or first variant
+ * @param rest - Options object (simple form) or remaining variants
  *
- * @example
+ * @example Basic role coverage (simple form)
  * ```typescript
- * cover("lunch", "waiter", 2),
- * cover("lunch", ["manager", "supervisor"], 1),
- * cover("dinner", "keyholder", 1),
- * cover("lunch", "waiter", 1, { skills: ["senior"] }),
+ * cover("lunch", "waiter", 2)
+ * ```
+ *
+ * @example OR logic (any of the listed roles)
+ * ```typescript
+ * cover("lunch", ["manager", "supervisor"], 1)
+ * ```
+ *
+ * @example Skill-based coverage
+ * ```typescript
+ * cover("dinner", "keyholder", 1)
+ * ```
+ *
+ * @example Role with skill filter (role AND skill)
+ * ```typescript
+ * cover("lunch", "waiter", 1, { skills: ["senior"] })
+ * ```
+ *
+ * @example Mutually exclusive day scoping (simple form, no stacking)
+ * ```typescript
+ * cover("lunch", "waiter", 2, { dayOfWeek: weekdays }),
  * cover("lunch", "waiter", 3, { dayOfWeek: weekend }),
+ * ```
+ *
+ * @example Day-specific overrides (variant form)
+ * ```typescript
+ * // Default 2 waiters; 5 on New Year's Eve
+ * cover("dinner", "waiter",
+ *   { count: 2 },
+ *   { count: 5, dates: ["2025-12-31"] },
+ * )
+ * ```
+ *
+ * @example Decrease from default on a specific date (variant form)
+ * ```typescript
+ * // Default 3 waiters; 1 on Christmas Eve
+ * cover("dinner", "waiter",
+ *   { count: 3 },
+ *   { count: 1, dates: ["2025-12-24"] },
+ * )
+ * ```
+ *
+ * @example Weekday vs weekend with holiday override (variant form)
+ * ```typescript
+ * cover("dinner", "waiter",
+ *   { count: 2, dayOfWeek: weekdays },
+ *   { count: 4, dayOfWeek: weekend },
+ *   { count: 6, dates: ["2025-12-31"] },
+ * )
  * ```
  */
 export function cover<T extends string, R extends string>(
@@ -221,13 +299,47 @@ export function cover<T extends string, R extends string>(
   target: R | [R, ...R[]],
   count: number,
   opts?: CoverageOptions,
+): CoverageEntry<T, R>;
+export function cover<T extends string, R extends string>(
+  timeName: T,
+  target: R | [R, ...R[]],
+  ...variants: [CoverageVariant, ...CoverageVariant[]]
+): CoverageEntry<T, R>;
+export function cover<T extends string, R extends string>(
+  timeName: T,
+  target: R | [R, ...R[]],
+  countOrFirstVariant: number | CoverageVariant,
+  ...rest: unknown[]
 ): CoverageEntry<T, R> {
+  if (typeof countOrFirstVariant === "number") {
+    // Simple form: cover(time, target, count, opts?)
+    return {
+      _type: "coverage",
+      timeName,
+      target,
+      count: countOrFirstVariant,
+      options: (rest[0] as CoverageOptions | undefined) ?? {},
+    };
+  }
+
+  // Variant form: cover(time, target, ...variants)
+  const variants = [countOrFirstVariant, ...(rest as CoverageVariant[])];
+
+  const defaults = variants.filter((v) => !v.dayOfWeek && !v.dates);
+  if (defaults.length > 1) {
+    throw new Error(
+      "cover() accepts at most one default variant (without dayOfWeek or dates). " +
+        `Found ${defaults.length} default variants.`,
+    );
+  }
+
   return {
     _type: "coverage",
     timeName,
     target,
-    count,
-    options: opts ?? {},
+    count: 0,
+    options: {},
+    variants,
   };
 }
 
@@ -289,28 +401,51 @@ export interface RuleOptions {
   priority?: Priority;
 }
 
-/** Options for rules that support entity scoping only (no time scoping). */
+/**
+ * Options for rules that support entity scoping only (no time scoping).
+ *
+ * @remarks
+ * Used by rules whose semantics are inherently per-day or per-week
+ * (e.g., {@link minHoursPerDay}, {@link maxConsecutiveDays}) and cannot
+ * be meaningfully restricted to a date range or day of week.
+ */
 export interface EntityOnlyRuleOptions {
+  /** Who this rule applies to (role name, skill name, or member ID). */
   appliesTo?: string | string[];
+  /** Defaults to `"MANDATORY"`. */
   priority?: Priority;
 }
 
-/** Options for {@link timeOff}. Time scoping is required. */
+/**
+ * Options for {@link timeOff}.
+ *
+ * @remarks
+ * At least one time scoping field is required (`dayOfWeek`, `dateRange`,
+ * `dates`, or `recurringPeriods`). Use `from`/`until` to block only part
+ * of a day.
+ */
 export interface TimeOffOptions {
+  /** Who this rule applies to (role name, skill name, or member ID). */
   appliesTo?: string | string[];
   /** Off from this time until end of day. */
   from?: TimeOfDay;
   /** Off from start of day until this time. */
   until?: TimeOfDay;
+  /** Restrict to specific days of the week. */
   dayOfWeek?: readonly DayOfWeek[];
+  /** Restrict to a date range. */
   dateRange?: { start: string; end: string };
+  /** Restrict to specific dates (YYYY-MM-DD). */
   dates?: string[];
+  /** Restrict to recurring calendar periods. */
   recurringPeriods?: [RecurringPeriod, ...RecurringPeriod[]];
+  /** Defaults to `"MANDATORY"`. */
   priority?: Priority;
 }
 
 /** Options for {@link assignTogether}. */
 export interface AssignTogetherOptions {
+  /** Defaults to `"MANDATORY"`. */
   priority?: Priority;
 }
 
@@ -339,7 +474,14 @@ interface RuleEntryBase {
   readonly _rule: CpsatRuleName;
 }
 
-/** An opaque rule entry returned by rule functions. */
+/**
+ * An opaque rule entry returned by rule functions.
+ *
+ * @remarks
+ * Pass these directly into the `rules` array of {@link ScheduleConfig} or
+ * the `runtimeRules` array of {@link RuntimeArgs}. The internal fields are
+ * resolved during {@link ScheduleDefinition.createSchedulerConfig}.
+ */
 export type RuleEntry = RuleEntryBase & Record<string, unknown>;
 
 function makeRule(rule: CpsatRuleName, fields: Record<string, unknown>): RuleEntry {
@@ -351,6 +493,16 @@ function makeRule(rule: CpsatRuleName, fields: Record<string, unknown>): RuleEnt
  *
  * @param hours - Maximum hours per day
  * @param opts - Entity and time scoping
+ *
+ * @example Global limit
+ * ```ts
+ * maxHoursPerDay(10)
+ * ```
+ *
+ * @example Scoped to a role
+ * ```ts
+ * maxHoursPerDay(6, { appliesTo: "student" })
+ * ```
  */
 export function maxHoursPerDay(hours: number, opts?: RuleOptions): RuleEntry {
   return makeRule("max-hours-day", { hours, ...opts });
@@ -361,16 +513,31 @@ export function maxHoursPerDay(hours: number, opts?: RuleOptions): RuleEntry {
  *
  * @param hours - Maximum hours per week
  * @param opts - Entity and time scoping
+ *
+ * @example Global cap
+ * ```ts
+ * maxHoursPerWeek(48)
+ * ```
+ *
+ * @example Part-time cap for a skill group
+ * ```ts
+ * maxHoursPerWeek(20, { appliesTo: "part_time" })
+ * ```
  */
 export function maxHoursPerWeek(hours: number, opts?: RuleOptions): RuleEntry {
   return makeRule("max-hours-week", { hours, ...opts });
 }
 
 /**
- * Ensures a person works at least a minimum number of hours per day.
+ * Ensures a person works at least a minimum number of hours per day when assigned.
  *
  * @param hours - Minimum hours per day
  * @param opts - Entity scoping only
+ *
+ * @example
+ * ```ts
+ * minHoursPerDay(4)
+ * ```
  */
 export function minHoursPerDay(hours: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-hours-day", { hours, ...opts });
@@ -381,6 +548,11 @@ export function minHoursPerDay(hours: number, opts?: EntityOnlyRuleOptions): Rul
  *
  * @param hours - Minimum hours per week
  * @param opts - Entity scoping only
+ *
+ * @example Guaranteed minimum for full-time members
+ * ```ts
+ * minHoursPerWeek(30, { appliesTo: "full_time" })
+ * ```
  */
 export function minHoursPerWeek(hours: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-hours-week", { hours, ...opts });
@@ -391,6 +563,11 @@ export function minHoursPerWeek(hours: number, opts?: EntityOnlyRuleOptions): Ru
  *
  * @param shifts - Maximum shifts per day
  * @param opts - Entity and time scoping
+ *
+ * @example One shift per day
+ * ```ts
+ * maxShiftsPerDay(1)
+ * ```
  */
 export function maxShiftsPerDay(shifts: number, opts?: RuleOptions): RuleEntry {
   return makeRule("max-shifts-day", { shifts, ...opts });
@@ -401,17 +578,26 @@ export function maxShiftsPerDay(shifts: number, opts?: RuleOptions): RuleEntry {
  *
  * @param days - Maximum consecutive days
  * @param opts - Entity scoping only
+ *
+ * @example Five-day work week limit
+ * ```ts
+ * maxConsecutiveDays(5)
+ * ```
  */
 export function maxConsecutiveDays(days: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("max-consecutive-days", { days, ...opts });
 }
 
 /**
- * Requires that once a person starts working, they continue for a minimum
- * number of consecutive days.
+ * Requires a minimum stretch of consecutive working days once assigned.
  *
  * @param days - Minimum consecutive days
  * @param opts - Entity scoping only
+ *
+ * @example
+ * ```ts
+ * minConsecutiveDays(2)
+ * ```
  */
 export function minConsecutiveDays(days: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-consecutive-days", { days, ...opts });
@@ -422,6 +608,11 @@ export function minConsecutiveDays(days: number, opts?: EntityOnlyRuleOptions): 
  *
  * @param hours - Minimum rest hours between shifts
  * @param opts - Entity scoping only
+ *
+ * @example EU Working Time Directive (11 hours)
+ * ```ts
+ * minRestBetweenShifts(11)
+ * ```
  */
 export function minRestBetweenShifts(hours: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-rest-between-shifts", { hours, ...opts });
@@ -432,6 +623,16 @@ export function minRestBetweenShifts(hours: number, opts?: EntityOnlyRuleOptions
  *
  * @param level - `"high"` to prefer assigning, `"low"` to avoid
  * @param opts - Entity and time scoping (no priority; preference is the priority mechanism)
+ *
+ * @example Prefer assigning waiters
+ * ```ts
+ * preference("high", { appliesTo: "waiter" })
+ * ```
+ *
+ * @example Avoid assigning a specific member on weekends
+ * ```ts
+ * preference("low", { appliesTo: "alice", dayOfWeek: weekend })
+ * ```
  */
 export function preference(level: "high" | "low", opts?: Omit<RuleOptions, "priority">): RuleEntry {
   return makeRule("assignment-priority", { preference: level, ...opts });
@@ -442,6 +643,11 @@ export function preference(level: "high" | "low", opts?: Omit<RuleOptions, "prio
  *
  * @param locationId - The location to prefer
  * @param opts - Entity scoping only
+ *
+ * @example
+ * ```ts
+ * preferLocation("terrace", { appliesTo: "alice" })
+ * ```
  */
 export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("location-preference", { locationId, ...opts });
@@ -450,6 +656,7 @@ export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions)
 /**
  * Tells the solver to minimize total labor cost.
  *
+ * @remarks
  * Without this rule, cost modifiers only affect post-solve calculation.
  * When present, the solver actively prefers cheaper assignments.
  *
@@ -458,6 +665,11 @@ export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions)
  * any assignment that week (zero marginal cost up to contracted hours).
  *
  * @param opts - Entity and time scoping
+ *
+ * @example
+ * ```ts
+ * minimizeCost()
+ * ```
  */
 export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
   return makeRule("minimize-cost", { ...opts });
@@ -466,7 +678,8 @@ export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
 /**
  * Multiplies the base rate for assignments on specified days.
  *
- * The base cost (1x) is already counted by `minimizeCost()`;
+ * @remarks
+ * The base cost (1x) is already counted by {@link minimizeCost};
  * this rule adds only the extra portion above 1x.
  *
  * @param factor - Multiplier (e.g., 1.5 for time-and-a-half)
@@ -482,8 +695,10 @@ export function dayMultiplier(factor: number, opts?: CostRuleOptions): RuleEntry
 }
 
 /**
- * Adds a flat extra amount per hour for assignments on specified days,
- * independent of the member's base rate.
+ * Adds a flat extra amount per hour for assignments on specified days.
+ *
+ * @remarks
+ * The surcharge is independent of the member's base rate.
  *
  * @param amountPerHour - Flat surcharge per hour in smallest currency unit
  * @param opts - Entity and time scoping
@@ -498,11 +713,14 @@ export function daySurcharge(amountPerHour: number, opts?: CostRuleOptions): Rul
 }
 
 /**
- * Adds a flat surcharge per hour for the portion of a shift that overlaps
- * a time-of-day window.
+ * Adds a flat surcharge per hour for the portion of a shift that overlaps a time-of-day window.
+ *
+ * @remarks
+ * The window supports overnight spans (e.g., 22:00-06:00). The surcharge
+ * is independent of the member's base rate.
  *
  * @param amountPerHour - Flat surcharge per hour in smallest currency unit
- * @param window - Time-of-day window (supports overnight, e.g., 22:00-06:00)
+ * @param window - Time-of-day window
  * @param opts - Entity and time scoping
  *
  * @example Night differential
@@ -519,8 +737,11 @@ export function timeSurcharge(
 }
 
 /**
- * Hours beyond the threshold per week are paid at `factor` times the base rate.
- * Only the extra portion above 1x is added.
+ * Applies a multiplier to hours beyond a weekly threshold.
+ *
+ * @remarks
+ * Only the extra portion above 1x is added (the base cost is already
+ * counted by {@link minimizeCost}).
  *
  * @param opts - Must include `after` (hours threshold) and `factor` (multiplier)
  *
@@ -536,8 +757,10 @@ export function overtimeMultiplier(
 }
 
 /**
- * Hours beyond the threshold per week get a flat surcharge per hour,
- * independent of the member's base rate.
+ * Adds a flat surcharge per hour beyond a weekly threshold.
+ *
+ * @remarks
+ * The surcharge is independent of the member's base rate.
  *
  * @param opts - Must include `after` (hours threshold) and `amount` (flat extra per hour)
  *
@@ -553,8 +776,11 @@ export function overtimeSurcharge(
 }
 
 /**
- * Hours beyond the threshold per day are paid at `factor` times the base rate.
- * Only the extra portion above 1x is added.
+ * Applies a multiplier to hours beyond a daily threshold.
+ *
+ * @remarks
+ * Only the extra portion above 1x is added (the base cost is already
+ * counted by {@link minimizeCost}).
  *
  * @param opts - Must include `after` (hours threshold per day) and `factor`
  *
@@ -570,8 +796,10 @@ export function dailyOvertimeMultiplier(
 }
 
 /**
- * Hours beyond the threshold per day get a flat surcharge per hour,
- * independent of the member's base rate.
+ * Adds a flat surcharge per hour beyond a daily threshold.
+ *
+ * @remarks
+ * The surcharge is independent of the member's base rate.
  *
  * @param opts - Must include `after` (hours threshold per day) and `amount`
  *
@@ -587,8 +815,11 @@ export function dailyOvertimeSurcharge(
 }
 
 /**
- * Multiple overtime thresholds with increasing multipliers.
+ * Applies multiple overtime thresholds with increasing multipliers.
+ *
+ * @remarks
  * Each tier applies only to the hours between its threshold and the next.
+ * Tiers must be sorted by threshold ascending.
  *
  * @param tiers - At least one tier, sorted by threshold ascending
  * @param opts - Entity and time scoping
@@ -656,7 +887,14 @@ export function assignTogether(
 // Schedule Definition
 // ============================================================================
 
-/** Runtime arguments passed to {@link ScheduleDefinition.createSchedulerConfig}. */
+/**
+ * Runtime arguments passed to {@link ScheduleDefinition.createSchedulerConfig}.
+ *
+ * @remarks
+ * Separates data known at runtime (team roster, date range, ad-hoc rules)
+ * from the static schedule definition. Runtime rules are merged after the
+ * definition's own rules and undergo the same `appliesTo` resolution.
+ */
 export interface RuntimeArgs {
   /** The scheduling period (date range + optional filters). */
   schedulingPeriod: SchedulingPeriod;
@@ -682,7 +920,15 @@ export interface ScheduleDefinition {
   readonly ruleNames: readonly string[];
 }
 
-/** Configuration for {@link defineSchedule}. */
+/**
+ * Configuration for {@link defineSchedule}.
+ *
+ * @remarks
+ * Coverage entries for the same semantic time and target stack additively.
+ * An unscoped entry applies every day; adding a weekend-only entry on top
+ * doubles the count on those days. Use mutually exclusive `dayOfWeek` on
+ * both entries to avoid stacking. See {@link cover} for details.
+ */
 export interface ScheduleConfig<
   R extends readonly string[],
   S extends readonly string[],
@@ -694,7 +940,7 @@ export interface ScheduleConfig<
   skills?: S;
   /** Named semantic time periods. */
   times: T;
-  /** Staffing requirements per time period. */
+  /** Staffing requirements per time period (entries stack additively). */
   coverage: CoverageEntry<keyof T & string, R[number] | NonNullable<S>[number]>[];
   /** Available shift patterns. */
   shiftPatterns: ShiftPattern[];
@@ -721,7 +967,7 @@ export interface ScheduleConfig<
  *
  * export default defineSchedule({
  *   roles: ["waiter", "manager"],
- *   times: { lunch: time({ start: t(12), end: t(15) }) },
+ *   times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
  *   coverage: [cover("lunch", "waiter", 2)],
  *   shiftPatterns: [shift("lunch_shift", t(12), t(15))],
  *   rules: [maxHoursPerDay(10)],
@@ -911,6 +1157,12 @@ function buildCoverageRequirements<T extends string>(
   skills: Set<string>,
 ): MixedCoverageRequirement<T>[] {
   return entries.map((entry) => {
+    // Variant form: produce a VariantCoverageRequirement
+    if (entry.variants) {
+      return buildVariantCoverageRequirement(entry, roles, skills);
+    }
+
+    // Simple form: produce a SemanticCoverageRequirement
     const base: {
       semanticTime: T;
       targetCount: number;
@@ -926,42 +1178,89 @@ function buildCoverageRequirements<T extends string>(
     if (entry.options.dayOfWeek) base.dayOfWeek = entry.options.dayOfWeek as DayOfWeek[];
     if (entry.options.dates) base.dates = entry.options.dates;
 
-    if (Array.isArray(entry.target)) {
-      // Array = OR of roles
-      return {
-        ...base,
-        roles: entry.target as [string, ...string[]],
-      } satisfies MixedCoverageRequirement<T>;
-    }
+    return buildSimpleCoverageTarget(entry, base, roles, skills);
+  }) as MixedCoverageRequirement<T>[];
+}
 
-    // Single target
-    const singleTarget = entry.target as string;
-    if (roles.has(singleTarget)) {
-      // Role-based coverage, optionally with skill filter
-      if (entry.options.skills) {
-        return {
-          ...base,
-          roles: [singleTarget] as [string, ...string[]],
-          skills: entry.options.skills,
-        } satisfies MixedCoverageRequirement<T>;
-      }
+/**
+ * Resolve the target (role/skill) for a simple coverage entry.
+ */
+function buildSimpleCoverageTarget<T extends string>(
+  entry: CoverageEntry<T, string>,
+  base: {
+    semanticTime: T;
+    targetCount: number;
+    priority?: Priority;
+    dayOfWeek?: DayOfWeek[];
+    dates?: string[];
+  },
+  roles: Set<string>,
+  skills: Set<string>,
+): MixedCoverageRequirement<T> {
+  if (Array.isArray(entry.target)) {
+    return {
+      ...base,
+      roles: entry.target as [string, ...string[]],
+    } satisfies MixedCoverageRequirement<T>;
+  }
+
+  const singleTarget = entry.target as string;
+  if (roles.has(singleTarget)) {
+    if (entry.options.skills) {
       return {
         ...base,
         roles: [singleTarget] as [string, ...string[]],
+        skills: entry.options.skills,
       } satisfies MixedCoverageRequirement<T>;
     }
+    return {
+      ...base,
+      roles: [singleTarget] as [string, ...string[]],
+    } satisfies MixedCoverageRequirement<T>;
+  }
 
+  if (skills.has(singleTarget)) {
+    return {
+      ...base,
+      skills: [singleTarget] as [string, ...string[]],
+    } satisfies MixedCoverageRequirement<T>;
+  }
+
+  throw new Error(`Coverage target "${singleTarget}" is not a declared role or skill.`);
+}
+
+/**
+ * Build a VariantCoverageRequirement from a variant-form CoverageEntry.
+ */
+function buildVariantCoverageRequirement<T extends string>(
+  entry: CoverageEntry<T, string>,
+  roles: Set<string>,
+  skills: Set<string>,
+): MixedCoverageRequirement<T> {
+  const variants = entry.variants! as unknown as [CoverageVariant, ...CoverageVariant[]];
+
+  const resolveTarget = (): {
+    roles?: [string, ...string[]];
+    skills?: [string, ...string[]];
+  } => {
+    if (Array.isArray(entry.target)) {
+      return { roles: entry.target as [string, ...string[]] };
+    }
+    const singleTarget = entry.target as string;
+    if (roles.has(singleTarget)) {
+      return { roles: [singleTarget] as [string, ...string[]] };
+    }
     if (skills.has(singleTarget)) {
-      // Skill-based coverage
-      return {
-        ...base,
-        skills: [singleTarget] as [string, ...string[]],
-      } satisfies MixedCoverageRequirement<T>;
+      return { skills: [singleTarget] as [string, ...string[]] };
     }
-
-    // Should not reach here due to validation in defineSchedule
     throw new Error(`Coverage target "${singleTarget}" is not a declared role or skill.`);
-  }) as MixedCoverageRequirement<T>[];
+  };
+
+  return {
+    semanticTime: entry.timeName,
+    variants,
+    ...resolveTarget(),
+  } as MixedCoverageRequirement<T>;
 }
 
 // ============================================================================
@@ -971,10 +1270,11 @@ function buildCoverageRequirements<T extends string>(
 /**
  * Resolves an `appliesTo` value into entity scope fields.
  *
+ * @remarks
  * Each target string is checked against roles, skills, then member IDs.
  * If all targets resolve to the same namespace, they are combined into one
- * scope field. If they span namespaces, an error is thrown (the caller should
- * use separate rule entries).
+ * scope field. If they span namespaces, an error is thrown; the caller
+ * should use separate rule entries instead.
  */
 function resolveAppliesTo(
   appliesTo: string | string[] | undefined,
@@ -1122,7 +1422,11 @@ function resolveRules(
 
 /**
  * Sorts rules so that `minimize-cost` compiles before cost modifier rules.
- * Non-cost rules retain their original order.
+ *
+ * @remarks
+ * The `minimize-cost` rule must be compiled first because modifier rules
+ * (multipliers, surcharges) reference cost variables it creates.
+ * Non-cost rules retain their original relative order.
  */
 function sortCostRulesFirst(rules: RuleEntry[]): RuleEntry[] {
   return rules.toSorted((a, b) => {
