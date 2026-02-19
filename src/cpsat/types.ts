@@ -19,8 +19,8 @@ export interface HourlyPay {
  * (`annual / 52`) that is incurred once they work any shift in a week.
  * Additional shifts within the same week have zero marginal cost.
  *
- * Note: overtime rules currently apply only to hourly members.
- * Salaried members are skipped by overtime multiplier/surcharge rules.
+ * Note: overtime multiplier rules apply only to hourly members.
+ * Overtime surcharge rules apply to all members regardless of pay type.
  *
  * @category Types
  */
@@ -74,8 +74,8 @@ export interface SchedulingMember {
  * @example
  * // Restaurant: different shifts for different roles
  * const patterns: ShiftPattern[] = [
- *   { id: "kitchen_morning", startTime: { hours: 6 }, endTime: { hours: 14 }, roleIds: ["chef", "prep_cook"] },
- *   { id: "floor_lunch", startTime: { hours: 11 }, endTime: { hours: 15 }, roleIds: ["waiter", "host"] },
+ *   { id: "kitchen_morning", startTime: { hours: 6 }, endTime: { hours: 14 }, roles: ["chef", "prep_cook"] },
+ *   { id: "floor_lunch", startTime: { hours: 11 }, endTime: { hours: 15 }, roles: ["waiter", "host"] },
  * ];
  */
 export interface ShiftPattern {
@@ -89,13 +89,13 @@ export interface ShiftPattern {
    * Restricts who can be assigned to this shift based on their roles.
    *
    * - If omitted: anyone can work this shift
-   * - If provided: only team members whose roleIds overlap with this list can be assigned
+   * - If provided: only team members whose roles overlap with this list can be assigned
    *
    * Most venues have the same shifts for everyone and don't need this.
    * Use it when different roles have different schedules (e.g., kitchen staff starts
    * earlier than floor staff).
    */
-  roleIds?: [string, ...string[]];
+  roles?: [string, ...string[]];
 
   /**
    * Restricts which days of the week this shift pattern can be used.

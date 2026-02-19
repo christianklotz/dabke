@@ -82,6 +82,7 @@ export function createOvertimeWeeklyMultiplierRule(
 
       for (const emp of targetMembers) {
         const rate = getHourlyRate(emp);
+        if (rate === undefined) continue;
 
         for (const [weekIdx, weekDays] of weeks.entries()) {
           // Build total minutes expression and compute per-member week max
@@ -128,7 +129,7 @@ export function createOvertimeWeeklyMultiplierRule(
           // Penalty tightens the variable via minimization.
           // For int vars, coeff is per unit (minute). Scale so max overtime
           // contribution is proportional to OBJECTIVE_WEIGHTS.COST.
-          if (rate !== undefined && rate > 0) {
+          if (rate > 0) {
             const totalOvertimeCost = (rate * extraFactor * maxOvertime) / 60;
             if (hasCostContext) {
               const normalizedMax = totalOvertimeCost / b.costContext!.normalizationFactor;
@@ -140,7 +141,6 @@ export function createOvertimeWeeklyMultiplierRule(
               );
             }
           } else {
-            // Token penalty for tightening
             b.addPenalty(overtimeVar, 1);
           }
         }

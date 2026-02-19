@@ -235,34 +235,13 @@ export function cover<T extends string, R extends string>(
 // Shift Patterns
 // ============================================================================
 
-/** Options for a {@link shift} call. */
-export interface ShiftOptions {
-  /** Restrict who can work this shift by role. */
-  roles?: [string, ...string[]];
-  /** Restrict which days this shift is available. */
-  dayOfWeek?: readonly DayOfWeek[];
-  /** Physical location for this shift. */
-  locationId?: string;
-}
-
 /**
- * A shift pattern definition returned by {@link shift}.
- */
-export interface ShiftPatternDef {
-  /** @internal */ readonly _type: "shiftPattern";
-  readonly id: string;
-  readonly startTime: TimeOfDay;
-  readonly endTime: TimeOfDay;
-  readonly options: ShiftOptions;
-}
-
-/**
- * Defines a shift pattern (time slot template).
+ * Creates a {@link ShiftPattern} (time slot template).
  *
  * @param id - Unique identifier for this shift pattern
  * @param startTime - When the shift starts
  * @param endTime - When the shift ends
- * @param opts - See {@link ShiftOptions}
+ * @param opts - Optional fields: `roles`, `dayOfWeek`, `locationId`
  *
  * @example
  * ```typescript
@@ -275,15 +254,13 @@ export function shift(
   id: string,
   startTime: TimeOfDay,
   endTime: TimeOfDay,
-  opts?: ShiftOptions,
-): ShiftPatternDef {
-  return {
-    _type: "shiftPattern",
-    id,
-    startTime,
-    endTime,
-    options: opts ?? {},
-  };
+  opts?: Pick<ShiftPattern, "roles" | "dayOfWeek" | "locationId">,
+): ShiftPattern {
+  const pattern: ShiftPattern = { id, startTime, endTime };
+  if (opts?.roles) pattern.roles = opts.roles;
+  if (opts?.dayOfWeek) pattern.dayOfWeek = opts.dayOfWeek as DayOfWeek[];
+  if (opts?.locationId) pattern.locationId = opts.locationId;
+  return pattern;
 }
 
 // ============================================================================
@@ -720,7 +697,7 @@ export interface ScheduleConfig<
   /** Staffing requirements per time period. */
   coverage: CoverageEntry<keyof T & string, R[number] | NonNullable<S>[number]>[];
   /** Available shift patterns. */
-  shiftPatterns: ShiftPatternDef[];
+  shiftPatterns: ShiftPattern[];
   /** Scheduling rules and constraints. */
   rules?: RuleEntry[];
   /** Days of the week the business operates (inclusion filter). */
@@ -770,8 +747,8 @@ export function defineSchedule<
 
   // Validate shift pattern role references
   for (const sp of config.shiftPatterns) {
-    if (sp.options.roles) {
-      for (const role of sp.options.roles) {
+    if (sp.roles) {
+      for (const role of sp.roles) {
         if (!roles.has(role)) {
           throw new Error(
             `Shift pattern "${sp.id}" references unknown role "${role}". ` +
@@ -824,8 +801,7 @@ export function defineSchedule<
   // Convert coverage entries to semantic coverage requirements
   const coverageReqs = buildCoverageRequirements(config.coverage, roles, skills);
 
-  // Convert shift pattern defs to internal ShiftPattern type
-  const shiftPatterns = buildShiftPatterns(config.shiftPatterns);
+  const shiftPatterns = config.shiftPatterns;
 
   return {
     roles: config.roles as readonly string[],
@@ -986,24 +962,6 @@ function buildCoverageRequirements<T extends string>(
     // Should not reach here due to validation in defineSchedule
     throw new Error(`Coverage target "${singleTarget}" is not a declared role or skill.`);
   }) as MixedCoverageRequirement<T>[];
-}
-
-// ============================================================================
-// Internal: Shift Pattern Translation
-// ============================================================================
-
-function buildShiftPatterns(defs: ShiftPatternDef[]): ShiftPattern[] {
-  return defs.map((def) => {
-    const pattern: ShiftPattern = {
-      id: def.id,
-      startTime: def.startTime,
-      endTime: def.endTime,
-    };
-    if (def.options.roles) pattern.roleIds = def.options.roles;
-    if (def.options.dayOfWeek) pattern.dayOfWeek = def.options.dayOfWeek as DayOfWeek[];
-    if (def.options.locationId) pattern.locationId = def.options.locationId;
-    return pattern;
-  });
 }
 
 // ============================================================================

@@ -286,7 +286,7 @@ describe("CP-SAT time-off rule: validate()", () => {
     shiftPatterns: [
       {
         id: "morning",
-        roleIds: ["barista"],
+        roles: ["barista"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
       },

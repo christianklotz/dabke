@@ -69,6 +69,7 @@ export function createOvertimeDailyMultiplierRule(
 
       for (const emp of targetMembers) {
         const rate = getHourlyRate(emp);
+        if (rate === undefined) continue;
 
         for (const day of activeDays) {
           const dayRanges: Array<{ start: number; end: number }> = [];
@@ -103,7 +104,7 @@ export function createOvertimeDailyMultiplierRule(
             -thresholdMinutes,
           );
 
-          if (rate !== undefined && rate > 0) {
+          if (rate > 0) {
             const totalOvertimeCost = (rate * extraFactor * maxOvertime) / 60;
             if (hasCostContext) {
               const normalizedMax = totalOvertimeCost / b.costContext!.normalizationFactor;
@@ -137,38 +138,41 @@ export function createOvertimeDailyMultiplierRule(
         resolveMembersFromScope(entityScopeValue, [...memberMap.values()]).map((e) => e.id),
       );
 
-      // Group assignments by (member, day) and compute daily minutes
-      const dayMinutes = new Map<string, number>(); // key: "empId:day"
+      // Group assignments by member then day, computing daily minutes
+      const memberDayMinutes = new Map<string, Map<string, number>>();
 
       for (const a of assignments) {
         if (!activeDays.has(a.day)) continue;
         if (!targetEmpIds.has(a.memberId)) continue;
         const pattern = patternMap.get(a.shiftPatternId);
         if (!pattern) continue;
-        const key = `${a.memberId}:${a.day}`;
-        dayMinutes.set(key, (dayMinutes.get(key) ?? 0) + patternDurationMinutes(pattern));
+        let dayMap = memberDayMinutes.get(a.memberId);
+        if (!dayMap) {
+          dayMap = new Map();
+          memberDayMinutes.set(a.memberId, dayMap);
+        }
+        dayMap.set(a.day, (dayMap.get(a.day) ?? 0) + patternDurationMinutes(pattern));
       }
 
       const entries: CostContribution["entries"] = [];
 
-      for (const [key, minutes] of dayMinutes) {
-        const overtimeMinutes = Math.max(0, minutes - thresholdMinutes);
-        if (overtimeMinutes <= 0) continue;
-
-        const [empId, day] = key.split(":");
-        if (!empId || !day) continue;
-
+      for (const [empId, dayMap] of memberDayMinutes) {
         const emp = memberMap.get(empId);
         if (!emp) continue;
         const rate = getHourlyRate(emp);
         if (rate === undefined) continue;
 
-        entries.push({
-          memberId: empId,
-          day,
-          category: COST_CATEGORY.OVERTIME,
-          amount: (rate * extraFactor * overtimeMinutes) / 60,
-        });
+        for (const [day, minutes] of dayMap) {
+          const overtimeMinutes = Math.max(0, minutes - thresholdMinutes);
+          if (overtimeMinutes <= 0) continue;
+
+          entries.push({
+            memberId: empId,
+            day,
+            category: COST_CATEGORY.OVERTIME,
+            amount: (rate * extraFactor * overtimeMinutes) / 60,
+          });
+        }
       }
 
       return { entries };

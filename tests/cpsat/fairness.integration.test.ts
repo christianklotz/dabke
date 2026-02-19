@@ -39,7 +39,7 @@ describe("Fair distribution (integration)", () => {
         shiftPatterns: [
           {
             id: "day",
-            roleIds: ["staff"] as [string, ...string[]],
+            roles: ["staff"] as [string, ...string[]],
             startTime: { hours: 8, minutes: 30 },
             endTime: { hours: 17, minutes: 30 },
           },
@@ -107,7 +107,7 @@ describe("Fair distribution (integration)", () => {
         shiftPatterns: [
           {
             id: "day",
-            roleIds: ["staff"] as [string, ...string[]],
+            roles: ["staff"] as [string, ...string[]],
             startTime: { hours: 8, minutes: 30 },
             endTime: { hours: 17, minutes: 30 },
           },
@@ -163,7 +163,7 @@ describe("Fair distribution (integration)", () => {
         shiftPatterns: [
           {
             id: "day",
-            roleIds: ["staff"] as [string],
+            roles: ["staff"] as [string],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -218,7 +218,7 @@ describe("Fair distribution (integration)", () => {
         shiftPatterns: [
           {
             id: "day",
-            roleIds: ["staff"] as [string, ...string[]],
+            roles: ["staff"] as [string, ...string[]],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },

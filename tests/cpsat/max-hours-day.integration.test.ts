@@ -13,13 +13,13 @@ describe("CP-SAT: max-hours-day rule", () => {
     const shiftPatterns = [
       {
         id: "short",
-        roleIds: ["server"] as [string],
+        roles: ["server"] as [string],
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 14, minutes: 0 },
       },
       {
         id: "long",
-        roleIds: ["server"] as [string],
+        roles: ["server"] as [string],
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
       },

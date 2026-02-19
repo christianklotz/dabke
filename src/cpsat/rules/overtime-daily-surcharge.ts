@@ -124,32 +124,35 @@ export function createOvertimeDailySurchargeRule(
         resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
       );
 
-      const dayMinutes = new Map<string, number>();
+      const memberDayMinutes = new Map<string, Map<string, number>>();
 
       for (const a of assignments) {
         if (!activeDays.has(a.day)) continue;
         if (!targetEmpIds.has(a.memberId)) continue;
         const pattern = patternMap.get(a.shiftPatternId);
         if (!pattern) continue;
-        const key = `${a.memberId}:${a.day}`;
-        dayMinutes.set(key, (dayMinutes.get(key) ?? 0) + patternDurationMinutes(pattern));
+        let dayMap = memberDayMinutes.get(a.memberId);
+        if (!dayMap) {
+          dayMap = new Map();
+          memberDayMinutes.set(a.memberId, dayMap);
+        }
+        dayMap.set(a.day, (dayMap.get(a.day) ?? 0) + patternDurationMinutes(pattern));
       }
 
       const entries: CostContribution["entries"] = [];
 
-      for (const [key, minutes] of dayMinutes) {
-        const overtimeMinutes = Math.max(0, minutes - thresholdMinutes);
-        if (overtimeMinutes <= 0) continue;
+      for (const [empId, dayMap] of memberDayMinutes) {
+        for (const [day, minutes] of dayMap) {
+          const overtimeMinutes = Math.max(0, minutes - thresholdMinutes);
+          if (overtimeMinutes <= 0) continue;
 
-        const [empId, day] = key.split(":");
-        if (!empId || !day) continue;
-
-        entries.push({
-          memberId: empId,
-          day,
-          category: COST_CATEGORY.OVERTIME,
-          amount: (amount * overtimeMinutes) / 60,
-        });
+          entries.push({
+            memberId: empId,
+            day,
+            category: COST_CATEGORY.OVERTIME,
+            amount: (amount * overtimeMinutes) / 60,
+          });
+        }
       }
 
       return { entries };

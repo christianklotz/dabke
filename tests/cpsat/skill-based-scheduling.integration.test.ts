@@ -108,7 +108,7 @@ describe("Skill-based scheduling (integration)", () => {
       shiftPatterns: [
         {
           id: "kitchen",
-          roleIds: ["chef"], // Only chefs
+          roles: ["chef"], // Only chefs
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -146,7 +146,7 @@ describe("Skill-based scheduling (integration)", () => {
       shiftPatterns: [
         {
           id: "floor",
-          roleIds: ["waiter", "host"], // Floor roles
+          roles: ["waiter", "host"], // Floor roles
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -184,7 +184,7 @@ describe("Skill-based scheduling (integration)", () => {
       shiftPatterns: [
         {
           id: "floor",
-          roleIds: ["waiter"], // Need waiters, but have none!
+          roles: ["waiter"], // Need waiters, but have none!
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -219,7 +219,7 @@ describe("Skill-based scheduling (integration)", () => {
       shiftPatterns: [
         {
           id: "floor",
-          roleIds: ["waiter"],
+          roles: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },

@@ -362,10 +362,10 @@ export class ModelBuilder {
   }
 
   canAssign(member: SchedulingMember, pattern: ShiftPattern): boolean {
-    if (!pattern.roleIds || pattern.roleIds.length === 0) {
+    if (!pattern.roles || pattern.roles.length === 0) {
       return true;
     }
-    return pattern.roleIds.some((roleId) => member.roles.includes(roleId));
+    return pattern.roles.some((role) => member.roles.includes(role));
   }
 
   /**

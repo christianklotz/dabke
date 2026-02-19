@@ -38,7 +38,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       shiftPatterns: [
         {
           id: "p1",
-          roleIds: ["role"],
+          roles: ["role"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -73,7 +73,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "p1",
-        roleIds: ["server"],
+        roles: ["server"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -127,13 +127,13 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "early",
-        roleIds: ["nurse"],
+        roles: ["nurse"],
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 12, minutes: 0 },
       },
       {
         id: "late",
-        roleIds: ["nurse"],
+        roles: ["nurse"],
         startTime: { hours: 14, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
       },
@@ -196,7 +196,7 @@ describe("ModelBuilder (CP-SAT)", () => {
           shiftPatterns: [
             {
               id: "shift:morning",
-              roleIds: ["role"],
+              roles: ["role"],
               startTime: { hours: 9, minutes: 0 },
               endTime: { hours: 17, minutes: 0 },
             },
@@ -207,7 +207,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     ).toThrow('Shift pattern ID "shift:morning" cannot contain colons');
   });
 
-  it("allows any member to work a shift pattern with no roleIds", () => {
+  it("allows any member to work a shift pattern with no roles", () => {
     const members = [
       { id: "alice", roles: ["server"] },
       { id: "bob", roles: ["chef"] },
@@ -216,7 +216,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "generic_shift",
-        // No roleIds - anyone can work
+        // No roles - anyone can work
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -247,7 +247,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "floor_shift",
-        roleIds: ["server", "runner"], // Both servers and runners can work
+        roles: ["server", "runner"], // Both servers and runners can work
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -278,7 +278,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "server_shift",
-        roleIds: ["server"], // Only servers
+        roles: ["server"], // Only servers
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -299,7 +299,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     expect(variableNames.has("assign:bob:server_shift:2024-01-01")).toBe(false);
   });
 
-  it("treats empty roleIds array same as undefined - anyone can work", () => {
+  it("treats empty roles array same as undefined - anyone can work", () => {
     const members = [
       { id: "alice", roles: ["server"] },
       { id: "bob", roles: ["chef"] },
@@ -308,7 +308,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "open_shift",
-        // roleIds omitted - anyone can work
+        // roles omitted - anyone can work
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -338,7 +338,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "host_shift",
-        roleIds: ["host"], // Only hosts
+        roles: ["host"], // Only hosts
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -359,7 +359,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     expect(variableNames.has("assign:bob:host_shift:2024-01-01")).toBe(false);
   });
 
-  it("handles mixed shift patterns - some with roleIds, some without", () => {
+  it("handles mixed shift patterns - some with roles, some without", () => {
     const members = [
       { id: "alice", roles: ["server"] },
       { id: "bob", roles: ["chef"] },
@@ -368,13 +368,13 @@ describe("ModelBuilder (CP-SAT)", () => {
     const shiftPatterns: ShiftPattern[] = [
       {
         id: "server_only",
-        roleIds: ["server"],
+        roles: ["server"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
       },
       {
         id: "anyone",
-        // No roleIds
+        // No roles
         startTime: { hours: 13, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -707,7 +707,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const baseShiftPatterns: ShiftPattern[] = [
       {
         id: "day",
-        roleIds: ["barista"],
+        roles: ["barista"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
       },
@@ -780,7 +780,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     const baseShiftPatterns: ShiftPattern[] = [
       {
         id: "day_shift",
-        roleIds: ["server"],
+        roles: ["server"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },

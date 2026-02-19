@@ -99,6 +99,7 @@ export function createOvertimeTieredMultiplierRule(
 
       for (const emp of targetMembers) {
         const rate = getHourlyRate(emp);
+        if (rate === undefined) continue;
 
         for (const [weekIdx, weekDays] of weeks.entries()) {
           // Build total minutes expression and compute per-member week max
@@ -131,7 +132,8 @@ export function createOvertimeTieredMultiplierRule(
             const thresholdMinutes = tier.after * 60;
             const maxOvertime = Math.max(0, empWeekMaxMinutes - thresholdMinutes);
             if (maxOvertime === 0) {
-              tierVars.push(""); // Placeholder; this tier can never be reached
+              // Tiers are sorted ascending, so all subsequent tiers are also unreachable.
+              tierVars.push("");
               continue;
             }
 
@@ -182,7 +184,7 @@ export function createOvertimeTieredMultiplierRule(
                 0,
               );
 
-              if (rate !== undefined && rate > 0) {
+              if (rate > 0) {
                 const totalTierCost = (rate * extraFactor * Math.max(1, maxTierOnly)) / 60;
                 if (hasCostContext) {
                   const normalizedMax = totalTierCost / b.costContext!.normalizationFactor;
@@ -202,7 +204,7 @@ export function createOvertimeTieredMultiplierRule(
             } else {
               // Last tier: penalty directly on tierVar
               const maxOvertimeLast = Math.max(1, empWeekMaxMinutes - tier.after * 60);
-              if (rate !== undefined && rate > 0) {
+              if (rate > 0) {
                 const totalTierCost = (rate * extraFactor * maxOvertimeLast) / 60;
                 if (hasCostContext) {
                   const normalizedMax = totalTierCost / b.costContext!.normalizationFactor;

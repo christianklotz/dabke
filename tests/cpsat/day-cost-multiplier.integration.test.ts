@@ -36,7 +36,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       shiftPatterns: [
         {
           id: "day",
-          roleIds: ["waiter"] as [string, ...string[]],
+          roles: ["waiter"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -86,7 +86,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       shiftPatterns: [
         {
           id: "day",
-          roleIds: ["waiter"] as [string, ...string[]],
+          roles: ["waiter"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },

@@ -161,7 +161,7 @@ export function createMinimizeCostRule(config: MinimizeCostConfig): CompilationR
             b.addImplication(assignVar, activeVar);
           }
 
-          b.addPenalty(activeVar, Math.max(1, normalizedWeeklyCost));
+          b.addPenalty(activeVar, Math.max(1, Math.round(normalizedWeeklyCost)));
         }
       }
     },

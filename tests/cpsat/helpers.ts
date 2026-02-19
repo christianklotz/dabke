@@ -86,7 +86,7 @@ export function createSimpleConfig(opts: {
     shiftPatterns: [
       {
         id: shiftId,
-        roleIds,
+        roles: roleIds,
         startTime: shiftStart,
         endTime: shiftEnd,
       },
@@ -120,7 +120,7 @@ type BaseConfigOverrides = {
     startTime?: TimeOfDay;
     endTime?: TimeOfDay;
     locationId?: string;
-    roleIds?: [string, ...string[]];
+    roles?: [string, ...string[]];
   };
   /** Multiple shift patterns (takes precedence over `shift`) */
   shifts?: Array<{
@@ -128,7 +128,7 @@ type BaseConfigOverrides = {
     startTime: TimeOfDay;
     endTime: TimeOfDay;
     locationId?: string;
-    roleIds?: [string, ...string[]];
+    roles?: [string, ...string[]];
   }>;
   shiftPatterns?: ShiftPattern[];
   schedulingPeriod?: SchedulingPeriod;
@@ -166,7 +166,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
   } else if (overrides.shifts) {
     shiftPatterns = overrides.shifts.map((s) => ({
       id: s.id,
-      roleIds: s.roleIds ?? roleIds,
+      roles: s.roles ?? roleIds,
       startTime: s.startTime,
       endTime: s.endTime,
       ...(s.locationId ? { locationId: s.locationId } : {}),
@@ -175,7 +175,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     shiftPatterns = [
       {
         id: overrides.shift?.id ?? "day",
-        roleIds: overrides.shift?.roleIds ?? roleIds,
+        roles: overrides.shift?.roles ?? roleIds,
         startTime: overrides.shift?.startTime ?? { hours: 9, minutes: 0 },
         endTime: overrides.shift?.endTime ?? { hours: 17, minutes: 0 },
         ...(overrides.shift?.locationId ? { locationId: overrides.shift.locationId } : {}),
@@ -191,7 +191,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     days.flatMap((day) =>
       shiftPatterns.map((pattern) => ({
         day,
-        roleIds: pattern.roleIds ?? roleIds,
+        roleIds: pattern.roles ?? roleIds,
         startTime: pattern.startTime,
         endTime: pattern.endTime,
         targetCount: overrides.targetCount ?? 1,
@@ -245,13 +245,13 @@ export const fixtures = {
     shiftPatterns: [
       {
         id: "morning",
-        roleIds: ["chef", "waiter"],
+        roles: ["chef", "waiter"],
         startTime: { hours: 8, minutes: 0 },
         endTime: { hours: 14, minutes: 0 },
       },
       {
         id: "evening",
-        roleIds: ["chef", "waiter"],
+        roles: ["chef", "waiter"],
         startTime: { hours: 16, minutes: 0 },
         endTime: { hours: 22, minutes: 0 },
       },

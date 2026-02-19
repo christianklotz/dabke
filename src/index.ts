@@ -364,8 +364,6 @@ export type {
   TimeEntry,
   CoverageEntry,
   CoverageOptions,
-  ShiftPatternDef,
-  ShiftOptions,
   RuleEntry,
   RuleOptions,
   EntityOnlyRuleOptions,

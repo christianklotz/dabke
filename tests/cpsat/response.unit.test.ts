@@ -163,13 +163,13 @@ describe("resolveAssignments", () => {
   const shiftPatterns: ShiftPattern[] = [
     {
       id: "morning",
-      roleIds: ["staff"],
+      roles: ["staff"],
       startTime: { hours: 9, minutes: 0 },
       endTime: { hours: 13, minutes: 0 },
     },
     {
       id: "evening",
-      roleIds: ["staff"],
+      roles: ["staff"],
       startTime: { hours: 17, minutes: 0 },
       endTime: { hours: 21, minutes: 0 },
     },

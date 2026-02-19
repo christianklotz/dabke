@@ -15,13 +15,13 @@ describe("CP-SAT: min-rest-between-shifts rule", () => {
       shiftPatterns: [
         {
           id: "late",
-          roleIds: ["chef"],
+          roles: ["chef"],
           startTime: { hours: 14, minutes: 0 },
           endTime: { hours: 22, minutes: 0 },
         },
         {
           id: "early",
-          roleIds: ["chef"],
+          roles: ["chef"],
           startTime: { hours: 6, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
         },

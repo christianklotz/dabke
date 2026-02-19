@@ -140,24 +140,25 @@ describe("cover()", () => {
 // ============================================================================
 
 describe("shift()", () => {
-  it("creates a shift pattern def", () => {
+  it("creates a shift pattern", () => {
     const sp = shift("morning", t(11, 30), t(15));
-    expect(sp._type).toBe("shiftPattern");
     expect(sp.id).toBe("morning");
     expect(sp.startTime).toEqual(t(11, 30));
     expect(sp.endTime).toEqual(t(15));
-    expect(sp.options).toEqual({});
+    expect(sp.roles).toBeUndefined();
+    expect(sp.dayOfWeek).toBeUndefined();
+    expect(sp.locationId).toBeUndefined();
   });
 
-  it("passes through options", () => {
+  it("passes through options as flat fields", () => {
     const sp = shift("kitchen", t(6), t(14), {
       roles: ["chef", "prep_cook"],
       dayOfWeek: weekdays,
       locationId: "kitchen",
     });
-    expect(sp.options.roles).toEqual(["chef", "prep_cook"]);
-    expect(sp.options.dayOfWeek).toEqual(weekdays);
-    expect(sp.options.locationId).toBe("kitchen");
+    expect(sp.roles).toEqual(["chef", "prep_cook"]);
+    expect(sp.dayOfWeek).toEqual(weekdays);
+    expect(sp.locationId).toBe("kitchen");
   });
 });
 
@@ -427,7 +428,7 @@ describe("createSchedulerConfig()", () => {
 
     const kitchen = config.shiftPatterns.find((p) => p.id === "kitchen");
     expect(kitchen).toBeDefined();
-    expect(kitchen!.roleIds).toEqual(["runner"]);
+    expect(kitchen!.roles).toEqual(["runner"]);
     expect(kitchen!.locationId).toBe("kitchen");
   });
 

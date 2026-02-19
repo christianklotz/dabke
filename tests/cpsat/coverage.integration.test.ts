@@ -486,7 +486,7 @@ describe("Coverage requirements (integration)", () => {
         shiftPatterns: [
           {
             id: "opening",
-            roleIds: ["server"],
+            roles: ["server"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
           },

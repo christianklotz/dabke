@@ -9,7 +9,7 @@ describe("Role-based shift assignment (integration)", () => {
     client = getSolverClient();
   });
 
-  it("assigns any member to shifts with no roleIds", async () => {
+  it("assigns any member to shifts with no roles", async () => {
     const builder = new ModelBuilder({
       members: [
         { id: "alice", roles: ["server"] },
@@ -18,7 +18,7 @@ describe("Role-based shift assignment (integration)", () => {
       shiftPatterns: [
         {
           id: "generic_shift",
-          // No roleIds - anyone can work
+          // No roles - anyone can work
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -57,7 +57,7 @@ describe("Role-based shift assignment (integration)", () => {
       shiftPatterns: [
         {
           id: "server_shift",
-          roleIds: ["server"], // Only servers
+          roles: ["server"], // Only servers
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -96,7 +96,7 @@ describe("Role-based shift assignment (integration)", () => {
       shiftPatterns: [
         {
           id: "floor_shift",
-          roleIds: ["server", "runner"], // Servers OR runners
+          roles: ["server", "runner"], // Servers OR runners
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -144,7 +144,7 @@ describe("Role-based shift assignment (integration)", () => {
       shiftPatterns: [
         {
           id: "server_shift",
-          roleIds: ["server"], // Only servers - but we have no servers!
+          roles: ["server"], // Only servers - but we have no servers!
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -178,7 +178,7 @@ describe("Role-based shift assignment (integration)", () => {
       shiftPatterns: [
         {
           id: "host_shift",
-          roleIds: ["host"],
+          roles: ["host"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -207,7 +207,7 @@ describe("Role-based shift assignment (integration)", () => {
     expect(assignments[0]?.memberId).toBe("alice");
   }, 30_000);
 
-  it("handles mixed patterns - some with roleIds, some without", async () => {
+  it("handles mixed patterns - some with roles, some without", async () => {
     const builder = new ModelBuilder({
       members: [
         { id: "alice", roles: ["server"] },
@@ -216,13 +216,13 @@ describe("Role-based shift assignment (integration)", () => {
       shiftPatterns: [
         {
           id: "morning",
-          roleIds: ["server"], // Only servers
+          roles: ["server"], // Only servers
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 13, minutes: 0 },
         },
         {
           id: "afternoon",
-          // No roleIds - anyone
+          // No roles - anyone
           startTime: { hours: 13, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },

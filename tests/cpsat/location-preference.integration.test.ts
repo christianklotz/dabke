@@ -13,14 +13,14 @@ describe("CP-SAT: location-preference rule", () => {
     const shiftPatterns = [
       {
         id: "indoor",
-        roleIds: ["waiter"] as [string],
+        roles: ["waiter"] as [string],
         locationId: "indoor",
         startTime: { hours: 12, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
       },
       {
         id: "terrace",
-        roleIds: ["waiter"] as [string],
+        roles: ["waiter"] as [string],
         locationId: "terrace",
         startTime: { hours: 12, minutes: 0 },
         endTime: { hours: 18, minutes: 0 },
