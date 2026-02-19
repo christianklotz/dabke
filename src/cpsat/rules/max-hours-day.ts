@@ -3,6 +3,7 @@ import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
 import {
+  PrioritySchema,
   entityScope,
   timeScope,
   parseEntityScope,
@@ -14,12 +15,7 @@ import {
 const MaxHoursDaySchema = z
   .object({
     hours: z.number().min(0),
-    priority: z.union([
-      z.literal("LOW"),
-      z.literal("MEDIUM"),
-      z.literal("HIGH"),
-      z.literal("MANDATORY"),
-    ]),
+    priority: PrioritySchema,
   })
   .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));

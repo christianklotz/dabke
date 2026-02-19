@@ -6,8 +6,6 @@ import { groupKey, type GroupKey } from "./validation.types.js";
 
 /**
  * Base definition for a semantic time period.
- *
- * @category Semantic Times
  */
 export interface SemanticTimeDef {
   /** When this time period starts. */
@@ -18,8 +16,6 @@ export interface SemanticTimeDef {
 
 /**
  * Variant of a semantic time that applies to specific days or dates.
- *
- * @category Semantic Times
  */
 export interface SemanticTimeVariant extends SemanticTimeDef {
   /** Apply this variant only on these days of the week */
@@ -31,8 +27,6 @@ export interface SemanticTimeVariant extends SemanticTimeDef {
 /**
  * A semantic time can be a simple definition (applies every day)
  * or an array of variants with different times for different days/dates.
- *
- * @category Semantic Times
  */
 export type SemanticTimeEntry = SemanticTimeDef | SemanticTimeVariant[];
 
@@ -118,8 +112,6 @@ interface SkillBasedSemanticCoverageRequirement<
  * ```typescript
  * { semanticTime: "opening", skills: ["keyholder"], targetCount: 1 },
  * ```
- *
- * @category Semantic Times
  */
 export type SemanticCoverageRequirement<S extends string> =
   | RoleBasedSemanticCoverageRequirement<S>
@@ -175,8 +167,6 @@ interface SkillBasedConcreteCoverageRequirement extends ConcreteCoverageRequirem
  *
  * This is a discriminated union enforcing at compile time that at least
  * one of `roles` or `skills` must be provided.
- *
- * @category Semantic Times
  */
 export type ConcreteCoverageRequirement =
   | RoleBasedConcreteCoverageRequirement
@@ -184,8 +174,6 @@ export type ConcreteCoverageRequirement =
 
 /**
  * Union type for coverage - either semantic (type-safe) or concrete.
- *
- * @category Semantic Times
  */
 export type MixedCoverageRequirement<S extends string> =
   | SemanticCoverageRequirement<S>
@@ -211,8 +199,6 @@ export function isSemanticCoverage<S extends string>(
 
 /**
  * Result of defineSemanticTimes - provides type-safe coverage function.
- *
- * @category Semantic Times
  */
 export interface SemanticTimeContext<S extends string> {
   /** The semantic time definitions */
@@ -237,8 +223,6 @@ export interface SemanticTimeContext<S extends string> {
  * Returns a context object that provides:
  * - Type-safe coverage() function that only accepts defined semantic time names
  * - resolve() function to expand semantic times to concrete requirements
- *
- * @category Semantic Times
  *
  * @example Basic usage
  * ```typescript

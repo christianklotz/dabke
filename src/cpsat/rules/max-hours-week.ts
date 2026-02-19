@@ -4,6 +4,7 @@ import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
 import {
+  PrioritySchema,
   entityScope,
   timeScope,
   parseEntityScope,
@@ -14,12 +15,7 @@ import {
 
 const MaxHoursWeekBase = z.object({
   hours: z.number().min(0),
-  priority: z.union([
-    z.literal("LOW"),
-    z.literal("MEDIUM"),
-    z.literal("HIGH"),
-    z.literal("MANDATORY"),
-  ]),
+  priority: PrioritySchema,
   weekStartsOn: DayOfWeekSchema.optional(),
 });
 

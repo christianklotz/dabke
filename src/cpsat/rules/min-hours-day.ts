@@ -2,17 +2,17 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
-import { entityScope, parseEntityScope, resolveMembersFromScope } from "./scope.types.js";
+import {
+  PrioritySchema,
+  entityScope,
+  parseEntityScope,
+  resolveMembersFromScope,
+} from "./scope.types.js";
 
 const MinHoursDaySchema = z
   .object({
     hours: z.number().min(0),
-    priority: z.union([
-      z.literal("LOW"),
-      z.literal("MEDIUM"),
-      z.literal("HIGH"),
-      z.literal("MANDATORY"),
-    ]),
+    priority: PrioritySchema,
   })
   .and(entityScope(["members", "roles", "skills"]));
 

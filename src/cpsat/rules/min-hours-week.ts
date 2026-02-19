@@ -3,16 +3,16 @@ import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
-import { entityScope, parseEntityScope, resolveMembersFromScope } from "./scope.types.js";
+import {
+  PrioritySchema,
+  entityScope,
+  parseEntityScope,
+  resolveMembersFromScope,
+} from "./scope.types.js";
 
 const MinHoursWeekBase = z.object({
   hours: z.number().min(0),
-  priority: z.union([
-    z.literal("LOW"),
-    z.literal("MEDIUM"),
-    z.literal("HIGH"),
-    z.literal("MANDATORY"),
-  ]),
+  priority: PrioritySchema,
   weekStartsOn: DayOfWeekSchema.optional(),
 });
 

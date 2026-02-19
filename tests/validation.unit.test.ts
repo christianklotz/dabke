@@ -3,7 +3,7 @@ import {
   validateCoverageRoles,
   validateCoverageSkills,
   validateCoverageConfig,
-} from "../src/index.js";
+} from "../src/validation.js";
 import type { CoverageRequirement, SchedulingMember } from "../src/index.js";
 
 /**

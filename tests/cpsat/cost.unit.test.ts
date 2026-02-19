@@ -15,10 +15,9 @@ import {
   dailyOvertimeSurcharge,
   tieredOvertimeMultiplier,
   weekend,
-  calculateScheduleCost,
   ModelBuilder,
-  COST_CATEGORY,
 } from "../../src/index.js";
+import { calculateScheduleCost, COST_CATEGORY } from "../../src/cpsat/cost.js";
 import type { ShiftAssignment } from "../../src/cpsat/response.js";
 
 // ============================================================================

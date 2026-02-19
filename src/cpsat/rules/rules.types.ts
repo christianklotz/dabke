@@ -52,7 +52,6 @@ export type CpsatRuleRegistryFromFactories<F extends CpsatRuleFactories> = {
  * same level. This eliminates the `{ name, config: { ... } }` nesting that
  * invited misplacement of scope fields.
  *
- * @category Rules
  * @example
  * ```ts
  * const rules: CpsatRuleConfigEntry[] = [

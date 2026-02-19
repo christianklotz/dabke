@@ -4,8 +4,6 @@ import type { GroupKey } from "./validation.types.js";
 
 /**
  * Pay per hour in the caller's smallest currency unit (e.g., pence, cents).
- *
- * @category Types
  */
 export interface HourlyPay {
   /** Pay per hour in smallest currency unit. */
@@ -21,8 +19,6 @@ export interface HourlyPay {
  *
  * Note: overtime multiplier rules apply only to hourly members.
  * Overtime surcharge rules apply to all members regardless of pay type.
- *
- * @category Types
  */
 export interface SalariedPay {
   /** Annual salary in smallest currency unit. */
@@ -36,8 +32,6 @@ export interface SalariedPay {
  *
  * - `"LOW"`, `"MEDIUM"`, `"HIGH"`: soft constraints with increasing penalty for violations
  * - `"MANDATORY"`: hard constraint; the solver will not produce a solution that violates it
- *
- * @category Types
  */
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 
@@ -64,7 +58,6 @@ export interface SchedulingMember {
  * Shift patterns are templates that repeat across all scheduling days. The solver assigns
  * team members to these patterns based on coverage requirements and constraints.
  *
- * @category Shifts
  * @example
  * // Simple venue: one shift type, anyone can work it
  * const patterns: ShiftPattern[] = [

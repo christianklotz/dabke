@@ -39,6 +39,20 @@ import type { SchedulingMember } from "../types.js";
 import { parseDayString } from "../utils.js";
 
 // ============================================================================
+// Priority
+// ============================================================================
+
+/**
+ * Zod schema for rule priority with a default of `"MANDATORY"`.
+ *
+ * Rules that use priority should include this in their schema so the
+ * default is co-located with the rule system, not injected externally.
+ */
+export const PrioritySchema = z
+  .union([z.literal("LOW"), z.literal("MEDIUM"), z.literal("HIGH"), z.literal("MANDATORY")])
+  .default("MANDATORY");
+
+// ============================================================================
 // Scope Keys
 // ============================================================================
 

@@ -58,7 +58,7 @@ import { defineSemanticTimes } from "./cpsat/semantic-time.js";
 import { resolveDaysFromPeriod } from "./datetime.utils.js";
 import type { ModelBuilderConfig } from "./cpsat/model-builder.js";
 import type { SchedulingMember, ShiftPattern, Priority } from "./cpsat/types.js";
-import type { CpsatRuleConfigEntry } from "./cpsat/rules/rules.types.js";
+import type { CpsatRuleName, CpsatRuleConfigEntry } from "./cpsat/rules/rules.types.js";
 import type { RecurringPeriod } from "./cpsat/rules/scope.types.js";
 import type { OvertimeTier } from "./cpsat/rules/overtime-tiered-multiplier.js";
 
@@ -336,13 +336,13 @@ export interface CostRuleOptions {
 // Internal rule entry type
 interface RuleEntryBase {
   readonly _type: "rule";
-  readonly _rule: string;
+  readonly _rule: CpsatRuleName;
 }
 
 /** An opaque rule entry returned by rule functions. */
 export type RuleEntry = RuleEntryBase & Record<string, unknown>;
 
-function makeRule(rule: string, fields: Record<string, unknown>): RuleEntry {
+function makeRule(rule: CpsatRuleName, fields: Record<string, unknown>): RuleEntry {
   return { _type: "rule", _rule: rule, ...fields };
 }
 
@@ -969,7 +969,7 @@ function buildCoverageRequirements<T extends string>(
 // ============================================================================
 
 /**
- * Resolves an `appliesTo` value into v1 entity scope fields.
+ * Resolves an `appliesTo` value into entity scope fields.
  *
  * Each target string is checked against roles, skills, then member IDs.
  * If all targets resolve to the same namespace, they are combined into one
@@ -1013,8 +1013,7 @@ function resolveAppliesTo(
   ).length;
 
   if (namespacesUsed > 1) {
-    // Mixed namespaces: not supported in a single v1 rule config.
-    // For now, throw an error with guidance.
+    // Mixed namespaces not supported in a single rule config.
     throw new Error(
       `appliesTo targets span multiple namespaces (roles: [${resolvedRoles.join(", ")}], ` +
         `skills: [${resolvedSkills.join(", ")}], members: [${resolvedMembers.join(", ")}]). ` +
@@ -1034,15 +1033,6 @@ function resolveAppliesTo(
   return {};
 }
 
-function resolveTimeScope(entry: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  if (entry.dayOfWeek) result.dayOfWeek = entry.dayOfWeek;
-  if (entry.dateRange) result.dateRange = entry.dateRange;
-  if (entry.dates) result.specificDates = entry.dates;
-  if (entry.recurringPeriods) result.recurringPeriods = entry.recurringPeriods;
-  return result;
-}
-
 function resolveRules(
   rules: RuleEntry[],
   roles: Set<string>,
@@ -1050,134 +1040,60 @@ function resolveRules(
   memberIds: Set<string>,
 ): CpsatRuleConfigEntry[] {
   return rules.map((rule) => {
-    const { _type, _rule, appliesTo, ...rest } = rule as RuleEntry & {
+    const { _type, _rule, appliesTo, dates, ...passthrough } = rule as RuleEntry & {
       appliesTo?: string | string[];
+      dates?: string[];
     };
 
     const entityScope =
       _rule === "assign-together" ? {} : resolveAppliesTo(appliesTo, roles, skills, memberIds);
 
+    // Rename dates → specificDates (internal field name)
+    const resolvedDates = dates ? { specificDates: dates } : {};
+
     switch (_rule) {
-      case "max-hours-day":
-        return {
-          name: "max-hours-day" as const,
-          hours: rest.hours as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "max-hours-week":
-        return {
-          name: "max-hours-week" as const,
-          hours: rest.hours as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "min-hours-day":
-        return {
-          name: "min-hours-day" as const,
-          hours: rest.hours as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-        };
-
-      case "min-hours-week":
-        return {
-          name: "min-hours-week" as const,
-          hours: rest.hours as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-        };
-
-      case "max-shifts-day":
-        return {
-          name: "max-shifts-day" as const,
-          shifts: rest.shifts as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "max-consecutive-days":
-        return {
-          name: "max-consecutive-days" as const,
-          days: rest.days as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-        };
-
-      case "min-consecutive-days":
-        return {
-          name: "min-consecutive-days" as const,
-          days: rest.days as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-        };
-
-      case "min-rest-between-shifts":
-        return {
-          name: "min-rest-between-shifts" as const,
-          hours: rest.hours as number,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-        };
-
-      case "assignment-priority":
-        return {
-          name: "assignment-priority" as const,
-          preference: rest.preference as "high" | "low",
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "location-preference":
-        return {
-          name: "location-preference" as const,
-          locationId: rest.locationId as string,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-        };
-
       case "time-off": {
-        const timeScope = resolveTimeScope(rest);
-        const hasTimeScope =
-          timeScope.dayOfWeek ||
-          timeScope.dateRange ||
-          timeScope.specificDates ||
-          timeScope.recurringPeriods;
-        if (!hasTimeScope) {
+        const { from, until, ...timeOffRest } = passthrough as Record<string, unknown> & {
+          from?: TimeOfDay;
+          until?: TimeOfDay;
+        };
+
+        if (
+          !timeOffRest.dayOfWeek &&
+          !timeOffRest.dateRange &&
+          !dates &&
+          !timeOffRest.recurringPeriods
+        ) {
           throw new Error(
             "timeOff() requires at least one time scope (dayOfWeek, dateRange, dates, or recurringPeriods).",
           );
         }
 
-        const config: Record<string, unknown> = {
-          name: "time-off" as const,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-          ...entityScope,
-          ...timeScope,
-        };
-
-        // Partial day support
-        if (rest.from && rest.until) {
-          config.startTime = rest.from;
-          config.endTime = rest.until;
-        } else if (rest.from) {
-          config.startTime = rest.from;
-          config.endTime = { hours: 23, minutes: 59 };
-        } else if (rest.until) {
-          config.startTime = { hours: 0, minutes: 0 };
-          config.endTime = rest.until;
+        const partialDay: Record<string, unknown> = {};
+        if (from && until) {
+          partialDay.startTime = from;
+          partialDay.endTime = until;
+        } else if (from) {
+          partialDay.startTime = from;
+          partialDay.endTime = { hours: 23, minutes: 59 };
+        } else if (until) {
+          partialDay.startTime = { hours: 0, minutes: 0 };
+          partialDay.endTime = until;
         }
 
-        return config as CpsatRuleConfigEntry;
+        return {
+          name: _rule,
+          ...timeOffRest,
+          ...entityScope,
+          ...resolvedDates,
+          ...partialDay,
+        } as CpsatRuleConfigEntry;
       }
 
       case "assign-together": {
-        const members = rest.members as [string, string, ...string[]];
+        const { members, ...atRest } = passthrough as Record<string, unknown> & {
+          members: [string, string, ...string[]];
+        };
         for (const member of members) {
           if (!memberIds.has(member)) {
             throw new Error(
@@ -1186,94 +1102,16 @@ function resolveRules(
             );
           }
         }
-        return {
-          name: "assign-together" as const,
-          groupMemberIds: members,
-          priority: (rest.priority as Priority) ?? "MANDATORY",
-        };
+        return { name: _rule, groupMemberIds: members, ...atRest } as CpsatRuleConfigEntry;
       }
 
-      case "minimize-cost":
-        return {
-          name: "minimize-cost" as const,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "day-cost-multiplier":
-        return {
-          name: "day-cost-multiplier" as const,
-          factor: rest.factor as number,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "day-cost-surcharge":
-        return {
-          name: "day-cost-surcharge" as const,
-          amountPerHour: rest.amountPerHour as number,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "time-cost-surcharge":
-        return {
-          name: "time-cost-surcharge" as const,
-          amountPerHour: rest.amountPerHour as number,
-          window: rest.window as { from: TimeOfDay; until: TimeOfDay },
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "overtime-weekly-multiplier":
-        return {
-          name: "overtime-weekly-multiplier" as const,
-          after: rest.after as number,
-          factor: rest.factor as number,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "overtime-weekly-surcharge":
-        return {
-          name: "overtime-weekly-surcharge" as const,
-          after: rest.after as number,
-          amount: rest.amount as number,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "overtime-daily-multiplier":
-        return {
-          name: "overtime-daily-multiplier" as const,
-          after: rest.after as number,
-          factor: rest.factor as number,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "overtime-daily-surcharge":
-        return {
-          name: "overtime-daily-surcharge" as const,
-          after: rest.after as number,
-          amount: rest.amount as number,
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
-      case "overtime-tiered-multiplier":
-        return {
-          name: "overtime-tiered-multiplier" as const,
-          tiers: rest.tiers as [
-            { after: number; factor: number },
-            ...{ after: number; factor: number }[],
-          ],
-          ...entityScope,
-          ...resolveTimeScope(rest),
-        };
-
       default:
-        throw new Error(`Unknown rule type: ${_rule}`);
+        return {
+          name: _rule,
+          ...passthrough,
+          ...entityScope,
+          ...resolvedDates,
+        } as CpsatRuleConfigEntry;
     }
   }) as CpsatRuleConfigEntry[];
 }

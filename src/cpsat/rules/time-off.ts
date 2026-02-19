@@ -5,6 +5,7 @@ import type { ResolvedShiftAssignment } from "../response.js";
 import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
 import type { ValidationReporter } from "../validation-reporter.js";
 import {
+  PrioritySchema,
   entityScope,
   requiredTimeScope,
   parseEntityScope,
@@ -17,13 +18,6 @@ const timeOfDaySchema = z.object({
   hours: z.number().int().min(0).max(23),
   minutes: z.number().int().min(0).max(59),
 });
-
-const PrioritySchema = z.union([
-  z.literal("LOW"),
-  z.literal("MEDIUM"),
-  z.literal("HIGH"),
-  z.literal("MANDATORY"),
-]);
 
 const TimeOffSchema = z
   .object({

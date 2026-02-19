@@ -579,7 +579,7 @@ describe("createSchedulerConfig()", () => {
     expect(rule).toHaveProperty("memberIds", ["alice"]);
   });
 
-  it("applies default priority of MANDATORY", () => {
+  it("omits priority when not specified (rule schema provides the default)", () => {
     const def = defineSchedule({
       roles: ["waiter"] as const,
       times: { lunch: time({ start: t(12), end: t(15) }) },
@@ -594,7 +594,8 @@ describe("createSchedulerConfig()", () => {
     });
 
     const rule = config.ruleConfigs!.find((r) => r.name === "max-hours-day");
-    expect(rule).toHaveProperty("priority", "MANDATORY");
+    expect(rule).toBeDefined();
+    expect(rule).not.toHaveProperty("priority");
   });
 
   it("merges runtime rules", () => {

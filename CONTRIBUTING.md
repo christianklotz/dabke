@@ -38,22 +38,46 @@ Do not edit `CHANGELOG.md`. Changelog entries are added by maintainers.
 The rule system is the main extension point. Study these files in order:
 
 1. `src/cpsat/rules/max-hours-day.ts` — simplest rule, good starting template
-2. `src/cpsat/rules/scoping.ts` — how entity/time scoping works
+2. `src/cpsat/rules/scope.types.ts` — how entity/time scoping works
 3. `src/cpsat/rules/rules.types.ts` — type registry
 4. `src/cpsat/rules/registry.ts` — built-in rule registration
+
+### Architecture: co-locate rule knowledge
+
+Each rule is self-contained. Everything specific to a rule (its schema, defaults,
+validation, cost calculation) lives in the rule's own file. The scheduling layer
+(`schedule.ts`) and the resolver (`resolver.ts`) are generic; they pass config
+through without rule-specific knowledge.
+
+Concretely:
+
+- **Default priority** is declared in each rule's Zod schema via `PrioritySchema`
+  (which has `.default("MANDATORY")`), not injected by the translation layer.
+- **Config shape** is defined by the rule's Zod schema and validated at factory
+  call time. The scheduling layer passes fields through generically.
+- **Scoping** (entity and time) uses shared builders from `scope.types.ts`
+  (`entityScope()`, `timeScope()`, `requiredTimeScope()`).
+
+Do not add rule-specific logic (field lists, default values, special-case
+branches) to `schedule.ts` or `resolver.ts`. If a new rule needs something
+the generic path cannot provide, the solution is almost always to put it
+in the rule's schema or factory, not in the scheduling layer.
 
 ### Pattern
 
 Every rule follows the same structure:
 
-1. **Zod schema** with `withScopes()` for standard scoping fields
-2. **Factory function** returning a `CompilationRule` with `compile(builder)`
-3. **Optional `validate()`** for post-solve validation
+1. **Zod schema** using `PrioritySchema`, `entityScope()`, and `timeScope()`
+   from `scope.types.ts` for standard fields
+2. **Config type** inferred from the schema (`z.infer<typeof Schema>`)
+3. **Factory function** returning a `CompilationRule` with `compile(builder)`
+4. **Optional `validate()`** for post-solve validation
+5. **Optional `cost()`** for post-solve cost calculation
 
 The builder API inside `compile()`:
 
-- `b.assignment(employeeId, patternId, day)` — variable name
-- `b.canAssign(employee, pattern)` — role restriction check
+- `b.assignment(memberId, patternId, day)` — variable name
+- `b.canAssign(member, pattern)` — role restriction check
 - `b.patternAvailableOnDay(pattern, day)` — day-of-week filter
 - `b.patternDuration(patternId)` — duration in minutes
 - `b.addLinear(terms, op, bound)` — hard constraint

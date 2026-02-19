@@ -1,6 +1,7 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
+import { PrioritySchema } from "./scope.types.js";
 
 const AssignTogetherSchema = z.object({
   groupMemberIds: z
@@ -9,12 +10,7 @@ const AssignTogetherSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, {
       message: "IDs must be unique",
     }),
-  priority: z.union([
-    z.literal("LOW"),
-    z.literal("MEDIUM"),
-    z.literal("HIGH"),
-    z.literal("MANDATORY"),
-  ]),
+  priority: PrioritySchema,
 });
 
 /**

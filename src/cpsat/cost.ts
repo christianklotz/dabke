@@ -8,8 +8,6 @@ import { timeOfDayToMinutes, normalizeEndMinutes } from "./utils.js";
  *
  * Custom rules can use any string as a category. These constants
  * are provided for convenience and consistency.
- *
- * @category Cost
  */
 export const COST_CATEGORY = {
   /** Base pay cost (from {@link minimizeCost}). */
@@ -25,8 +23,6 @@ export const COST_CATEGORY = {
  *
  * Categories are open-ended strings. Built-in rules use categories
  * from {@link COST_CATEGORY}. Custom rules can introduce their own.
- *
- * @category Cost
  */
 export interface MemberCostDetail {
   /** Sum of all category costs. */
@@ -39,8 +35,6 @@ export interface MemberCostDetail {
 
 /**
  * Full cost breakdown for a solved schedule.
- *
- * @category Cost
  */
 export interface CostBreakdown {
   /** Total cost in the caller's currency unit. */

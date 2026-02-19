@@ -12,8 +12,6 @@ import * as z from "zod";
 
 /**
  * Day of the week identifier.
- *
- * @category Types
  */
 export type DayOfWeek =
   | "monday"
@@ -45,7 +43,6 @@ export const DayOfWeekSchema = z.union([
  * Used for defining shift start/end times and semantic time boundaries.
  * Hours are in 24-hour format (0-23).
  *
- * @category Types
  * @example
  * ```typescript
  * const morningStart: TimeOfDay = {
@@ -151,7 +148,6 @@ export interface DateTimeRange {
  * and/or `dates` to narrow which days within the range are included.
  * Filters compose: a day must pass all specified filters to be included.
  *
- * @category Types
  * @example All days in a week
  * ```typescript
  * const period: SchedulingPeriod = {
