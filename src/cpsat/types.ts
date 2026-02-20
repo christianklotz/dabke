@@ -44,9 +44,9 @@ export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 export interface SchedulingMember {
   /** Unique identifier for this member. Must not contain colons. */
   id: string;
-  /** Roles this member can fill (e.g. "waiter", "chef"). */
+  /** Roles this member can fill (e.g. "nurse", "doctor"). */
   roles: string[];
-  /** Skills this member has (e.g. "senior", "trainer"). */
+  /** Skills this member has (e.g. "charge_nurse", "forklift"). */
   skills?: string[];
   /** Base pay. Required when cost rules are used. */
   pay?: HourlyPay | SalariedPay;
@@ -59,16 +59,16 @@ export interface SchedulingMember {
  * team members to these patterns based on coverage requirements and constraints.
  *
  * @example
- * // Simple venue: one shift type, anyone can work it
+ * // Simple setup: one shift type, anyone can work it
  * const patterns: ShiftPattern[] = [
  *   { id: "day", startTime: { hours: 9 }, endTime: { hours: 17 } }
  * ];
  *
  * @example
- * // Restaurant: different shifts for different roles
+ * // Role-restricted shifts
  * const patterns: ShiftPattern[] = [
- *   { id: "kitchen_morning", startTime: { hours: 6 }, endTime: { hours: 14 }, roles: ["chef", "prep_cook"] },
- *   { id: "floor_lunch", startTime: { hours: 11 }, endTime: { hours: 15 }, roles: ["waiter", "host"] },
+ *   { id: "ward_day", startTime: { hours: 7 }, endTime: { hours: 15 }, roles: ["nurse", "doctor"] },
+ *   { id: "reception", startTime: { hours: 8 }, endTime: { hours: 16 }, roles: ["admin"] },
  * ];
  */
 export interface ShiftPattern {

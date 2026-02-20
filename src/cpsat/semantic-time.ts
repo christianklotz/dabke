@@ -103,20 +103,21 @@ interface SkillBasedSemanticCoverageRequirement<
  * - `dates` — scope to specific dates (`"YYYY-MM-DD"` strings)
  * - `priority` — `"MANDATORY"` | `"HIGH"` | `"MEDIUM"` | `"LOW"`
  *
- * **IMPORTANT: Coverage entries for the same semantic time STACK additively.**
- * For weekday vs weekend staffing, use mutually exclusive `dayOfWeek` on BOTH entries:
+ * For day-specific count overrides, use {@link VariantCoverageRequirement}
+ * instead. When multiple simple entries match the same day, each produces its
+ * own independent constraint.
  *
  * @example Weekday vs weekend (mutually exclusive dayOfWeek)
  * ```typescript
- * { semanticTime: "lunch", roles: ["waiter"], targetCount: 2,
+ * { semanticTime: "day_shift", roles: ["nurse"], targetCount: 3,
  *   dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
- * { semanticTime: "lunch", roles: ["waiter"], targetCount: 3,
+ * { semanticTime: "day_shift", roles: ["nurse"], targetCount: 2,
  *   dayOfWeek: ["saturday", "sunday"] },
  * ```
  *
  * @example Skill-based coverage (any role with the skill)
  * ```typescript
- * { semanticTime: "opening", skills: ["keyholder"], targetCount: 1 },
+ * { semanticTime: "night_shift", skills: ["charge_nurse"], targetCount: 1 },
  * ```
  */
 export type SemanticCoverageRequirement<S extends string> =
@@ -192,10 +193,10 @@ export type ConcreteCoverageRequirement =
  *
  * @example
  * ```typescript
- * // Default: 3 waiters. Christmas Eve: 1.
- * cover("dinner", "waiter",
- *   { count: 3 },
- *   { count: 1, dates: ["2025-12-24"] },
+ * // Default: 4 agents. Christmas Eve: 2.
+ * cover("peak_hours", "agent",
+ *   { count: 4 },
+ *   { count: 2, dates: ["2025-12-24"] },
  * )
  * ```
  */
@@ -253,10 +254,10 @@ interface SkillBasedVariantCoverageRequirement<
  * @example Decrease from default on a specific date
  * ```typescript
  * {
- *   semanticTime: "dinner", roles: ["waiter"],
+ *   semanticTime: "peak_hours", roles: ["agent"],
  *   variants: [
- *     { count: 3 },                              // default
- *     { count: 1, dates: ["2025-12-24"] },        // Christmas Eve
+ *     { count: 4 },                              // default
+ *     { count: 2, dates: ["2025-12-24"] },        // Christmas Eve
  *   ],
  * }
  * ```
@@ -334,25 +335,25 @@ export interface SemanticTimeContext<S extends string> {
  * @example Basic usage
  * ```typescript
  * const times = defineSemanticTimes({
- *   opening: { startTime: { hours: 6 }, endTime: { hours: 8 } },
- *   lunch: { startTime: { hours: 11, minutes: 30 }, endTime: { hours: 14 } },
- *   closing: { startTime: { hours: 21 }, endTime: { hours: 23 } },
+ *   morning_round: { startTime: { hours: 7 }, endTime: { hours: 9 } },
+ *   day_shift: { startTime: { hours: 7 }, endTime: { hours: 15 } },
+ *   night_shift: { startTime: { hours: 23 }, endTime: { hours: 7 } },
  * });
  *
  * const coverage = times.coverage([
- *   { semanticTime: "lunch", roleId: "server", targetCount: 3 },
- *   { semanticTime: "opening", roleId: "keyholder", targetCount: 1, priority: "MANDATORY" },
- *   // Type error: "dinner" is not a defined semantic time
- *   // { semanticTime: "dinner", roleId: "server", targetCount: 2 },
+ *   { semanticTime: "day_shift", roles: ["nurse"], targetCount: 3 },
+ *   { semanticTime: "morning_round", skills: ["charge_nurse"], targetCount: 1, priority: "MANDATORY" },
+ *   // Type error: "evening" is not a defined semantic time
+ *   // { semanticTime: "evening", roles: ["nurse"], targetCount: 2 },
  * ]);
  * ```
  *
  * @example Variants for different days
  * ```typescript
  * const times = defineSemanticTimes({
- *   lunch: [
- *     { startTime: { hours: 11, minutes: 30 }, endTime: { hours: 14 }, dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
- *     { startTime: { hours: 12 }, endTime: { hours: 15 }, dayOfWeek: ["saturday", "sunday"] },
+ *   peak_hours: [
+ *     { startTime: { hours: 9 }, endTime: { hours: 17 }, dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] },
+ *     { startTime: { hours: 10 }, endTime: { hours: 16 }, dayOfWeek: ["saturday", "sunday"] },
  *   ],
  * });
  * ```
@@ -360,9 +361,9 @@ export interface SemanticTimeContext<S extends string> {
  * @example Mixed semantic and concrete coverage
  * ```typescript
  * const coverage = times.coverage([
- *   { semanticTime: "lunch", roleId: "server", targetCount: 3 },
- *   // One-off party - concrete time
- *   { day: "2026-01-14", startTime: { hours: 15 }, endTime: { hours: 20 }, roleId: "server", targetCount: 5 },
+ *   { semanticTime: "day_shift", roles: ["nurse"], targetCount: 3 },
+ *   // One-off event requiring extra staff
+ *   { day: "2026-01-14", startTime: { hours: 8 }, endTime: { hours: 12 }, roles: ["nurse"], targetCount: 5 },
  * ]);
  * ```
  */

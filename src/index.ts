@@ -12,6 +12,17 @@
  * complete scheduling configuration via {@link defineSchedule}. Each concept
  * is a single function call with full type safety.
  *
+ * **Times vs Shift Patterns**: These are two distinct concepts.
+ * `times` are named time windows used to define and reference recurring
+ * periods: service hours, delivery windows, peak periods, weekly events
+ * like a fire drill. Times may overlap (e.g., "dinner" 18:00-22:00 and
+ * "happy_hour" 17:30-18:30). Coverage and rules reference these names.
+ * `shiftPatterns` define WHEN people CAN work (available time slots).
+ * The solver assigns people to shift patterns whose hours overlap with
+ * times to satisfy coverage. Not every shift pattern needs a
+ * corresponding time; create times only for periods you need to
+ * reference.
+ *
  * **Rules**: Business requirements expressed as scheduling constraints.
  * - Built-in rules: hours limits, time-off, rest periods, preferences, cost optimization
  * - Scoping: apply rules globally, per person, per role, per skill, or per time period
@@ -31,27 +42,26 @@
  * } from "dabke";
  *
  * const schedule = defineSchedule({
- *   roles: ["waiter", "manager"],
- *   skills: ["senior"],
+ *   roles: ["nurse", "doctor"],
+ *   skills: ["charge_nurse"],
  *
  *   times: {
- *     lunch: time({ startTime: t(12), endTime: t(15) }),
- *     dinner: time(
- *       { startTime: t(17), endTime: t(21) },
- *       { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
- *     ),
+ *     morning_round: time({ startTime: t(7), endTime: t(9) }),
+ *     day_ward: time({ startTime: t(7), endTime: t(15) }),
+ *     night_ward: time({ startTime: t(23), endTime: t(7) }),
  *   },
  *
  *   coverage: [
- *     cover("lunch", "waiter", 2),
- *     cover("dinner", "waiter", 3, { dayOfWeek: weekdays }),
- *     cover("dinner", "waiter", 4, { dayOfWeek: weekend }),
- *     cover("dinner", "manager", 1),
+ *     cover("morning_round", "doctor", 1),
+ *     cover("day_ward", "nurse", 3, { dayOfWeek: weekdays }),
+ *     cover("day_ward", "nurse", 2, { dayOfWeek: weekend }),
+ *     cover("night_ward", "nurse", 2),
+ *     cover("night_ward", "charge_nurse", 1),
  *   ],
  *
  *   shiftPatterns: [
- *     shift("lunch_shift", t(12), t(15)),
- *     shift("evening", t(17), t(22)),
+ *     shift("day", t(7), t(15)),
+ *     shift("night", t(23), t(7)),
  *   ],
  *
  *   rules: [
@@ -71,8 +81,9 @@
  *     dateRange: { start: "2026-02-09", end: "2026-02-15" },
  *   },
  *   members: [
- *     { id: "alice", roles: ["waiter"] },
- *     { id: "bob", roles: ["waiter", "manager"], skills: ["senior"] },
+ *     { id: "alice", roles: ["nurse"], skills: ["charge_nurse"] },
+ *     { id: "bob", roles: ["nurse"] },
+ *     { id: "carol", roles: ["doctor"] },
  *   ],
  * });
  *

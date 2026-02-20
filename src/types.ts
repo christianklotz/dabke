@@ -45,15 +45,8 @@ export const DayOfWeekSchema = z.union([
  *
  * @example
  * ```typescript
- * const morningStart: TimeOfDay = {
- *   hours: 9,
- *   minutes: 0
- * };
- *
- * const afternoonEnd: TimeOfDay = {
- *   hours: 17,
- *   minutes: 30
- * };
+ * { hours: 9, minutes: 0 }
+ * { hours: 17, minutes: 30 }
  * ```
  */
 export interface TimeOfDay {
@@ -155,7 +148,7 @@ export interface DateTimeRange {
  * };
  * ```
  *
- * @example Only specific days of the week (restaurant closed Mon/Tue)
+ * @example Only specific days of the week (closed Mon/Tue)
  * ```typescript
  * const period: SchedulingPeriod = {
  *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
@@ -163,13 +156,7 @@ export interface DateTimeRange {
  * };
  * ```
  *
- * @example Only specific dates within the range
- * ```typescript
- * const period: SchedulingPeriod = {
- *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
- *   dates: ['2025-02-05', '2025-02-07'],
- * };
- * ```
+
  */
 export interface SchedulingPeriod {
   /**
