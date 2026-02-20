@@ -166,16 +166,8 @@ export function time(
     } satisfies SemanticTimeDef;
   }
 
-  // Multiple entries or scoped entries: pass through directly
-  return entries.map((entry): SemanticTimeVariant => {
-    const variant: SemanticTimeVariant = {
-      startTime: entry.startTime,
-      endTime: entry.endTime,
-    };
-    if (entry.dayOfWeek) variant.dayOfWeek = entry.dayOfWeek;
-    if (entry.dates) variant.dates = entry.dates;
-    return variant;
-  });
+  // Multiple entries or scoped entries: shallow-copy to decouple from caller
+  return entries.map((entry) => Object.assign({}, entry));
 }
 
 // ============================================================================
