@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.81.1 (2026-02-20)
+
+### Documentation
+
+- Rewrite README for the v2 `defineSchedule` API with a verified cafe scheduling example.
+
 ## 0.81.0 (2026-02-19)
 
 ### Breaking Changes
