@@ -5,21 +5,52 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
-## 0.81.0 (2026-02-14)
+## 0.81.0 (2026-02-19)
 
 ### Breaking Changes
 
-- Flatten `CpsatRuleConfigEntry` from `{ name, config: { ... } }` to `{ name, ...config }`.
-  Rule config fields are now at the top level alongside `name` instead of nested under `config`.
-- `CpsatRuleConfigEntry` is now a distributive mapped type (discriminated union over rule names),
-  preventing mismatched `name`/config pairings at compile time.
-- `resolveRuleScopes` returns flat entries matching the new `CpsatRuleConfigEntry` shape.
+- **Rename employee to member**: `SchedulingEmployee` is now `SchedulingMember`,
+  `employeeIds` scope fields are now `memberIds`, and `Employee` type alias is removed.
+  The `employee-assignment-priority` rule is renamed to `assignment-priority`.
+- **Rename roleIds/skillIds to roles/skills**: on `SchedulingMember`, `ShiftPattern`,
+  and all coverage requirement types. Scope fields on rules remain `roleIds`/`skillIds`.
+- **Merge ShiftPatternDef into ShiftPattern**: the separate `ShiftPatternDef` type is
+  removed. `ShiftPattern` now directly includes `startTime`, `endTime`, and optional
+  `roles`/`skills` fields.
+- **Flatten CpsatRuleConfigEntry**: rule config entries change from
+  `{ name, config: { ... } }` to `{ name, ...config }`. Config fields sit at the same
+  level as `name`. The type is now a distributive union preventing mismatched name/config
+  pairings at compile time.
+- **Rename daysOfWeek to dayOfWeek**: on `SchedulingPeriod`, `SemanticTimeVariant`,
+  and coverage requirement types.
+- **Remove v1-only exports**: `Employee`, `ShiftPatternDef`, `defineSemanticTimes`,
+  and related types removed from the public API. Use `defineSchedule` instead.
+
+### Features
+
+- **defineSchedule API**: new primary API with composable factory functions (`time`,
+  `cover`, `shift`, rule helpers like `maxHoursPerWeek`, `timeOff`, etc.) for building
+  a complete scheduling configuration declaratively.
+- **Cost optimization**: base pay tracking (`HourlyPay`, `SalariedPay` on members),
+  cost minimization rule (`minimize-cost`), day/time cost surcharges and multipliers,
+  and post-solve cost calculation.
+- **Overtime rules**: daily and weekly overtime multipliers and surcharges,
+  tiered overtime multiplier for graduated rates.
+- **Variant coverage**: day-specific count overrides on coverage requirements
+  via `countByDay` on the `cover()` helper.
 
 ### Fixes
 
-- Strip all entity-scope fields (`employeeIds`, `roleIds`, `skillIds`) consistently
-  during scope resolution. Previously `employeeIds` was not explicitly removed before
-  being overridden via object spread ordering.
+- Clean up stale solver containers on startup in the test harness.
+- Strip all entity-scope fields consistently during scope resolution.
+
+### Improvements
+
+- Simplify rule translation layer; rule-specific knowledge (schemas, defaults,
+  validation, cost) is co-located in each rule file.
+- Rewrite llms.txt generator as whitelist-based, aligned with the v2 API.
+- Enrich TSDoc throughout: schedule.ts, semantic-time.ts, coverage types,
+  and package-level documentation updated for the defineSchedule API.
 
 ## 0.80.0 (2026-02-14)
 
