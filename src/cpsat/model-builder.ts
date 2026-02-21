@@ -522,7 +522,7 @@ export class ModelBuilder {
                 : "Add team members with the required skills",
               "Change the coverage requirement to match available team members",
             ],
-            groupKey: cov.groupKey,
+            group: cov.group,
           });
 
           const impossibleVar = `infeasible:coverage:${covKey}:${cov.day}`;
@@ -685,7 +685,7 @@ export class ModelBuilder {
             days: [cov.day],
             memberIds: eligibleMembers.map((e) => e.id),
           },
-          groupKey: cov.groupKey,
+          group: cov.group,
         });
       }
 
@@ -705,7 +705,7 @@ export class ModelBuilder {
             skills: cov.skills,
             reason,
             suggestions: issue.suggestions,
-            groupKey: cov.groupKey,
+            group: cov.group,
           });
         }
         // Note: soft coverage warnings are tracked via trackConstraint and reported post-solve

@@ -2,6 +2,7 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
@@ -10,6 +11,8 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  formatEntityScope,
+  formatTimeScope,
 } from "./scope.types.js";
 
 const MaxShiftsDaySchema = z
@@ -61,6 +64,9 @@ export function createMaxShiftsDayRule(config: MaxShiftsDayConfig): CompilationR
   const entityScopeValue = parseEntityScope(parsed);
   const timeScopeValue = parseTimeScope(parsed);
   const { shifts, priority } = parsed;
+  const gKey = validationGroup(
+    `max ${shifts} shift${shifts === 1 ? "" : "s"}/day${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  );
 
   return {
     compile(b) {
@@ -83,10 +89,23 @@ export function createMaxShiftsDayRule(config: MaxShiftsDayConfig): CompilationR
 
           if (terms.length === 0) continue;
 
+          const constraintId = `max-shifts-day:${emp.id}:${day}`;
+
           if (priority === "MANDATORY") {
             b.addLinear(terms, "<=", shifts);
           } else {
-            b.addSoftLinear(terms, "<=", shifts, priorityToPenalty(priority));
+            b.addSoftLinear(terms, "<=", shifts, priorityToPenalty(priority), constraintId);
+            b.reporter.trackConstraint({
+              id: constraintId,
+              type: "rule",
+              rule: "max-shifts-day",
+              description: `${emp.id} max ${shifts} shift${shifts === 1 ? "" : "s"} on ${day}`,
+              targetValue: shifts,
+              comparator: "<=",
+              day,
+              context: { memberIds: [emp.id], days: [day] },
+              group: gKey,
+            });
           }
         }
       }

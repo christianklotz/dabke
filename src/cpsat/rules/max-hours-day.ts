@@ -2,6 +2,7 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
@@ -10,6 +11,8 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  formatEntityScope,
+  formatTimeScope,
 } from "./scope.types.js";
 
 const MaxHoursDaySchema = z
@@ -59,6 +62,9 @@ export function createMaxHoursDayRule(config: MaxHoursDayConfig): CompilationRul
   const timeScopeValue = parseTimeScope(parsed);
   const { hours, priority } = parsed;
   const maxMinutes = hours * 60;
+  const gKey = validationGroup(
+    `max ${hours}h/day${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  );
 
   return {
     compile(b) {
@@ -81,10 +87,23 @@ export function createMaxHoursDayRule(config: MaxHoursDayConfig): CompilationRul
 
           if (terms.length === 0) continue;
 
+          const constraintId = `max-hours-day:${emp.id}:${day}`;
+
           if (priority === "MANDATORY") {
             b.addLinear(terms, "<=", maxMinutes);
           } else {
-            b.addSoftLinear(terms, "<=", maxMinutes, priorityToPenalty(priority));
+            b.addSoftLinear(terms, "<=", maxMinutes, priorityToPenalty(priority), constraintId);
+            b.reporter.trackConstraint({
+              id: constraintId,
+              type: "rule",
+              rule: "max-hours-day",
+              description: `${emp.id} max ${hours}h on ${day}`,
+              targetValue: maxMinutes,
+              comparator: "<=",
+              day,
+              context: { memberIds: [emp.id], days: [day] },
+              group: gKey,
+            });
           }
         }
       }

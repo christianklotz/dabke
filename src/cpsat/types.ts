@@ -1,6 +1,6 @@
 import type { TimeOfDay, DayOfWeek } from "../types.js";
 import type { SolverRequest, SolverTerm } from "../client.types.js";
-import type { GroupKey } from "./validation.types.js";
+import type { ValidationGroup } from "./validation.types.js";
 
 /**
  * Pay per hour in the caller's smallest currency unit (e.g., pence, cents).
@@ -133,13 +133,13 @@ interface CoverageRequirementBase extends TimeInterval {
   targetCount: number;
   priority: Priority;
   /**
-   * Groups this requirement with others sharing the same key for validation reporting.
-   * When provided, all coverage constraints generated from this requirement will
-   * share the same groupKey, enabling meaningful aggregation in reports.
+   * Groups this requirement with others for validation reporting.
+   * All coverage constraints generated from this requirement will share the
+   * same group, enabling meaningful aggregation in reports.
    *
-   * If not provided, an auto-generated key will be used based on the coverage parameters.
+   * If not provided, an auto-generated group will be used based on the coverage parameters.
    */
-  groupKey?: GroupKey;
+  group?: ValidationGroup;
 }
 
 /**

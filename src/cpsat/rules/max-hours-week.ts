@@ -3,6 +3,7 @@ import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
@@ -11,6 +12,8 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  formatEntityScope,
+  formatTimeScope,
 } from "./scope.types.js";
 
 const MaxHoursWeekBase = z.object({
@@ -62,6 +65,9 @@ export function createMaxHoursWeekRule(config: MaxHoursWeekConfig): CompilationR
   const timeScopeValue = parseTimeScope(parsed);
   const { hours, priority, weekStartsOn } = parsed;
   const maxMinutes = hours * 60;
+  const gKey = validationGroup(
+    `max ${hours}h/week${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  );
 
   return {
     compile(b) {
@@ -88,10 +94,24 @@ export function createMaxHoursWeekRule(config: MaxHoursWeekConfig): CompilationR
 
           if (terms.length === 0) continue;
 
+          const weekLabel = weekDays[0]!;
+          const constraintId = `max-hours-week:${emp.id}:${weekLabel}`;
+
           if (priority === "MANDATORY") {
             b.addLinear(terms, "<=", maxMinutes);
           } else {
-            b.addSoftLinear(terms, "<=", maxMinutes, priorityToPenalty(priority));
+            b.addSoftLinear(terms, "<=", maxMinutes, priorityToPenalty(priority), constraintId);
+            b.reporter.trackConstraint({
+              id: constraintId,
+              type: "rule",
+              rule: "max-hours-week",
+              description: `${emp.id} max ${hours}h in week starting ${weekLabel}`,
+              targetValue: maxMinutes,
+              comparator: "<=",
+              day: weekLabel,
+              context: { memberIds: [emp.id], days: weekDays },
+              group: gKey,
+            });
           }
         }
       }

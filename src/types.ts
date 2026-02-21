@@ -26,7 +26,6 @@ export type DayOfWeek =
  * Zod schema for {@link DayOfWeek}.
  * Useful for rule configs that need to accept a day-of-week string.
  */
-
 export const DayOfWeekSchema = z.union([
   z.literal("monday"),
   z.literal("tuesday"),
@@ -38,96 +37,27 @@ export const DayOfWeekSchema = z.union([
 ]);
 
 /**
- * Time of day representation (hours and minutes, with optional seconds/nanos).
+ * Time of day representation (hours and minutes).
  *
  * Used for defining shift start/end times and semantic time boundaries.
  * Hours are in 24-hour format (0-23).
  *
  * @example
  * ```typescript
- * { hours: 9, minutes: 0 }
- * { hours: 17, minutes: 30 }
+ * const morningStart: TimeOfDay = {
+ *   hours: 9,
+ *   minutes: 0
+ * };
+ *
+ * const afternoonEnd: TimeOfDay = {
+ *   hours: 17,
+ *   minutes: 30
+ * };
  * ```
  */
 export interface TimeOfDay {
   hours: number;
   minutes: number;
-  seconds?: number;
-  nanos?: number;
-}
-
-/**
- * Calendar date representation (year, month, day).
- *
- * @example
- * ```typescript
- * const christmas: CalendarDate = {
- *   year: 2025,
- *   month: 12,
- *   day: 25
- * };
- * ```
- */
-export interface CalendarDate {
-  year: number;
-  month: number;
-  day: number;
-}
-
-/**
- * Time horizon defining the start and end dates for scheduling.
- *
- * Specifies the date range over which the schedule should be generated.
- * The range is inclusive of start date and exclusive of end date.
- *
- * @example
- * ```typescript
- * // One week schedule starting Monday, March 3, 2025
- * const horizon: TimeHorizon = {
- *   start: new Date('2025-03-03'),  // Monday
- *   end: new Date('2025-03-10')     // Following Monday (exclusive)
- * };
- * ```
- */
-export interface TimeHorizon {
-  start: Date;
-  end: Date;
-}
-
-// ============================================================================
-// DateTime Types
-// ============================================================================
-
-export interface DateTimeComponents extends Partial<CalendarDate>, Partial<TimeOfDay> {}
-
-interface DateTimeWithUtcOffset extends DateTimeComponents {
-  utcOffset?: string;
-  timeZone?: never;
-}
-
-interface DateTimeWithTimeZone extends DateTimeComponents {
-  timeZone?: {
-    id: string;
-    version: string;
-  };
-  utcOffset?: never;
-}
-
-/**
- * Date and time representation supporting both UTC offset and timezone-aware formats.
- *
- * Can be specified either with a UTC offset (e.g., "-08:00") or with a timezone ID
- * (e.g., "America/Los_Angeles").
- */
-export type DateTime = DateTimeWithUtcOffset | DateTimeWithTimeZone;
-
-/**
- * Represents a time range with start and end DateTimes.
- * Used for checking overlaps and scheduling constraints.
- */
-export interface DateTimeRange {
-  start: DateTime;
-  end: DateTime;
 }
 
 // ============================================================================
@@ -156,7 +86,13 @@ export interface DateTimeRange {
  * };
  * ```
  *
-
+ * @example Only specific dates within the range
+ * ```typescript
+ * const period: SchedulingPeriod = {
+ *   dateRange: { start: '2025-02-03', end: '2025-02-09' },
+ *   dates: ['2025-02-05', '2025-02-07'],
+ * };
+ * ```
  */
 export interface SchedulingPeriod {
   /**

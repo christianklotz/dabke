@@ -3,6 +3,7 @@ import type { TimeOfDay } from "../../types.js";
 import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
 import type { ResolvedShiftAssignment } from "../response.js";
 import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import type { ValidationReporter } from "../validation-reporter.js";
 import {
   PrioritySchema,
@@ -12,6 +13,8 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  formatEntityScope,
+  formatTimeScope,
 } from "./scope.types.js";
 
 const timeOfDaySchema = z.object({
@@ -108,6 +111,9 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
 
   const entityScopeValue = parseEntityScope(parsed);
   const timeScopeValue = parseTimeScope(parsed);
+  const gKey = validationGroup(
+    `time-off${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  );
 
   return {
     compile(builder) {
@@ -187,6 +193,7 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
                 memberIds: [emp.id],
                 days: [day],
               },
+              group: gKey,
             });
           } else {
             reporter.reportRulePassed({
@@ -196,6 +203,7 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
                 memberIds: [emp.id],
                 days: [day],
               },
+              group: gKey,
             });
           }
         }

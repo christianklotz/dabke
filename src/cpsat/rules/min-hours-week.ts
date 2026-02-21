@@ -3,11 +3,13 @@ import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
+  formatEntityScope,
 } from "./scope.types.js";
 
 const MinHoursWeekBase = z.object({
@@ -43,6 +45,7 @@ export function createMinHoursWeekRule(config: MinHoursWeekConfig): CompilationR
   const scope = parseEntityScope(parsed);
   const { hours, priority, weekStartsOn } = parsed;
   const minMinutes = hours * 60;
+  const gKey = validationGroup(`min ${hours}h/week${formatEntityScope(scope)}`);
 
   return {
     compile(b) {
@@ -67,10 +70,24 @@ export function createMinHoursWeekRule(config: MinHoursWeekConfig): CompilationR
 
           if (terms.length === 0) continue;
 
+          const weekLabel = weekDays[0]!;
+          const constraintId = `min-hours-week:${emp.id}:${weekLabel}`;
+
           if (priority === "MANDATORY") {
             b.addLinear(terms, ">=", minMinutes);
           } else {
-            b.addSoftLinear(terms, ">=", minMinutes, priorityToPenalty(priority));
+            b.addSoftLinear(terms, ">=", minMinutes, priorityToPenalty(priority), constraintId);
+            b.reporter.trackConstraint({
+              id: constraintId,
+              type: "rule",
+              rule: "min-hours-week",
+              description: `${emp.id} min ${hours}h in week starting ${weekLabel}`,
+              targetValue: minMinutes,
+              comparator: ">=",
+              day: weekLabel,
+              context: { memberIds: [emp.id], days: weekDays },
+              group: gKey,
+            });
           }
         }
       }

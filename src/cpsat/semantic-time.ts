@@ -2,7 +2,7 @@ import type { DayOfWeek, TimeOfDay } from "../types.js";
 import { toDayOfWeekUTC } from "../datetime.utils.js";
 import { parseDayString } from "./utils.js";
 import type { CoverageRequirement, Priority } from "./types.js";
-import { groupKey, type GroupKey } from "./validation.types.js";
+import { validationGroup, type ValidationGroup } from "./validation.types.js";
 
 /**
  * Base definition for a semantic time period.
@@ -48,11 +48,11 @@ interface SemanticCoverageRequirementBase<S extends string> {
   /** Scope this requirement to specific dates (YYYY-MM-DD) */
   dates?: string[];
   /**
-   * Override the auto-generated group key for validation reporting.
-   * If not provided, a key is auto-generated from the semantic time name,
+   * Override the auto-generated group for validation reporting.
+   * If not provided, a group is auto-generated from the semantic time name,
    * role/skills, and target count.
    */
-  groupKey?: GroupKey;
+  group?: ValidationGroup;
 }
 
 /**
@@ -134,11 +134,11 @@ interface ConcreteCoverageRequirementBase {
   targetCount: number;
   priority?: Priority;
   /**
-   * Override the auto-generated group key for validation reporting.
-   * If not provided, a key is auto-generated from the day, time range,
+   * Override the auto-generated group for validation reporting.
+   * If not provided, a group is auto-generated from the day, time range,
    * role/skills, and target count.
    */
-  groupKey?: GroupKey;
+  group?: ValidationGroup;
 }
 
 /**
@@ -218,7 +218,7 @@ interface VariantCoverageRequirementBase<S extends string> {
   semanticTime: S;
   /** At least one variant is required. At most one may be unscoped (the default). */
   variants: [CoverageVariant, ...CoverageVariant[]];
-  groupKey?: GroupKey;
+  group?: ValidationGroup;
 }
 
 /**
@@ -397,9 +397,9 @@ function buildCoverageRequirement(
   skills: [string, ...string[]] | undefined,
   targetCount: number,
   priority: Priority,
-  gKey: GroupKey,
+  group: ValidationGroup,
 ): CoverageRequirement {
-  const base = { day, startTime, endTime, targetCount, priority, groupKey: gKey };
+  const base = { day, startTime, endTime, targetCount, priority, group };
 
   if (roles && roles.length > 0) {
     // Role-based (with optional skills)
@@ -431,7 +431,7 @@ function resolveSemanticCoverage<S extends string>(
     if (isConcreteCoverage(req)) {
       // Concrete requirement - pass through if day is in horizon
       if (daySet.has(req.day)) {
-        const autoGroupKey = generateConcreteGroupKey(req);
+        const autoGroup = generateConcreteGroup(req);
         result.push(
           buildCoverageRequirement(
             req.day,
@@ -441,7 +441,7 @@ function resolveSemanticCoverage<S extends string>(
             req.skills,
             req.targetCount,
             req.priority ?? "MANDATORY",
-            req.groupKey ?? autoGroupKey,
+            req.group ?? autoGroup,
           ),
         );
       }
@@ -452,7 +452,7 @@ function resolveSemanticCoverage<S extends string>(
         throw new Error(`Unknown semantic time: ${req.semanticTime}`);
       }
 
-      const autoGroupKey = generateVariantGroupKey(req);
+      const autoGroup = generateVariantGroup(req);
 
       for (const day of days) {
         const resolved = resolveTimeForDay(entry, day);
@@ -470,7 +470,7 @@ function resolveSemanticCoverage<S extends string>(
             req.skills,
             variant.count,
             variant.priority ?? "MANDATORY",
-            req.groupKey ?? autoGroupKey,
+            req.group ?? autoGroup,
           ),
         );
       }
@@ -481,7 +481,7 @@ function resolveSemanticCoverage<S extends string>(
         throw new Error(`Unknown semantic time: ${req.semanticTime}`);
       }
 
-      const autoGroupKey = generateSemanticGroupKey(req);
+      const autoGroup = generateSemanticGroup(req);
       const applicableDays = filterDays(days, req.dayOfWeek, req.dates);
 
       for (const day of applicableDays) {
@@ -496,7 +496,7 @@ function resolveSemanticCoverage<S extends string>(
               req.skills,
               req.targetCount,
               req.priority ?? "MANDATORY",
-              req.groupKey ?? autoGroupKey,
+              req.group ?? autoGroup,
             ),
           );
         }
@@ -511,19 +511,20 @@ function resolveSemanticCoverage<S extends string>(
  * Generates a human-readable group key for a semantic coverage requirement.
  * Format: "{count}x {role/skills} during {semanticTime}" with optional scope
  */
-function generateSemanticGroupKey<S extends string>(req: SemanticCoverageRequirement<S>): GroupKey {
+function generateSemanticGroup<S extends string>(
+  req: SemanticCoverageRequirement<S>,
+): ValidationGroup {
   const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
   const base = `${req.targetCount}x ${roleOrSkills} during ${req.semanticTime}`;
 
-  // Add scope qualifier if scoped to specific days
   if (req.dayOfWeek && req.dayOfWeek.length > 0 && req.dayOfWeek.length < 7) {
-    return groupKey(`${base} (${formatDaysScope(req.dayOfWeek)})`);
+    return validationGroup(`${base} (${formatDaysScope(req.dayOfWeek)})`);
   }
   if (req.dates && req.dates.length > 0) {
-    return groupKey(`${base} (specific dates)`);
+    return validationGroup(`${base} (specific dates)`);
   }
 
-  return groupKey(base);
+  return validationGroup(base);
 }
 
 /**
@@ -531,9 +532,11 @@ function generateSemanticGroupKey<S extends string>(req: SemanticCoverageRequire
  * Format: "{role/skills} during {semanticTime}" — shared across all days since
  * the count varies per variant.
  */
-function generateVariantGroupKey<S extends string>(req: VariantCoverageRequirement<S>): GroupKey {
+function generateVariantGroup<S extends string>(
+  req: VariantCoverageRequirement<S>,
+): ValidationGroup {
   const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
-  return groupKey(`${roleOrSkills} during ${req.semanticTime}`);
+  return validationGroup(`${roleOrSkills} during ${req.semanticTime}`);
 }
 
 /**
@@ -573,10 +576,10 @@ function resolveVariantForDay(
  * Generates a human-readable group key for a concrete coverage requirement.
  * Format: "{count}x {role/skills} on {day} {time}"
  */
-function generateConcreteGroupKey(req: ConcreteCoverageRequirement): GroupKey {
+function generateConcreteGroup(req: ConcreteCoverageRequirement): ValidationGroup {
   const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
   const timeRange = `${formatTime(req.startTime)}-${formatTime(req.endTime)}`;
-  return groupKey(`${req.targetCount}x ${roleOrSkills} on ${req.day} ${timeRange}`);
+  return validationGroup(`${req.targetCount}x ${roleOrSkills} on ${req.day} ${timeRange}`);
 }
 
 /**

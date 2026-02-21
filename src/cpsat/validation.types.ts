@@ -1,29 +1,45 @@
 import type { TimeOfDay } from "../types.js";
 
 // =============================================================================
-// Group Key - for aggregating related validation items
+// Validation Group - for aggregating related validation items
 // =============================================================================
 
-declare const GroupKeyBrand: unique symbol;
+let nextGroupId = 1;
 
 /**
- * Branded type for validation group keys.
  * Groups related validation items that originated from the same instruction.
- */
-export type GroupKey = string & { readonly [GroupKeyBrand]: never };
-
-/**
- * Creates a GroupKey from a description string.
- * Use this to create keys that group related validation items together.
+ *
+ * Each `cover()` or rule call creates one group. All constraints generated
+ * from that call share the same group, so `summarizeValidation()` can
+ * collapse hundreds of individual items into a single summary line.
  *
  * @example
  * ```typescript
- * const key = groupKey("2x waiter during lunch");
- * coverage.groupKey = key;
+ * const group = validationGroup("3x nurse during day_ward (Mon-Fri)");
  * ```
  */
-export function groupKey(description: string): GroupKey {
-  return description as GroupKey;
+export interface ValidationGroup {
+  /** Unique opaque identifier for this group. */
+  readonly key: string;
+  /** Human-readable description of the instruction that created this group. */
+  readonly description: string;
+}
+
+/**
+ * Creates a new validation group with a unique key.
+ *
+ * @param description - Human-readable summary of the source instruction
+ */
+export function validationGroup(description: string): ValidationGroup {
+  return { key: `grp_${nextGroupId++}`, description };
+}
+
+/**
+ * Resets the group counter. Only for use in tests.
+ * @internal
+ */
+export function resetValidationGroupCounter(): void {
+  nextGroupId = 1;
 }
 
 /**
@@ -48,7 +64,7 @@ export interface CoverageError {
   readonly skills?: readonly string[];
   readonly reason: string;
   readonly suggestions?: readonly string[];
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 export interface RuleError {
@@ -58,7 +74,7 @@ export interface RuleError {
   readonly reason: string;
   readonly context: ValidationContext;
   readonly suggestions?: readonly string[];
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 export interface SolverError {
@@ -83,7 +99,7 @@ export interface CoverageViolation {
   readonly targetCount: number;
   readonly actualCount: number;
   readonly shortfall: number;
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 export interface RuleViolation {
@@ -94,7 +110,7 @@ export interface RuleViolation {
   readonly context: ValidationContext;
   readonly shortfall?: number;
   readonly overflow?: number;
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 export type ScheduleViolation = CoverageViolation | RuleViolation;
@@ -111,7 +127,7 @@ export interface CoveragePassed {
   readonly roles?: string[];
   readonly skills?: readonly string[];
   readonly description: string;
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 export interface RulePassed {
@@ -120,7 +136,7 @@ export interface RulePassed {
   readonly rule: string;
   readonly description: string;
   readonly context: ValidationContext;
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 export type SchedulePassed = CoveragePassed | RulePassed;
@@ -144,7 +160,8 @@ export interface ScheduleValidation {
  * Use `summarizeValidation()` to create these from a ScheduleValidation.
  */
 export interface ValidationSummary {
-  readonly groupKey: GroupKey;
+  /** Unique group identifier. Stable within a single solve run. */
+  readonly groupKey: string;
   readonly type: "coverage" | "rule";
   readonly description: string;
   readonly days: readonly string[];
@@ -170,7 +187,7 @@ export interface TrackedConstraint {
   readonly roles?: string[];
   readonly skills?: readonly string[];
   readonly context: ValidationContext;
-  readonly groupKey?: GroupKey;
+  readonly group?: ValidationGroup;
 }
 
 /**

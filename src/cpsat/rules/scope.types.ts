@@ -546,3 +546,64 @@ function isDateInRecurringPeriod(
     return true;
   }
 }
+
+/**
+ * Formats a parsed entity scope as a human-readable suffix for descriptions.
+ * Returns an empty string for global scope.
+ *
+ * @example
+ * ```ts
+ * formatEntityScope({ type: "roles", roleIds: ["nurse"] })  // " for nurse"
+ * formatEntityScope({ type: "members", memberIds: ["alice", "bob"] })  // " for alice, bob"
+ * formatEntityScope({ type: "global" })  // ""
+ * ```
+ */
+export function formatEntityScope(scope: ParsedEntityScope): string {
+  switch (scope.type) {
+    case "global":
+      return "";
+    case "members":
+      return ` for ${scope.memberIds.join(", ")}`;
+    case "roles":
+      return ` for ${scope.roleIds.join(", ")}`;
+    case "skills":
+      return ` for ${scope.skillIds.join(", ")}`;
+  }
+}
+
+/**
+ * Formats a parsed time scope as a human-readable suffix for descriptions.
+ * Returns an empty string for unscoped rules.
+ *
+ * @example
+ * ```ts
+ * formatTimeScope({ type: "dayOfWeek", days: ["monday", "friday"] })  // " on mon, fri"
+ * formatTimeScope({ type: "dateRange", start: "2026-03-01", end: "2026-03-15" })  // " during 2026-03-01..2026-03-15"
+ * formatTimeScope({ type: "none" })  // ""
+ * ```
+ */
+export function formatTimeScope(scope: ParsedTimeScope): string {
+  switch (scope.type) {
+    case "none":
+      return "";
+    case "dateRange":
+      return ` during ${scope.start}..${scope.end}`;
+    case "specificDates":
+      return scope.dates.length <= 3
+        ? ` on ${scope.dates.join(", ")}`
+        : ` on ${scope.dates.length} dates`;
+    case "dayOfWeek":
+      return ` on ${formatDayOfWeek(scope.days)}`;
+    case "recurring":
+      return ` during ${scope.periods.map((p) => p.name).join(", ")}`;
+  }
+}
+
+function formatDayOfWeek(days: DayOfWeek[]): string {
+  const weekdays: DayOfWeek[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+  const weekend: DayOfWeek[] = ["saturday", "sunday"];
+
+  if (days.length === 5 && weekdays.every((d) => days.includes(d))) return "weekdays";
+  if (days.length === 2 && weekend.every((d) => days.includes(d))) return "weekends";
+  return days.map((d) => d.slice(0, 3)).join(", ");
+}

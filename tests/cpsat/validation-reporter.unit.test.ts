@@ -3,7 +3,7 @@ import {
   ValidationReporterImpl,
   summarizeValidation,
 } from "../../src/cpsat/validation-reporter.js";
-import { groupKey } from "../../src/cpsat/validation.types.js";
+import { validationGroup } from "../../src/cpsat/validation.types.js";
 import type { SolverResponse } from "../../src/client.types.js";
 
 describe("ValidationReporterImpl", () => {
@@ -436,9 +436,9 @@ describe("ValidationReporterImpl", () => {
       });
     });
 
-    it("propagates groupKey from tracked constraints to violations", () => {
+    it("propagates group from tracked constraints to violations", () => {
       const reporter = new ValidationReporterImpl();
-      const key = groupKey("2x barista during morning");
+      const grp = validationGroup("2x barista during morning");
 
       reporter.trackConstraint({
         id: "coverage:barista:2024-02-01:540",
@@ -450,7 +450,7 @@ describe("ValidationReporterImpl", () => {
         timeSlot: "09:00",
         roles: ["barista"],
         context: { days: ["2024-02-01"] },
-        groupKey: key,
+        group: grp,
       });
 
       const response: SolverResponse = {
@@ -469,12 +469,13 @@ describe("ValidationReporterImpl", () => {
       reporter.analyzeSolution(response);
 
       const validation = reporter.getValidation();
-      expect(validation.violations[0]?.groupKey).toBe(key);
+      const violation = validation.violations[0]!;
+      expect(violation.type !== "solver" && "group" in violation && violation.group).toBe(grp);
     });
 
-    it("propagates groupKey from tracked constraints to passed items", () => {
+    it("propagates group from tracked constraints to passed items", () => {
       const reporter = new ValidationReporterImpl();
-      const key = groupKey("2x barista during morning");
+      const grp = validationGroup("2x barista during morning");
 
       reporter.trackConstraint({
         id: "coverage:barista:2024-02-01:540",
@@ -486,7 +487,7 @@ describe("ValidationReporterImpl", () => {
         timeSlot: "09:00",
         roles: ["barista"],
         context: { days: ["2024-02-01"] },
-        groupKey: key,
+        group: grp,
       });
 
       const response: SolverResponse = {
@@ -498,14 +499,15 @@ describe("ValidationReporterImpl", () => {
       reporter.analyzeSolution(response);
 
       const validation = reporter.getValidation();
-      expect(validation.passed[0]?.groupKey).toBe(key);
+      const passed = validation.passed[0]!;
+      expect("group" in passed && passed.group).toBe(grp);
     });
   });
 });
 
 describe("summarizeValidation", () => {
-  it("groups passed items by groupKey", () => {
-    const key = groupKey("2x barista during morning");
+  it("groups passed items by group", () => {
+    const grp = validationGroup("2x barista during morning");
     const validation = {
       errors: [],
       violations: [],
@@ -517,7 +519,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:00"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:00",
-          groupKey: key,
+          group: grp,
         },
         {
           id: "passed:coverage:2024-02-01:09:15:barista:_",
@@ -526,7 +528,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:15"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:15",
-          groupKey: key,
+          group: grp,
         },
         {
           id: "passed:coverage:2024-02-02:09:00:barista:_",
@@ -535,7 +537,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:00"],
           roles: ["barista"],
           description: "2x barista on 2024-02-02 at 09:00",
-          groupKey: key,
+          group: grp,
         },
       ],
     };
@@ -544,8 +546,9 @@ describe("summarizeValidation", () => {
 
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
-      groupKey: key,
+      groupKey: grp.key,
       type: "coverage",
+      description: "2x barista during morning",
       status: "passed",
       passedCount: 3,
       violatedCount: 0,
@@ -554,9 +557,9 @@ describe("summarizeValidation", () => {
     });
   });
 
-  it("creates separate groups for different groupKeys", () => {
-    const morningKey = groupKey("2x barista during morning");
-    const afternoonKey = groupKey("3x barista during afternoon");
+  it("creates separate groups for different groups", () => {
+    const morningGrp = validationGroup("2x barista during morning");
+    const afternoonGrp = validationGroup("3x barista during afternoon");
     const validation = {
       errors: [],
       violations: [],
@@ -568,7 +571,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:00"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:00",
-          groupKey: morningKey,
+          group: morningGrp,
         },
         {
           id: "passed:coverage:2024-02-01:14:00:barista:_",
@@ -577,7 +580,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["14:00"],
           roles: ["barista"],
           description: "3x barista on 2024-02-01 at 14:00",
-          groupKey: afternoonKey,
+          group: afternoonGrp,
         },
       ],
     };
@@ -585,15 +588,17 @@ describe("summarizeValidation", () => {
     const summaries = summarizeValidation(validation);
 
     expect(summaries).toHaveLength(2);
-    const morning = summaries.find((s) => s.groupKey === morningKey);
-    const afternoon = summaries.find((s) => s.groupKey === afternoonKey);
+    const morning = summaries.find((s) => s.groupKey === morningGrp.key);
+    const afternoon = summaries.find((s) => s.groupKey === afternoonGrp.key);
 
     expect(morning?.passedCount).toBe(1);
+    expect(morning?.description).toBe("2x barista during morning");
     expect(afternoon?.passedCount).toBe(1);
+    expect(afternoon?.description).toBe("3x barista during afternoon");
   });
 
   it("sets status to partial when there are violations but also passed", () => {
-    const key = groupKey("2x barista during morning");
+    const grp = validationGroup("2x barista during morning");
     const validation = {
       errors: [],
       violations: [
@@ -606,7 +611,7 @@ describe("summarizeValidation", () => {
           targetCount: 2,
           actualCount: 1,
           shortfall: 1,
-          groupKey: key,
+          group: grp,
         },
       ],
       passed: [
@@ -617,7 +622,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:15"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:15",
-          groupKey: key,
+          group: grp,
         },
       ],
     };
@@ -631,7 +636,7 @@ describe("summarizeValidation", () => {
   });
 
   it("sets status to failed when there are errors", () => {
-    const key = groupKey("2x barista during morning");
+    const grp = validationGroup("2x barista during morning");
     const validation = {
       errors: [
         {
@@ -641,7 +646,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:00"],
           roles: ["barista"],
           reason: "No eligible members",
-          groupKey: key,
+          group: grp,
         },
       ],
       violations: [],
@@ -655,8 +660,8 @@ describe("summarizeValidation", () => {
     expect(summaries[0]?.errorCount).toBe(1);
   });
 
-  it("uses groupKey as description when it looks human-readable", () => {
-    const key = groupKey("2x barista during morning");
+  it("uses group description for summary description", () => {
+    const grp = validationGroup("2x barista during morning");
     const validation = {
       errors: [],
       violations: [],
@@ -668,7 +673,7 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:00"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:00",
-          groupKey: key,
+          group: grp,
         },
       ],
     };
@@ -678,7 +683,7 @@ describe("summarizeValidation", () => {
     expect(summaries[0]?.description).toBe("2x barista during morning");
   });
 
-  it("creates ungrouped entries for items without groupKey", () => {
+  it("creates separate entries for ungrouped items", () => {
     const validation = {
       errors: [],
       violations: [],
@@ -690,7 +695,6 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:00"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:00",
-          // No groupKey
         },
         {
           id: "passed:coverage:2024-02-01:09:15:barista:_",
@@ -699,17 +703,15 @@ describe("summarizeValidation", () => {
           timeSlots: ["09:15"],
           roles: ["barista"],
           description: "2x barista on 2024-02-01 at 09:15",
-          // No groupKey
         },
       ],
     };
 
     const summaries = summarizeValidation(validation);
 
-    // Each item without groupKey gets its own group
+    // Each item without group gets its own synthetic group
     expect(summaries).toHaveLength(2);
-    expect(summaries[0]?.groupKey).toContain("ungrouped:");
-    expect(summaries[1]?.groupKey).toContain("ungrouped:");
+    expect(summaries[0]?.groupKey).not.toBe(summaries[1]?.groupKey);
   });
 
   it("ignores solver errors in grouping", () => {

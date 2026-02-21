@@ -1,6 +1,5 @@
 import type { SolverResponse } from "../client.types.js";
 import {
-  groupKey,
   type ScheduleError,
   type ScheduleViolation,
   type SchedulePassed,
@@ -14,7 +13,7 @@ import {
   type RulePassed,
   type CoverageExclusion,
   type ValidationSummary,
-  type GroupKey,
+  type ValidationGroup,
 } from "./validation.types.js";
 
 export interface ValidationReporter {
@@ -191,7 +190,7 @@ export class ValidationReporterImpl implements ValidationReporter {
           targetCount: violation.targetValue,
           actualCount: violation.actualValue,
           shortfall: violation.violationAmount,
-          groupKey: tracked.groupKey,
+          group: tracked.group,
         });
       } else if (tracked?.type === "rule") {
         const isShortfall = tracked.comparator === ">=";
@@ -201,7 +200,7 @@ export class ValidationReporterImpl implements ValidationReporter {
           context: tracked.context,
           shortfall: isShortfall ? violation.violationAmount : undefined,
           overflow: !isShortfall ? violation.violationAmount : undefined,
-          groupKey: tracked.groupKey,
+          group: tracked.group,
         });
       } else {
         // Unknown constraint - create generic rule violation
@@ -225,7 +224,7 @@ export class ValidationReporterImpl implements ValidationReporter {
           roles: tracked.roles,
           skills: tracked.skills,
           description: tracked.description,
-          groupKey: tracked.groupKey,
+          group: tracked.group,
         });
       }
     }
@@ -238,18 +237,24 @@ export class ValidationReporterImpl implements ValidationReporter {
 
 type ValidationItem = ScheduleError | ScheduleViolation | SchedulePassed;
 
+function itemGroup(item: ValidationItem): ValidationGroup | undefined {
+  if ("group" in item) return item.group;
+  return undefined;
+}
+
 /**
- * Aggregates validation items by their groupKey into summaries.
+ * Aggregates validation items by their group into summaries.
  * This is a pure function that doesn't modify the input.
  *
- * Items without a groupKey are grouped by their ID (ungrouped).
+ * Items without a group are given a synthetic one based on their ID.
  *
  * @example
  * ```typescript
  * const validation = reporter.getValidation();
  * const summaries = summarizeValidation(validation);
  * // summaries[0] = {
- * //   groupKey: "2x waiter during lunch",
+ * //   groupKey: "grp_1",
+ * //   description: "3x nurse during day_ward (weekdays)",
  * //   status: "passed",
  * //   passedCount: 180,
  * //   days: ["2026-02-02", "2026-02-03", ...]
@@ -258,9 +263,10 @@ type ValidationItem = ScheduleError | ScheduleViolation | SchedulePassed;
  */
 export function summarizeValidation(validation: ScheduleValidation): readonly ValidationSummary[] {
   const groups = new Map<
-    GroupKey,
+    string,
     {
       type: "coverage" | "rule";
+      description: string;
       items: ValidationItem[];
       days: Set<string>;
       passedCount: number;
@@ -269,10 +275,11 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     }
   >();
 
-  const getOrCreateGroup = (key: GroupKey, type: "coverage" | "rule") => {
-    if (!groups.has(key)) {
-      groups.set(key, {
+  const getOrCreateGroup = (group: ValidationGroup, type: "coverage" | "rule") => {
+    if (!groups.has(group.key)) {
+      groups.set(group.key, {
         type,
+        description: group.description,
         items: [],
         days: new Set(),
         passedCount: 0,
@@ -280,13 +287,20 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
         errorCount: 0,
       });
     }
-    return groups.get(key)!;
+    return groups.get(group.key)!;
   };
+
+  // Synthetic group for items without an explicit group — keyed by item ID
+  // so each ungrouped item stays separate.
+  const syntheticGroup = (item: ValidationItem): ValidationGroup => ({
+    key: `ungrouped:${item.id}`,
+    description: inferItemDescription(item),
+  });
 
   // Group passed items
   for (const item of validation.passed) {
-    const key = item.groupKey ?? groupKey(`ungrouped:${item.id}`);
-    const group = getOrCreateGroup(key, item.type);
+    const grp = itemGroup(item) ?? syntheticGroup(item);
+    const group = getOrCreateGroup(grp, item.type);
     group.items.push(item);
     group.passedCount++;
     if (item.type === "coverage" && item.day) {
@@ -296,8 +310,8 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
 
   // Group violations
   for (const item of validation.violations) {
-    const key = item.groupKey ?? groupKey(`ungrouped:${item.id}`);
-    const group = getOrCreateGroup(key, item.type);
+    const grp = itemGroup(item) ?? syntheticGroup(item);
+    const group = getOrCreateGroup(grp, item.type);
     group.items.push(item);
     group.violatedCount++;
     if (item.type === "coverage" && item.day) {
@@ -305,11 +319,11 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     }
   }
 
-  // Group errors (except solver errors which don't have groupKey)
+  // Group errors (except solver errors which don't have group)
   for (const item of validation.errors) {
     if (item.type === "solver") continue;
-    const key = item.groupKey ?? groupKey(`ungrouped:${item.id}`);
-    const group = getOrCreateGroup(key, item.type);
+    const grp = itemGroup(item) ?? syntheticGroup(item);
+    const group = getOrCreateGroup(grp, item.type);
     group.items.push(item);
     group.errorCount++;
     if (item.type === "coverage" && item.day) {
@@ -326,7 +340,7 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     summaries.push({
       groupKey: key,
       type: group.type,
-      description: inferDescription(key, group.items),
+      description: group.description,
       days: [...group.days].toSorted(),
       status,
       passedCount: group.passedCount,
@@ -339,28 +353,14 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
 }
 
 /**
- * Infers a human-readable description from the groupKey or items.
+ * Infers a description from a single validation item (fallback for ungrouped items).
  */
-function inferDescription(key: GroupKey, items: ValidationItem[]): string {
-  // If the key looks like a human-readable description, use it
-  if (!key.startsWith("ungrouped:")) {
-    return key;
+function inferItemDescription(item: ValidationItem): string {
+  if ("description" in item && item.description) {
+    return item.description;
   }
-
-  // Try to infer from the first item with a description
-  for (const item of items) {
-    if ("description" in item && item.description) {
-      // Extract the meaningful part (e.g., "2x waiter" from "2x waiter on 2026-02-03 at 09:00")
-      const match = item.description.match(/^(\d+x \w+)/);
-      if (match?.[1]) {
-        return match[1];
-      }
-      return item.description;
-    }
-    if ("reason" in item && item.reason) {
-      return item.reason;
-    }
+  if ("reason" in item && item.reason) {
+    return item.reason;
   }
-
-  return key;
+  return item.id;
 }

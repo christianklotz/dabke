@@ -1,11 +1,13 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
+  formatEntityScope,
 } from "./scope.types.js";
 
 const MaxConsecutiveDaysSchema = z
@@ -39,6 +41,7 @@ export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): 
   const scope = parseEntityScope(parsed);
   const { days, priority } = parsed;
   const windowSize = days + 1;
+  const gKey = validationGroup(`max ${days} consecutive days${formatEntityScope(scope)}`);
 
   return {
     compile(b) {
@@ -81,6 +84,9 @@ export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): 
             }
           }
 
+          const windowStart = windowDays[0]!;
+          const constraintId = `max-consecutive-days:${emp.id}:${windowStart}`;
+
           if (priority === "MANDATORY") {
             b.addLinear(
               worksDayVars.map((v) => ({ var: v, coeff: 1 })),
@@ -93,7 +99,19 @@ export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): 
               "<=",
               days,
               priorityToPenalty(priority),
+              constraintId,
             );
+            b.reporter.trackConstraint({
+              id: constraintId,
+              type: "rule",
+              rule: "max-consecutive-days",
+              description: `${emp.id} max ${days} consecutive days from ${windowStart}`,
+              targetValue: days,
+              comparator: "<=",
+              day: windowStart,
+              context: { memberIds: [emp.id], days: windowDays },
+              group: gKey,
+            });
           }
         }
       }

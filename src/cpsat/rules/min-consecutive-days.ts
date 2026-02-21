@@ -1,11 +1,13 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
+  formatEntityScope,
 } from "./scope.types.js";
 
 const MinConsecutiveDaysSchema = z
@@ -39,6 +41,7 @@ export function createMinConsecutiveDaysRule(config: MinConsecutiveDaysConfig): 
   const parsed = MinConsecutiveDaysSchema.parse(config);
   const scope = parseEntityScope(parsed);
   const { days, priority } = parsed;
+  const gKey = validationGroup(`min ${days} consecutive days${formatEntityScope(scope)}`);
 
   return {
     compile(b) {
@@ -132,10 +135,23 @@ export function createMinConsecutiveDaysRule(config: MinConsecutiveDaysConfig): 
             { var: startVar, coeff: -days },
           ];
 
+          const constraintId = `min-consecutive-days:${emp.id}:${dayLabel}`;
+
           if (priority === "MANDATORY") {
             b.addLinear(terms, ">=", 0);
           } else {
-            b.addSoftLinear(terms, ">=", 0, priorityToPenalty(priority));
+            b.addSoftLinear(terms, ">=", 0, priorityToPenalty(priority), constraintId);
+            b.reporter.trackConstraint({
+              id: constraintId,
+              type: "rule",
+              rule: "min-consecutive-days",
+              description: `${emp.id} min ${days} consecutive days from ${dayLabel}`,
+              targetValue: 0,
+              comparator: ">=",
+              day: dayLabel,
+              context: { memberIds: [emp.id], days: b.days.slice(i, i + days) },
+              group: gKey,
+            });
           }
         }
       }

@@ -103,15 +103,9 @@
 // Time primitives
 // ============================================================================
 
-export type { TimeOfDay, DayOfWeek, DateTime, SchedulingPeriod } from "./types.js";
+export type { TimeOfDay, DayOfWeek, SchedulingPeriod } from "./types.js";
 
 export { DayOfWeekSchema } from "./types.js";
-
-// ============================================================================
-// Date/time utilities
-// ============================================================================
-
-export { dateTimeToDate } from "./datetime.utils.js";
 
 // ============================================================================
 // Errors
@@ -149,7 +143,6 @@ export type {
   CompilationResult,
   CompilationRule,
   RuleValidationContext,
-  CostContext,
   CostEntry,
   CostContribution,
 } from "./cpsat/model-builder.js";
@@ -167,7 +160,6 @@ export type { ShiftAssignment, ResolvedShiftAssignment, SolverResult } from "./c
 // ============================================================================
 
 export type {
-  CpsatRuleRegistry,
   CpsatRuleName,
   CpsatRuleConfigEntry,
   CpsatRuleFactories,
@@ -186,9 +178,7 @@ export type {
   SalariedPay,
   SchedulingMember,
   ShiftPattern,
-  CoverageRequirement,
   Priority,
-  ModelBuilderOptions,
 } from "./cpsat/types.js";
 
 // ============================================================================
@@ -201,31 +191,26 @@ export { OBJECTIVE_WEIGHTS } from "./cpsat/utils.js";
 // Validation
 // ============================================================================
 
-export type { ValidationReporter } from "./cpsat/validation-reporter.js";
-
 export type {
+  ValidationGroup,
   ScheduleValidation,
   ScheduleError,
-  ScheduleViolation,
-  SchedulePassed,
   CoverageError,
-  CoverageViolation,
-  CoveragePassed,
   RuleError,
-  RuleViolation,
-  RulePassed,
   SolverError,
-  ValidationContext,
+  ScheduleViolation,
+  CoverageViolation,
+  RuleViolation,
+  SchedulePassed,
+  CoveragePassed,
+  RulePassed,
   ValidationSummary,
-  GroupKey,
 } from "./cpsat/validation.types.js";
 
 export { summarizeValidation } from "./cpsat/validation-reporter.js";
 
-export { groupKey } from "./cpsat/validation.types.js";
-
 // ============================================================================
-// Schedule Definition API (v2)
+// Schedule Definition API
 // ============================================================================
 
 export {

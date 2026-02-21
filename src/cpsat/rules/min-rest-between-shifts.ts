@@ -1,11 +1,15 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
-import { priorityToPenalty } from "../utils.js";
+import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
+import type { ResolvedShiftAssignment } from "../response.js";
+import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
+import { validationGroup } from "../validation.types.js";
+import type { ValidationReporter } from "../validation-reporter.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
+  formatEntityScope,
 } from "./scope.types.js";
 
 const MinRestBetweenShiftsSchema = z
@@ -41,6 +45,7 @@ export function createMinRestBetweenShiftsRule(
   const scope = parseEntityScope(parsed);
   const { hours, priority } = parsed;
   const minMinutes = hours * 60;
+  const gKey = validationGroup(`min ${hours}h rest between shifts${formatEntityScope(scope)}`);
 
   return {
     compile(b) {
@@ -121,5 +126,87 @@ export function createMinRestBetweenShiftsRule(
         }
       }
     },
+
+    validate(
+      assignments: ResolvedShiftAssignment[],
+      reporter: ValidationReporter,
+      context: RuleValidationContext,
+    ) {
+      if (priority === "MANDATORY") return;
+
+      const members = resolveMembersFromScope(scope, context.members);
+      if (members.length === 0) return;
+
+      const memberIds = new Set(members.map((m) => m.id));
+
+      // Group assignments by member, sort by day then start time
+      const byMember = new Map<string, ResolvedShiftAssignment[]>();
+      for (const a of assignments) {
+        if (!memberIds.has(a.memberId)) continue;
+        const list = byMember.get(a.memberId) ?? [];
+        list.push(a);
+        byMember.set(a.memberId, list);
+      }
+
+      for (const [memberId, memberAssignments] of byMember) {
+        const sorted = memberAssignments.toSorted((a, b) => {
+          if (a.day !== b.day) return a.day < b.day ? -1 : 1;
+          return timeOfDayToMinutes(a.startTime) - timeOfDayToMinutes(b.startTime);
+        });
+
+        let violated = false;
+        for (let i = 0; i < sorted.length - 1; i++) {
+          const current = sorted[i]!;
+          const next = sorted[i + 1]!;
+
+          const currentEndMin = timeOfDayToMinutes(current.endTime);
+          const normalizedEnd = normalizeEndMinutes(
+            timeOfDayToMinutes(current.startTime),
+            currentEndMin,
+          );
+          const nextStartMin = timeOfDayToMinutes(next.startTime);
+
+          // Calculate gap considering day boundaries
+          let gap: number;
+          if (current.day === next.day) {
+            gap = nextStartMin - normalizedEnd;
+          } else {
+            // Different days: account for the day boundary
+            const dayDiff = daysBetween(current.day, next.day);
+            gap = dayDiff * 24 * 60 - normalizedEnd + nextStartMin;
+          }
+
+          if (gap >= 0 && gap < minMinutes) {
+            reporter.reportRuleViolation({
+              rule: "min-rest-between-shifts",
+              reason: `${memberId} has ${Math.round((gap / 60) * 10) / 10}h rest between shifts on ${current.day} and ${next.day}, need ${hours}h`,
+              context: { memberIds: [memberId], days: [current.day, next.day] },
+              shortfall: minMinutes - gap,
+              group: gKey,
+            });
+            violated = true;
+          }
+        }
+
+        if (!violated && sorted.length > 1) {
+          reporter.reportRulePassed({
+            rule: "min-rest-between-shifts",
+            description: `${memberId} has ${hours}h+ rest between all shifts`,
+            context: {
+              memberIds: [memberId],
+              days: [...new Set(sorted.map((a) => a.day))],
+            },
+            group: gKey,
+          });
+        }
+      }
+    },
   };
+}
+
+/** Compute day difference from YYYY-MM-DD strings. */
+function daysBetween(day1: string, day2: string): number {
+  const d1 = new Date(`${day1}T00:00:00Z`);
+  const d2 = new Date(`${day2}T00:00:00Z`);
+  return Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000));
 }
