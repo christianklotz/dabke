@@ -2,14 +2,13 @@ import * as z from "zod";
 import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
 import type { ResolvedShiftAssignment } from "../response.js";
 import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import type { ValidationReporter } from "../validation-reporter.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
-  formatEntityScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MinRestBetweenShiftsSchema = z
@@ -45,7 +44,11 @@ export function createMinRestBetweenShiftsRule(
   const scope = parseEntityScope(parsed);
   const { hours, priority } = parsed;
   const minMinutes = hours * 60;
-  const gKey = validationGroup(`min ${hours}h rest between shifts${formatEntityScope(scope)}`);
+  const group = ruleGroup(
+    `min-rest-between-shifts:${hours}`,
+    `Min ${hours}h rest between shifts`,
+    scope,
+  );
 
   return {
     compile(b) {
@@ -179,10 +182,10 @@ export function createMinRestBetweenShiftsRule(
           if (gap >= 0 && gap < minMinutes) {
             reporter.reportRuleViolation({
               rule: "min-rest-between-shifts",
-              reason: `${memberId} has ${Math.round((gap / 60) * 10) / 10}h rest between shifts on ${current.day} and ${next.day}, need ${hours}h`,
+              message: `${memberId} has ${Math.round((gap / 60) * 10) / 10}h rest between shifts on ${current.day} and ${next.day}, need ${hours}h`,
               context: { memberIds: [memberId], days: [current.day, next.day] },
               shortfall: minMinutes - gap,
-              group: gKey,
+              group,
             });
             violated = true;
           }
@@ -191,12 +194,12 @@ export function createMinRestBetweenShiftsRule(
         if (!violated && sorted.length > 1) {
           reporter.reportRulePassed({
             rule: "min-rest-between-shifts",
-            description: `${memberId} has ${hours}h+ rest between all shifts`,
+            message: `${memberId} has ${hours}h+ rest between all shifts`,
             context: {
               memberIds: [memberId],
               days: [...new Set(sorted.map((a) => a.day))],
             },
-            group: gKey,
+            group,
           });
         }
       }

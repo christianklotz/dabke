@@ -2,7 +2,20 @@ import type { DayOfWeek, TimeOfDay } from "../types.js";
 import { toDayOfWeekUTC } from "../datetime.utils.js";
 import { parseDayString } from "./utils.js";
 import type { CoverageRequirement, Priority } from "./types.js";
-import { validationGroup, type ValidationGroup } from "./validation.types.js";
+import { assertSafeKeySegment, type ValidationGroup } from "./validation.types.js";
+
+/** Validates and joins role/skill IDs into a key-safe segment. */
+function safeRoleOrSkills(roles?: readonly string[], skills?: readonly string[]): string {
+  if (roles && roles.length > 0) {
+    for (const r of roles) assertSafeKeySegment(r, "role ID");
+    return roles.join("/");
+  }
+  if (skills && skills.length > 0) {
+    for (const s of skills) assertSafeKeySegment(s, "skill ID");
+    return skills.join("+");
+  }
+  throw new Error("At least one role or skill is required");
+}
 
 /**
  * Base definition for a semantic time period.
@@ -25,7 +38,7 @@ export interface SemanticTimeDef {
  */
 export interface SemanticTimeVariant extends SemanticTimeDef {
   /** Restrict this entry to specific days of the week. */
-  dayOfWeek?: readonly DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict this entry to specific dates (YYYY-MM-DD). */
   dates?: string[];
 }
@@ -44,7 +57,7 @@ interface SemanticCoverageRequirementBase<S extends string> {
   targetCount: number;
   priority?: Priority;
   /** Scope this requirement to specific days of the week */
-  dayOfWeek?: DayOfWeek[];
+  dayOfWeek?: [DayOfWeek, ...DayOfWeek[]];
   /** Scope this requirement to specific dates (YYYY-MM-DD) */
   dates?: string[];
   /**
@@ -204,7 +217,7 @@ export interface CoverageVariant {
   /** Number of people needed. */
   count: number;
   /** Restrict this variant to specific days of the week. */
-  dayOfWeek?: readonly DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict this variant to specific dates (YYYY-MM-DD). */
   dates?: string[];
   /** Defaults to `"MANDATORY"`. */
@@ -431,7 +444,7 @@ function resolveSemanticCoverage<S extends string>(
     if (isConcreteCoverage(req)) {
       // Concrete requirement - pass through if day is in horizon
       if (daySet.has(req.day)) {
-        const autoGroup = generateConcreteGroup(req);
+        const defaultGroup = concreteCoverageGroup(req);
         result.push(
           buildCoverageRequirement(
             req.day,
@@ -441,7 +454,7 @@ function resolveSemanticCoverage<S extends string>(
             req.skills,
             req.targetCount,
             req.priority ?? "MANDATORY",
-            req.group ?? autoGroup,
+            req.group ?? defaultGroup,
           ),
         );
       }
@@ -452,7 +465,7 @@ function resolveSemanticCoverage<S extends string>(
         throw new Error(`Unknown semantic time: ${req.semanticTime}`);
       }
 
-      const autoGroup = generateVariantGroup(req);
+      const defaultGroup = variantCoverageGroup(req);
 
       for (const day of days) {
         const resolved = resolveTimeForDay(entry, day);
@@ -470,7 +483,7 @@ function resolveSemanticCoverage<S extends string>(
             req.skills,
             variant.count,
             variant.priority ?? "MANDATORY",
-            req.group ?? autoGroup,
+            req.group ?? defaultGroup,
           ),
         );
       }
@@ -481,7 +494,7 @@ function resolveSemanticCoverage<S extends string>(
         throw new Error(`Unknown semantic time: ${req.semanticTime}`);
       }
 
-      const autoGroup = generateSemanticGroup(req);
+      const defaultGroup = semanticCoverageGroup(req);
       const applicableDays = filterDays(days, req.dayOfWeek, req.dates);
 
       for (const day of applicableDays) {
@@ -496,7 +509,7 @@ function resolveSemanticCoverage<S extends string>(
               req.skills,
               req.targetCount,
               req.priority ?? "MANDATORY",
-              req.group ?? autoGroup,
+              req.group ?? defaultGroup,
             ),
           );
         }
@@ -507,36 +520,42 @@ function resolveSemanticCoverage<S extends string>(
   return result;
 }
 
-/**
- * Generates a human-readable group key for a semantic coverage requirement.
- * Format: "{count}x {role/skills} during {semanticTime}" with optional scope
- */
-function generateSemanticGroup<S extends string>(
+/** Generates deterministic group for a semantic coverage requirement. */
+function semanticCoverageGroup<S extends string>(
   req: SemanticCoverageRequirement<S>,
 ): ValidationGroup {
-  const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
-  const base = `${req.targetCount}x ${roleOrSkills} during ${req.semanticTime}`;
+  assertSafeKeySegment(req.semanticTime, "semantic time name");
+  const roleOrSkills = safeRoleOrSkills(req.roles, req.skills);
+  const title = `${req.targetCount}x ${roleOrSkills} during ${req.semanticTime}`;
 
+  let scopeSuffix = "";
   if (req.dayOfWeek && req.dayOfWeek.length > 0 && req.dayOfWeek.length < 7) {
-    return validationGroup(`${base} (${formatDaysScope(req.dayOfWeek)})`);
-  }
-  if (req.dates && req.dates.length > 0) {
-    return validationGroup(`${base} (specific dates)`);
+    scopeSuffix = `:dow:${req.dayOfWeek.toSorted().join(",")}`;
+  } else if (req.dates && req.dates.length > 0) {
+    scopeSuffix = `:dates:${req.dates.toSorted().join(",")}`;
   }
 
-  return validationGroup(base);
+  const key = `coverage:${req.semanticTime}:${roleOrSkills}:${req.targetCount}${scopeSuffix}`;
+  const titleSuffix =
+    scopeSuffix && req.dayOfWeek
+      ? ` (${formatDaysScope(req.dayOfWeek)})`
+      : scopeSuffix && req.dates
+        ? " (specific dates)"
+        : "";
+
+  return { key, title: `${title}${titleSuffix}` };
 }
 
-/**
- * Generates a human-readable group key for a variant coverage requirement.
- * Format: "{role/skills} during {semanticTime}" — shared across all days since
- * the count varies per variant.
- */
-function generateVariantGroup<S extends string>(
+/** Generates deterministic group for a variant coverage requirement. */
+function variantCoverageGroup<S extends string>(
   req: VariantCoverageRequirement<S>,
 ): ValidationGroup {
-  const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
-  return validationGroup(`${roleOrSkills} during ${req.semanticTime}`);
+  assertSafeKeySegment(req.semanticTime, "semantic time name");
+  const roleOrSkills = safeRoleOrSkills(req.roles, req.skills);
+  return {
+    key: `coverage-variant:${req.semanticTime}:${roleOrSkills}`,
+    title: `${roleOrSkills} during ${req.semanticTime}`,
+  };
 }
 
 /**
@@ -572,14 +591,14 @@ function resolveVariantForDay(
   return dateMatch ?? dowMatch ?? defaultMatch;
 }
 
-/**
- * Generates a human-readable group key for a concrete coverage requirement.
- * Format: "{count}x {role/skills} on {day} {time}"
- */
-function generateConcreteGroup(req: ConcreteCoverageRequirement): ValidationGroup {
-  const roleOrSkills = req.roles?.join("/") ?? req.skills?.join("+") ?? "staff";
+/** Generates deterministic group for a concrete coverage requirement. */
+function concreteCoverageGroup(req: ConcreteCoverageRequirement): ValidationGroup {
+  const roleOrSkills = safeRoleOrSkills(req.roles, req.skills);
   const timeRange = `${formatTime(req.startTime)}-${formatTime(req.endTime)}`;
-  return validationGroup(`${req.targetCount}x ${roleOrSkills} on ${req.day} ${timeRange}`);
+  return {
+    key: `coverage-concrete:${req.day}:${roleOrSkills}:${req.targetCount}:${timeRange}`,
+    title: `${req.targetCount}x ${roleOrSkills} on ${req.day} ${timeRange}`,
+  };
 }
 
 /**

@@ -2,7 +2,6 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
@@ -11,8 +10,7 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
-  formatEntityScope,
-  formatTimeScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MaxShiftsDaySchema = z
@@ -64,8 +62,11 @@ export function createMaxShiftsDayRule(config: MaxShiftsDayConfig): CompilationR
   const entityScopeValue = parseEntityScope(parsed);
   const timeScopeValue = parseTimeScope(parsed);
   const { shifts, priority } = parsed;
-  const gKey = validationGroup(
-    `max ${shifts} shift${shifts === 1 ? "" : "s"}/day${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  const group = ruleGroup(
+    `max-shifts-day:${shifts}`,
+    `Max ${shifts} shift${shifts === 1 ? "" : "s"} per day`,
+    entityScopeValue,
+    timeScopeValue,
   );
 
   return {
@@ -104,7 +105,7 @@ export function createMaxShiftsDayRule(config: MaxShiftsDayConfig): CompilationR
               comparator: "<=",
               day,
               context: { memberIds: [emp.id], days: [day] },
-              group: gKey,
+              group,
             });
           }
         }

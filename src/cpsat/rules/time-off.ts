@@ -3,7 +3,6 @@ import type { TimeOfDay } from "../../types.js";
 import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
 import type { ResolvedShiftAssignment } from "../response.js";
 import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import type { ValidationReporter } from "../validation-reporter.js";
 import {
   PrioritySchema,
@@ -13,8 +12,7 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
-  formatEntityScope,
-  formatTimeScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const timeOfDaySchema = z.object({
@@ -111,9 +109,7 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
 
   const entityScopeValue = parseEntityScope(parsed);
   const timeScopeValue = parseTimeScope(parsed);
-  const gKey = validationGroup(
-    `time-off${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
-  );
+  const group = ruleGroup("time-off", "Time off", entityScopeValue, timeScopeValue);
 
   return {
     compile(builder) {
@@ -188,22 +184,22 @@ export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
           if (violated) {
             reporter.reportRuleViolation({
               rule: "time-off",
-              reason: `Time-off request for ${emp.id} on ${day} could not be honored`,
+              message: `Time-off request for ${emp.id} on ${day} could not be honored`,
               context: {
                 memberIds: [emp.id],
                 days: [day],
               },
-              group: gKey,
+              group,
             });
           } else {
             reporter.reportRulePassed({
               rule: "time-off",
-              description: `Time-off honored for ${emp.id} on ${day}`,
+              message: `Time-off honored for ${emp.id} on ${day}`,
               context: {
                 memberIds: [emp.id],
                 days: [day],
               },
-              group: gKey,
+              group,
             });
           }
         }

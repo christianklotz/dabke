@@ -3,13 +3,12 @@ import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
-  formatEntityScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MinHoursWeekBase = z.object({
@@ -45,7 +44,7 @@ export function createMinHoursWeekRule(config: MinHoursWeekConfig): CompilationR
   const scope = parseEntityScope(parsed);
   const { hours, priority, weekStartsOn } = parsed;
   const minMinutes = hours * 60;
-  const gKey = validationGroup(`min ${hours}h/week${formatEntityScope(scope)}`);
+  const group = ruleGroup(`min-hours-week:${hours}`, `Min ${hours}h per week`, scope);
 
   return {
     compile(b) {
@@ -86,7 +85,7 @@ export function createMinHoursWeekRule(config: MinHoursWeekConfig): CompilationR
               comparator: ">=",
               day: weekLabel,
               context: { memberIds: [emp.id], days: weekDays },
-              group: gKey,
+              group,
             });
           }
         }

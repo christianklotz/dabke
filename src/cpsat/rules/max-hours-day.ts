@@ -2,7 +2,6 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
@@ -11,8 +10,7 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
-  formatEntityScope,
-  formatTimeScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MaxHoursDaySchema = z
@@ -62,8 +60,11 @@ export function createMaxHoursDayRule(config: MaxHoursDayConfig): CompilationRul
   const timeScopeValue = parseTimeScope(parsed);
   const { hours, priority } = parsed;
   const maxMinutes = hours * 60;
-  const gKey = validationGroup(
-    `max ${hours}h/day${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  const group = ruleGroup(
+    `max-hours-day:${hours}`,
+    `Max ${hours}h per day`,
+    entityScopeValue,
+    timeScopeValue,
   );
 
   return {
@@ -102,7 +103,7 @@ export function createMaxHoursDayRule(config: MaxHoursDayConfig): CompilationRul
               comparator: "<=",
               day,
               context: { memberIds: [emp.id], days: [day] },
-              group: gKey,
+              group,
             });
           }
         }

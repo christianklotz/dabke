@@ -3,7 +3,7 @@ import {
   ValidationReporterImpl,
   summarizeValidation,
 } from "../../src/cpsat/validation-reporter.js";
-import { validationGroup } from "../../src/cpsat/validation.types.js";
+import type { ValidationGroup } from "../../src/cpsat/validation.types.js";
 import type { SolverResponse } from "../../src/client.types.js";
 
 describe("ValidationReporterImpl", () => {
@@ -51,7 +51,7 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roles: ["barista"],
-        reason: "No eligible members available",
+        message: "No eligible members available",
         suggestions: ["Add members with role barista"],
       });
 
@@ -63,7 +63,7 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roles: ["barista"],
-        reason: "No eligible members available",
+        message: "No eligible members available",
         suggestions: ["Add members with role barista"],
       });
       expect(reporter.hasErrors()).toBe(true);
@@ -74,7 +74,7 @@ describe("ValidationReporterImpl", () => {
 
       reporter.reportRuleError({
         rule: "time-off",
-        reason: "Conflicting time-off requests",
+        message: "Conflicting time-off requests",
         context: { memberIds: ["alice", "bob"] },
         suggestions: ["Resolve the conflict"],
       });
@@ -85,7 +85,7 @@ describe("ValidationReporterImpl", () => {
         id: "error:rule:time-off:_:alice,bob",
         type: "rule",
         rule: "time-off",
-        reason: "Conflicting time-off requests",
+        message: "Conflicting time-off requests",
         context: { memberIds: ["alice", "bob"] },
         suggestions: ["Resolve the conflict"],
       });
@@ -102,12 +102,12 @@ describe("ValidationReporterImpl", () => {
       expect(validation.errors[0]).toEqual({
         id: "error:solver:1",
         type: "solver",
-        reason: "Solver timed out",
+        message: "Solver timed out",
       });
       expect(validation.errors[1]).toEqual({
         id: "error:solver:2",
         type: "solver",
-        reason: "Another error",
+        message: "Another error",
       });
     });
   });
@@ -123,6 +123,7 @@ describe("ValidationReporterImpl", () => {
         targetCount: 2,
         actualCount: 1,
         shortfall: 1,
+        message: "barista on 2024-02-01 (09:00-13:00): 1 assigned, need 2",
       });
 
       const validation = reporter.getValidation();
@@ -136,6 +137,7 @@ describe("ValidationReporterImpl", () => {
         targetCount: 2,
         actualCount: 1,
         shortfall: 1,
+        message: "barista on 2024-02-01 (09:00-13:00): 1 assigned, need 2",
       });
     });
 
@@ -144,7 +146,7 @@ describe("ValidationReporterImpl", () => {
 
       reporter.reportRuleViolation({
         rule: "time-off",
-        reason: "Time-off for alice on 2024-02-01 could not be honored",
+        message: "Time-off for alice on 2024-02-01 could not be honored",
         context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
 
@@ -154,7 +156,7 @@ describe("ValidationReporterImpl", () => {
         id: "violation:rule:time-off:2024-02-01:alice",
         type: "rule",
         rule: "time-off",
-        reason: "Time-off for alice on 2024-02-01 could not be honored",
+        message: "Time-off for alice on 2024-02-01 could not be honored",
         context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
     });
@@ -168,7 +170,7 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roles: ["barista"],
-        description: "2 baristas scheduled",
+        message: "2 baristas scheduled",
       });
 
       const validation = reporter.getValidation();
@@ -179,7 +181,7 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roles: ["barista"],
-        description: "2 baristas scheduled",
+        message: "2 baristas scheduled",
       });
     });
 
@@ -188,7 +190,7 @@ describe("ValidationReporterImpl", () => {
 
       reporter.reportRulePassed({
         rule: "time-off",
-        description: "Alice's Monday time-off honored",
+        message: "Alice's Monday time-off honored",
         context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
 
@@ -198,7 +200,7 @@ describe("ValidationReporterImpl", () => {
         id: "passed:rule:time-off:2024-02-01:alice",
         type: "rule",
         rule: "time-off",
-        description: "Alice's Monday time-off honored",
+        message: "Alice's Monday time-off honored",
         context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
     });
@@ -214,7 +216,7 @@ describe("ValidationReporterImpl", () => {
         timeSlots: ["09:00-13:00", "14:00-18:00"],
         roles: ["barista"],
         skills: ["espresso", "latte"],
-        reason: "No eligible members available",
+        message: "No eligible members available",
       };
 
       reporter1.reportCoverageError(errorData);
@@ -233,7 +235,7 @@ describe("ValidationReporterImpl", () => {
 
       const violationData = {
         rule: "max-hours-week",
-        reason: "Weekly hours exceeded",
+        message: "Weekly hours exceeded",
         context: { memberIds: ["bob", "alice"], days: ["2024-02-01", "2024-02-02"] },
       };
 
@@ -244,7 +246,6 @@ describe("ValidationReporterImpl", () => {
       const id2 = reporter2.getValidation().violations[0]?.id;
 
       expect(id1).toBe(id2);
-      // Note: arrays are sorted for deterministic IDs
       expect(id1).toBe("violation:rule:max-hours-week:2024-02-01,2024-02-02:alice,bob");
     });
 
@@ -252,16 +253,15 @@ describe("ValidationReporterImpl", () => {
       const reporter1 = new ValidationReporterImpl();
       const reporter2 = new ValidationReporterImpl();
 
-      // Same data but arrays in different order
       reporter1.reportRulePassed({
         rule: "time-off",
-        description: "All time-off honored",
+        message: "All time-off honored",
         context: { memberIds: ["charlie", "alice", "bob"], days: ["2024-02-03", "2024-02-01"] },
       });
 
       reporter2.reportRulePassed({
         rule: "time-off",
-        description: "All time-off honored",
+        message: "All time-off honored",
         context: { memberIds: ["alice", "bob", "charlie"], days: ["2024-02-01", "2024-02-03"] },
       });
 
@@ -279,21 +279,21 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roles: ["barista"],
-        reason: "Error 1",
+        message: "Error 1",
       });
 
       reporter.reportCoverageError({
         day: "2024-02-01",
         timeSlots: ["14:00-18:00"],
         roles: ["barista"],
-        reason: "Error 2",
+        message: "Error 2",
       });
 
       reporter.reportCoverageError({
         day: "2024-02-02",
         timeSlots: ["09:00-13:00"],
         roles: ["barista"],
-        reason: "Error 3",
+        message: "Error 3",
       });
 
       const validation = reporter.getValidation();
@@ -311,14 +311,15 @@ describe("ValidationReporterImpl", () => {
         roles: ["barista"],
       };
 
-      reporter.reportCoverageError({ ...commonData, reason: "Error" });
+      reporter.reportCoverageError({ ...commonData, message: "Error" });
       reporter.reportCoverageViolation({
         ...commonData,
         targetCount: 2,
         actualCount: 1,
         shortfall: 1,
+        message: "Violation",
       });
-      reporter.reportCoveragePassed({ ...commonData, description: "Passed" });
+      reporter.reportCoveragePassed({ ...commonData, message: "Passed" });
 
       const validation = reporter.getValidation();
 
@@ -326,7 +327,6 @@ describe("ValidationReporterImpl", () => {
       expect(validation.violations[0]?.id).toContain("violation:");
       expect(validation.passed[0]?.id).toContain("passed:");
 
-      // All three should have different IDs
       const allIds = [
         validation.errors[0]?.id,
         validation.violations[0]?.id,
@@ -413,7 +413,7 @@ describe("ValidationReporterImpl", () => {
         day: "2024-02-01",
         timeSlots: ["09:00"],
         roles: ["barista"],
-        description: "2x barista on 2024-02-01 at 09:00",
+        message: "2x barista on 2024-02-01 at 09:00",
       });
     });
 
@@ -432,13 +432,16 @@ describe("ValidationReporterImpl", () => {
       expect(validation.errors[0]).toEqual({
         id: "error:solver:1",
         type: "solver",
-        reason: "No solution exists",
+        message: "No solution exists",
       });
     });
 
     it("propagates group from tracked constraints to violations", () => {
       const reporter = new ValidationReporterImpl();
-      const grp = validationGroup("2x barista during morning");
+      const grp: ValidationGroup = {
+        key: "coverage:morning:barista:2",
+        title: "2x barista during morning",
+      };
 
       reporter.trackConstraint({
         id: "coverage:barista:2024-02-01:540",
@@ -470,12 +473,15 @@ describe("ValidationReporterImpl", () => {
 
       const validation = reporter.getValidation();
       const violation = validation.violations[0]!;
-      expect(violation.type !== "solver" && "group" in violation && violation.group).toBe(grp);
+      expect(violation.group).toBe(grp);
     });
 
     it("propagates group from tracked constraints to passed items", () => {
       const reporter = new ValidationReporterImpl();
-      const grp = validationGroup("2x barista during morning");
+      const grp: ValidationGroup = {
+        key: "coverage:morning:barista:2",
+        title: "2x barista during morning",
+      };
 
       reporter.trackConstraint({
         id: "coverage:barista:2024-02-01:540",
@@ -500,14 +506,22 @@ describe("ValidationReporterImpl", () => {
 
       const validation = reporter.getValidation();
       const passed = validation.passed[0]!;
-      expect("group" in passed && passed.group).toBe(grp);
+      expect(passed.group).toBe(grp);
     });
   });
 });
 
 describe("summarizeValidation", () => {
-  it("groups passed items by group", () => {
-    const grp = validationGroup("2x barista during morning");
+  const morningGroup: ValidationGroup = {
+    key: "coverage:morning:barista:2",
+    title: "2x barista during morning",
+  };
+  const afternoonGroup: ValidationGroup = {
+    key: "coverage:afternoon:barista:3",
+    title: "3x barista during afternoon",
+  };
+
+  it("groups passed items by group key", () => {
     const validation = {
       errors: [],
       violations: [],
@@ -518,8 +532,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:00"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:00",
-          group: grp,
+          message: "2x barista on 2024-02-01 at 09:00",
+          group: morningGroup,
         },
         {
           id: "passed:coverage:2024-02-01:09:15:barista:_",
@@ -527,8 +541,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:15"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:15",
-          group: grp,
+          message: "2x barista on 2024-02-01 at 09:15",
+          group: morningGroup,
         },
         {
           id: "passed:coverage:2024-02-02:09:00:barista:_",
@@ -536,8 +550,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-02",
           timeSlots: ["09:00"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-02 at 09:00",
-          group: grp,
+          message: "2x barista on 2024-02-02 at 09:00",
+          group: morningGroup,
         },
       ],
     };
@@ -546,9 +560,9 @@ describe("summarizeValidation", () => {
 
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
-      groupKey: grp.key,
+      groupKey: morningGroup.key,
       type: "coverage",
-      description: "2x barista during morning",
+      title: "2x barista during morning",
       status: "passed",
       passedCount: 3,
       violatedCount: 0,
@@ -558,8 +572,6 @@ describe("summarizeValidation", () => {
   });
 
   it("creates separate groups for different groups", () => {
-    const morningGrp = validationGroup("2x barista during morning");
-    const afternoonGrp = validationGroup("3x barista during afternoon");
     const validation = {
       errors: [],
       violations: [],
@@ -570,8 +582,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:00"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:00",
-          group: morningGrp,
+          message: "2x barista on 2024-02-01 at 09:00",
+          group: morningGroup,
         },
         {
           id: "passed:coverage:2024-02-01:14:00:barista:_",
@@ -579,8 +591,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["14:00"],
           roles: ["barista"],
-          description: "3x barista on 2024-02-01 at 14:00",
-          group: afternoonGrp,
+          message: "3x barista on 2024-02-01 at 14:00",
+          group: afternoonGroup,
         },
       ],
     };
@@ -588,17 +600,16 @@ describe("summarizeValidation", () => {
     const summaries = summarizeValidation(validation);
 
     expect(summaries).toHaveLength(2);
-    const morning = summaries.find((s) => s.groupKey === morningGrp.key);
-    const afternoon = summaries.find((s) => s.groupKey === afternoonGrp.key);
+    const morning = summaries.find((s) => s.groupKey === morningGroup.key);
+    const afternoon = summaries.find((s) => s.groupKey === afternoonGroup.key);
 
     expect(morning?.passedCount).toBe(1);
-    expect(morning?.description).toBe("2x barista during morning");
+    expect(morning?.title).toBe("2x barista during morning");
     expect(afternoon?.passedCount).toBe(1);
-    expect(afternoon?.description).toBe("3x barista during afternoon");
+    expect(afternoon?.title).toBe("3x barista during afternoon");
   });
 
   it("sets status to partial when there are violations but also passed", () => {
-    const grp = validationGroup("2x barista during morning");
     const validation = {
       errors: [],
       violations: [
@@ -611,7 +622,8 @@ describe("summarizeValidation", () => {
           targetCount: 2,
           actualCount: 1,
           shortfall: 1,
-          group: grp,
+          message: "barista on 2024-02-01 (09:00): 1 assigned, need 2",
+          group: morningGroup,
         },
       ],
       passed: [
@@ -621,8 +633,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:15"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:15",
-          group: grp,
+          message: "2x barista on 2024-02-01 at 09:15",
+          group: morningGroup,
         },
       ],
     };
@@ -636,7 +648,6 @@ describe("summarizeValidation", () => {
   });
 
   it("sets status to failed when there are errors", () => {
-    const grp = validationGroup("2x barista during morning");
     const validation = {
       errors: [
         {
@@ -645,8 +656,8 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:00"],
           roles: ["barista"],
-          reason: "No eligible members",
-          group: grp,
+          message: "No eligible members",
+          group: morningGroup,
         },
       ],
       violations: [],
@@ -660,8 +671,7 @@ describe("summarizeValidation", () => {
     expect(summaries[0]?.errorCount).toBe(1);
   });
 
-  it("uses group description for summary description", () => {
-    const grp = validationGroup("2x barista during morning");
+  it("uses group title for summary title", () => {
     const validation = {
       errors: [],
       violations: [],
@@ -672,15 +682,15 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:00"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:00",
-          group: grp,
+          message: "2x barista on 2024-02-01 at 09:00",
+          group: morningGroup,
         },
       ],
     };
 
     const summaries = summarizeValidation(validation);
 
-    expect(summaries[0]?.description).toBe("2x barista during morning");
+    expect(summaries[0]?.title).toBe("2x barista during morning");
   });
 
   it("creates separate entries for ungrouped items", () => {
@@ -694,7 +704,7 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:00"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:00",
+          message: "2x barista on 2024-02-01 at 09:00",
         },
         {
           id: "passed:coverage:2024-02-01:09:15:barista:_",
@@ -702,14 +712,13 @@ describe("summarizeValidation", () => {
           day: "2024-02-01",
           timeSlots: ["09:15"],
           roles: ["barista"],
-          description: "2x barista on 2024-02-01 at 09:15",
+          message: "2x barista on 2024-02-01 at 09:15",
         },
       ],
     };
 
     const summaries = summarizeValidation(validation);
 
-    // Each item without group gets its own synthetic group
     expect(summaries).toHaveLength(2);
     expect(summaries[0]?.groupKey).not.toBe(summaries[1]?.groupKey);
   });
@@ -720,7 +729,7 @@ describe("summarizeValidation", () => {
         {
           id: "error:solver:1",
           type: "solver" as const,
-          reason: "Solver timed out",
+          message: "Solver timed out",
         },
       ],
       violations: [],
@@ -729,7 +738,6 @@ describe("summarizeValidation", () => {
 
     const summaries = summarizeValidation(validation);
 
-    // Solver errors don't create groups
     expect(summaries).toHaveLength(0);
   });
 });

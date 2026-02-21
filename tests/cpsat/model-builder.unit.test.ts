@@ -727,7 +727,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       expect(result.canSolve).toBe(false);
       expect(result.validation.errors).toHaveLength(1);
       expect(result.validation.errors[0]?.type).toBe("coverage");
-      expect(result.validation.errors[0]?.reason).toContain("no eligible team members");
+      expect(result.validation.errors[0]?.message).toContain("no eligible team members");
     });
 
     it("reports coverage error when mandatory time-off blocks everyone", () => {
@@ -751,7 +751,7 @@ describe("ModelBuilder (CP-SAT)", () => {
 
       expect(result.canSolve).toBe(false);
       const error = result.validation.errors.find(
-        (e) => e.type === "coverage" && e.reason.includes("mandatory time off"),
+        (e) => e.type === "coverage" && e.message.includes("mandatory time off"),
       );
       expect(error).toBeDefined();
     });

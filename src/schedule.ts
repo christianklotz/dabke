@@ -1119,7 +1119,7 @@ function buildCoverageRequirements<T extends string>(
       semanticTime: T;
       targetCount: number;
       priority?: Priority;
-      dayOfWeek?: DayOfWeek[];
+      dayOfWeek?: [DayOfWeek, ...DayOfWeek[]];
       dates?: string[];
     } = {
       semanticTime: entry.timeName,
@@ -1127,7 +1127,9 @@ function buildCoverageRequirements<T extends string>(
     };
 
     if (entry.options.priority) base.priority = entry.options.priority;
-    if (entry.options.dayOfWeek) base.dayOfWeek = entry.options.dayOfWeek as DayOfWeek[];
+    if (entry.options.dayOfWeek && entry.options.dayOfWeek.length > 0) {
+      base.dayOfWeek = entry.options.dayOfWeek as [DayOfWeek, ...DayOfWeek[]];
+    }
     if (entry.options.dates) base.dates = entry.options.dates;
 
     return buildSimpleCoverageTarget(entry, base, roles, skills);
@@ -1143,7 +1145,7 @@ function buildSimpleCoverageTarget<T extends string>(
     semanticTime: T;
     targetCount: number;
     priority?: Priority;
-    dayOfWeek?: DayOfWeek[];
+    dayOfWeek?: [DayOfWeek, ...DayOfWeek[]];
     dates?: string[];
   },
   roles: Set<string>,

@@ -3,7 +3,6 @@ import { DayOfWeekSchema } from "../../types.js";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
@@ -12,8 +11,7 @@ import {
   parseTimeScope,
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
-  formatEntityScope,
-  formatTimeScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MaxHoursWeekBase = z.object({
@@ -65,8 +63,11 @@ export function createMaxHoursWeekRule(config: MaxHoursWeekConfig): CompilationR
   const timeScopeValue = parseTimeScope(parsed);
   const { hours, priority, weekStartsOn } = parsed;
   const maxMinutes = hours * 60;
-  const gKey = validationGroup(
-    `max ${hours}h/week${formatEntityScope(entityScopeValue)}${formatTimeScope(timeScopeValue)}`,
+  const group = ruleGroup(
+    `max-hours-week:${hours}`,
+    `Max ${hours}h per week`,
+    entityScopeValue,
+    timeScopeValue,
   );
 
   return {
@@ -110,7 +111,7 @@ export function createMaxHoursWeekRule(config: MaxHoursWeekConfig): CompilationR
               comparator: "<=",
               day: weekLabel,
               context: { memberIds: [emp.id], days: weekDays },
-              group: gKey,
+              group,
             });
           }
         }

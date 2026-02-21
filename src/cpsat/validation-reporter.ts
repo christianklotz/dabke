@@ -13,7 +13,6 @@ import {
   type RulePassed,
   type CoverageExclusion,
   type ValidationSummary,
-  type ValidationGroup,
 } from "./validation.types.js";
 
 export interface ValidationReporter {
@@ -23,7 +22,7 @@ export interface ValidationReporter {
   // Errors (block generation)
   reportCoverageError(error: Omit<CoverageError, "type" | "id">): void;
   reportRuleError(error: Omit<RuleError, "type" | "id">): void;
-  reportSolverError(reason: string): void;
+  reportSolverError(message: string): void;
 
   // Violations (soft constraint issues)
   reportCoverageViolation(violation: Omit<CoverageViolation, "type" | "id">): void;
@@ -108,10 +107,10 @@ export class ValidationReporterImpl implements ValidationReporter {
     this.#errors.push({ id, type: "rule", ...error });
   }
 
-  reportSolverError(reason: string): void {
+  reportSolverError(message: string): void {
     this.#solverErrorCount++;
     const id = `error:solver:${this.#solverErrorCount}`;
-    this.#errors.push({ id, type: "solver", reason });
+    this.#errors.push({ id, type: "solver", message });
   }
 
   reportCoverageViolation(violation: Omit<CoverageViolation, "type" | "id">): void {
@@ -182,6 +181,8 @@ export class ValidationReporterImpl implements ValidationReporter {
       const tracked = this.#trackedConstraints.get(violation.constraintId);
 
       if (tracked?.type === "coverage") {
+        const roles = tracked.roles?.join(", ") ?? "staff";
+        const slot = tracked.timeSlot ?? "all day";
         this.reportCoverageViolation({
           day: tracked.day ?? "",
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
@@ -190,23 +191,23 @@ export class ValidationReporterImpl implements ValidationReporter {
           targetCount: violation.targetValue,
           actualCount: violation.actualValue,
           shortfall: violation.violationAmount,
+          message: `${roles} on ${tracked.day} (${slot}): ${violation.actualValue} assigned, need ${violation.targetValue}`,
           group: tracked.group,
         });
       } else if (tracked?.type === "rule") {
         const isShortfall = tracked.comparator === ">=";
         this.reportRuleViolation({
           rule: tracked.rule ?? "unknown",
-          reason: `${tracked.description}: needed ${violation.targetValue}, got ${violation.actualValue}`,
+          message: `${tracked.description}: needed ${violation.targetValue}, got ${violation.actualValue}`,
           context: tracked.context,
           shortfall: isShortfall ? violation.violationAmount : undefined,
           overflow: !isShortfall ? violation.violationAmount : undefined,
           group: tracked.group,
         });
       } else {
-        // Unknown constraint - create generic rule violation
         this.reportRuleViolation({
           rule: "unknown",
-          reason: `Constraint ${violation.constraintId} violated by ${violation.violationAmount}`,
+          message: `Constraint ${violation.constraintId} violated by ${violation.violationAmount}`,
           context: {},
         });
       }
@@ -223,7 +224,7 @@ export class ValidationReporterImpl implements ValidationReporter {
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
           roles: tracked.roles,
           skills: tracked.skills,
-          description: tracked.description,
+          message: tracked.description,
           group: tracked.group,
         });
       }
@@ -232,29 +233,24 @@ export class ValidationReporterImpl implements ValidationReporter {
 }
 
 // =============================================================================
-// Validation Summary - pure function for aggregation
+// Validation Summary
 // =============================================================================
 
 type ValidationItem = ScheduleError | ScheduleViolation | SchedulePassed;
 
-function itemGroup(item: ValidationItem): ValidationGroup | undefined {
-  if ("group" in item) return item.group;
-  return undefined;
-}
-
 /**
  * Aggregates validation items by their group into summaries.
- * This is a pure function that doesn't modify the input.
  *
- * Items without a group are given a synthetic one based on their ID.
+ * Items sharing the same `group.key` are merged into a single summary.
+ * The title comes from the first item's `group.title`; for ungrouped items
+ * the item's `message` is used instead.
  *
  * @example
  * ```typescript
- * const validation = reporter.getValidation();
  * const summaries = summarizeValidation(validation);
  * // summaries[0] = {
- * //   groupKey: "grp_1",
- * //   description: "3x nurse during day_ward (weekdays)",
+ * //   groupKey: "coverage:day_ward:nurse:3:dow:monday,tuesday,...",
+ * //   title: "3x nurse during day_ward (weekdays)",
  * //   status: "passed",
  * //   passedCount: 180,
  * //   days: ["2026-02-02", "2026-02-03", ...]
@@ -266,8 +262,7 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     string,
     {
       type: "coverage" | "rule";
-      description: string;
-      items: ValidationItem[];
+      title: string;
       days: Set<string>;
       passedCount: number;
       violatedCount: number;
@@ -275,63 +270,48 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     }
   >();
 
-  const getOrCreateGroup = (group: ValidationGroup, type: "coverage" | "rule") => {
-    if (!groups.has(group.key)) {
-      groups.set(group.key, {
-        type,
-        description: group.description,
-        items: [],
+  const getOrCreateStats = (item: Exclude<ValidationItem, { type: "solver" }>) => {
+    const key = ("group" in item && item.group?.key) || `ungrouped:${item.id}`;
+    const title = ("group" in item && item.group?.title) || item.message;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        type: item.type,
+        title,
         days: new Set(),
         passedCount: 0,
         violatedCount: 0,
         errorCount: 0,
       });
     }
-    return groups.get(group.key)!;
+    return groups.get(key)!;
   };
 
-  // Synthetic group for items without an explicit group — keyed by item ID
-  // so each ungrouped item stays separate.
-  const syntheticGroup = (item: ValidationItem): ValidationGroup => ({
-    key: `ungrouped:${item.id}`,
-    description: inferItemDescription(item),
-  });
-
-  // Group passed items
   for (const item of validation.passed) {
-    const grp = itemGroup(item) ?? syntheticGroup(item);
-    const group = getOrCreateGroup(grp, item.type);
-    group.items.push(item);
-    group.passedCount++;
+    const stats = getOrCreateStats(item);
+    stats.passedCount++;
     if (item.type === "coverage" && item.day) {
-      group.days.add(item.day);
+      stats.days.add(item.day);
     }
   }
 
-  // Group violations
   for (const item of validation.violations) {
-    const grp = itemGroup(item) ?? syntheticGroup(item);
-    const group = getOrCreateGroup(grp, item.type);
-    group.items.push(item);
-    group.violatedCount++;
+    const stats = getOrCreateStats(item);
+    stats.violatedCount++;
     if (item.type === "coverage" && item.day) {
-      group.days.add(item.day);
+      stats.days.add(item.day);
     }
   }
 
-  // Group errors (except solver errors which don't have group)
   for (const item of validation.errors) {
     if (item.type === "solver") continue;
-    const grp = itemGroup(item) ?? syntheticGroup(item);
-    const group = getOrCreateGroup(grp, item.type);
-    group.items.push(item);
-    group.errorCount++;
+    const stats = getOrCreateStats(item);
+    stats.errorCount++;
     if (item.type === "coverage" && item.day) {
-      group.days.add(item.day);
+      stats.days.add(item.day);
     }
   }
 
-  // Build summaries
   const summaries: ValidationSummary[] = [];
   for (const [key, group] of groups) {
     const status: ValidationSummary["status"] =
@@ -340,7 +320,7 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     summaries.push({
       groupKey: key,
       type: group.type,
-      description: group.description,
+      title: group.title,
       days: [...group.days].toSorted(),
       status,
       passedCount: group.passedCount,
@@ -350,17 +330,4 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
   }
 
   return summaries;
-}
-
-/**
- * Infers a description from a single validation item (fallback for ungrouped items).
- */
-function inferItemDescription(item: ValidationItem): string {
-  if ("description" in item && item.description) {
-    return item.description;
-  }
-  if ("reason" in item && item.reason) {
-    return item.reason;
-  }
-  return item.id;
 }

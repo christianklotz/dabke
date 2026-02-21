@@ -40,7 +40,7 @@ describe("Validation diagnostics (integration)", () => {
       expect(diagnostics.canSolve).toBe(false);
       expect(diagnostics.validation.errors.length).toBeGreaterThan(0);
       expect(diagnostics.validation.errors[0]?.type).toBe("coverage");
-      expect(diagnostics.validation.errors[0]?.reason).toContain("no eligible team members");
+      expect(diagnostics.validation.errors[0]?.message).toContain("no eligible team members");
     });
 
     it("reports coverage error when mandatory time-off blocks all members", () => {
@@ -80,7 +80,7 @@ describe("Validation diagnostics (integration)", () => {
 
       expect(diagnostics.canSolve).toBe(false);
       const error = diagnostics.validation.errors.find(
-        (e) => e.type === "coverage" && e.reason.includes("mandatory time off"),
+        (e) => e.type === "coverage" && e.message.includes("mandatory time off"),
       );
       expect(error).toBeDefined();
     });
@@ -233,7 +233,7 @@ describe("Validation diagnostics (integration)", () => {
       expect(timeOffViolation).toBeDefined();
       expect(timeOffViolation?.type).toBe("rule");
       if (timeOffViolation?.type === "rule") {
-        expect(timeOffViolation.reason.toLowerCase()).toContain("alice");
+        expect(timeOffViolation.message.toLowerCase()).toContain("alice");
       }
     }, 30_000);
 
@@ -302,7 +302,7 @@ describe("Validation diagnostics (integration)", () => {
         (p) => p.type === "rule" && p.rule === "time-off",
       );
       expect(timeOffPassed).toBeDefined();
-      expect(timeOffPassed?.description.toLowerCase()).toContain("alice");
+      expect(timeOffPassed?.message.toLowerCase()).toContain("alice");
     }, 30_000);
 
     it("validates time-off with role scoping", async () => {
@@ -366,7 +366,7 @@ describe("Validation diagnostics (integration)", () => {
       expect(timeOffViolation).toBeDefined();
       expect(timeOffViolation?.type).toBe("rule");
       if (timeOffViolation?.type === "rule") {
-        expect(timeOffViolation.reason).toContain("alice");
+        expect(timeOffViolation.message).toContain("alice");
       }
     }, 30_000);
 

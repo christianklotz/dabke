@@ -68,7 +68,7 @@ describe("defineSemanticTimes", () => {
         priority: "MANDATORY",
       });
       // Should auto-generate group
-      expect(resolved[0]?.group?.description).toBe("3x server during lunch");
+      expect(resolved[0]?.group?.title).toBe("3x server during lunch");
     });
 
     it("should resolve semantic coverage scoped to specific days of week", () => {
@@ -144,7 +144,7 @@ describe("defineSemanticTimes", () => {
         priority: "MANDATORY",
       });
       // Should auto-generate group for concrete coverage
-      expect(resolved[0]?.group?.description).toBe("5x server on 2026-01-14 15:00-20:00");
+      expect(resolved[0]?.group?.title).toBe("5x server on 2026-01-14 15:00-20:00");
     });
 
     it("should filter out concrete coverage for days not in horizon", () => {
@@ -427,7 +427,7 @@ describe("defineSemanticTimes", () => {
         priority: "MANDATORY",
       });
       expect(resolved[0]?.roles).toBeUndefined();
-      expect(resolved[0]?.group?.description).toBe("1x keyholder during opening");
+      expect(resolved[0]?.group?.title).toBe("1x keyholder during opening");
     });
 
     it("should resolve semantic coverage with both roles and skills", () => {
@@ -705,8 +705,8 @@ describe("defineSemanticTimes", () => {
 
       const resolved = times.resolve(coverage, ["2026-01-12", "2026-01-13"]);
       // All resolved entries from the same variant cover share a group key
-      expect(resolved[0]?.group?.description).toBe("waiter during dinner");
-      expect(resolved[1]?.group?.description).toBe("waiter during dinner");
+      expect(resolved[0]?.group?.title).toBe("waiter during dinner");
+      expect(resolved[1]?.group?.title).toBe("waiter during dinner");
     });
 
     it("resolves variant coverage with skill-only target", () => {

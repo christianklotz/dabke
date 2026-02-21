@@ -331,8 +331,8 @@ describe("CP-SAT time-off rule: validate()", () => {
       expect(violation?.type).toBe("rule");
       if (violation?.type === "rule") {
         expect(violation.rule).toBe("time-off");
-        expect(violation.reason).toContain("alice");
-        expect(violation.reason).toContain("2024-02-01");
+        expect(violation.message).toContain("alice");
+        expect(violation.message).toContain("2024-02-01");
       }
     });
 
@@ -355,7 +355,7 @@ describe("CP-SAT time-off rule: validate()", () => {
       expect(passed?.type).toBe("rule");
       if (passed?.type === "rule") {
         expect(passed.rule).toBe("time-off");
-        expect(passed.description).toContain("alice");
+        expect(passed.message).toContain("alice");
       }
     });
 
@@ -459,11 +459,11 @@ describe("CP-SAT time-off rule: validate()", () => {
       const passed = validation.passed[0];
       expect(violation?.type).toBe("rule");
       if (violation?.type === "rule") {
-        expect(violation.reason).toContain("alice");
+        expect(violation.message).toContain("alice");
       }
       expect(passed?.type).toBe("rule");
       if (passed?.type === "rule") {
-        expect(passed.description).toContain("bob");
+        expect(passed.message).toContain("bob");
       }
     });
 
@@ -508,11 +508,11 @@ describe("CP-SAT time-off rule: validate()", () => {
       const passed = validation.passed[0];
       expect(violation?.type).toBe("rule");
       if (violation?.type === "rule") {
-        expect(violation.reason).toContain("2024-02-01");
+        expect(violation.message).toContain("2024-02-01");
       }
       expect(passed?.type).toBe("rule");
       if (passed?.type === "rule") {
-        expect(passed.description).toContain("2024-02-02");
+        expect(passed.message).toContain("2024-02-02");
       }
     });
   });
@@ -555,7 +555,7 @@ describe("CP-SAT time-off rule: validate()", () => {
       // Only 02-01 should be validated (02-10 not in context.days)
       expect(validation.passed).toHaveLength(1);
       expect(validation.passed[0]?.type).toBe("rule");
-      expect(validation.passed[0]?.description).toContain("2024-02-01");
+      expect(validation.passed[0]?.message).toContain("2024-02-01");
     });
 
     it("only validates members present in context", () => {
@@ -574,7 +574,7 @@ describe("CP-SAT time-off rule: validate()", () => {
       // Only alice should be validated (unknown not in context.members)
       expect(validation.passed).toHaveLength(1);
       expect(validation.passed[0]?.type).toBe("rule");
-      expect(validation.passed[0]?.description).toContain("alice");
+      expect(validation.passed[0]?.message).toContain("alice");
     });
   });
 });

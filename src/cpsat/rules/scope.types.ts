@@ -37,6 +37,7 @@ import * as z from "zod";
 import { DayOfWeekSchema, type DayOfWeek } from "../../types.js";
 import type { SchedulingMember } from "../types.js";
 import { parseDayString } from "../utils.js";
+import { assertSafeKeySegments, type ValidationGroup } from "../validation.types.js";
 
 // ============================================================================
 // Priority
@@ -548,62 +549,64 @@ function isDateInRecurringPeriod(
 }
 
 /**
- * Formats a parsed entity scope as a human-readable suffix for descriptions.
- * Returns an empty string for global scope.
+ * Creates a validation group for a rule with a deterministic structural key.
  *
- * @example
- * ```ts
- * formatEntityScope({ type: "roles", roleIds: ["nurse"] })  // " for nurse"
- * formatEntityScope({ type: "members", memberIds: ["alice", "bob"] })  // " for alice, bob"
- * formatEntityScope({ type: "global" })  // ""
- * ```
+ * The key encodes the rule name (including parameters), entity scope, and
+ * time scope so that identical configurations always produce the same group.
+ *
+ * @param rule - Rule name with parameters, e.g. `"max-hours-week:40"`
+ * @param title - Human-readable label, e.g. `"Max 40h per week"`
+ * @param entity - Parsed entity scope (members, roles, skills, or global)
+ * @param time - Parsed time scope (optional)
  */
-export function formatEntityScope(scope: ParsedEntityScope): string {
-  switch (scope.type) {
+export function ruleGroup(
+  rule: string,
+  title: string,
+  entity: ParsedEntityScope,
+  time?: ParsedTimeScope,
+): ValidationGroup {
+  let key = `rule:${rule}`;
+
+  switch (entity.type) {
     case "global":
-      return "";
+      break;
     case "members":
-      return ` for ${scope.memberIds.join(", ")}`;
+      assertSafeKeySegments(entity.memberIds, "member ID");
+      key += `:members:${entity.memberIds.toSorted().join(",")}`;
+      break;
     case "roles":
-      return ` for ${scope.roleIds.join(", ")}`;
+      assertSafeKeySegments(entity.roleIds, "role ID");
+      key += `:roles:${entity.roleIds.toSorted().join(",")}`;
+      break;
     case "skills":
-      return ` for ${scope.skillIds.join(", ")}`;
+      assertSafeKeySegments(entity.skillIds, "skill ID");
+      key += `:skills:${entity.skillIds.toSorted().join(",")}`;
+      break;
   }
-}
 
-/**
- * Formats a parsed time scope as a human-readable suffix for descriptions.
- * Returns an empty string for unscoped rules.
- *
- * @example
- * ```ts
- * formatTimeScope({ type: "dayOfWeek", days: ["monday", "friday"] })  // " on mon, fri"
- * formatTimeScope({ type: "dateRange", start: "2026-03-01", end: "2026-03-15" })  // " during 2026-03-01..2026-03-15"
- * formatTimeScope({ type: "none" })  // ""
- * ```
- */
-export function formatTimeScope(scope: ParsedTimeScope): string {
-  switch (scope.type) {
-    case "none":
-      return "";
-    case "dateRange":
-      return ` during ${scope.start}..${scope.end}`;
-    case "specificDates":
-      return scope.dates.length <= 3
-        ? ` on ${scope.dates.join(", ")}`
-        : ` on ${scope.dates.length} dates`;
-    case "dayOfWeek":
-      return ` on ${formatDayOfWeek(scope.days)}`;
-    case "recurring":
-      return ` during ${scope.periods.map((p) => p.name).join(", ")}`;
+  if (time && time.type !== "none") {
+    switch (time.type) {
+      case "dateRange":
+        key += `:range:${time.start}..${time.end}`;
+        break;
+      case "specificDates":
+        key += `:dates:${time.dates.toSorted().join(",")}`;
+        break;
+      case "dayOfWeek":
+        key += `:dow:${time.days.toSorted().join(",")}`;
+        break;
+      case "recurring":
+        assertSafeKeySegments(
+          time.periods.map((p) => p.name),
+          "recurring period name",
+        );
+        key += `:recurring:${time.periods
+          .map((p) => p.name)
+          .toSorted()
+          .join(",")}`;
+        break;
+    }
   }
-}
 
-function formatDayOfWeek(days: DayOfWeek[]): string {
-  const weekdays: DayOfWeek[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
-  const weekend: DayOfWeek[] = ["saturday", "sunday"];
-
-  if (days.length === 5 && weekdays.every((d) => days.includes(d))) return "weekdays";
-  if (days.length === 2 && weekend.every((d) => days.includes(d))) return "weekends";
-  return days.map((d) => d.slice(0, 3)).join(", ");
+  return { key, title };
 }

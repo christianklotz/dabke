@@ -1,13 +1,12 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
-  formatEntityScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MaxConsecutiveDaysSchema = z
@@ -41,7 +40,7 @@ export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): 
   const scope = parseEntityScope(parsed);
   const { days, priority } = parsed;
   const windowSize = days + 1;
-  const gKey = validationGroup(`max ${days} consecutive days${formatEntityScope(scope)}`);
+  const group = ruleGroup(`max-consecutive-days:${days}`, `Max ${days} consecutive days`, scope);
 
   return {
     compile(b) {
@@ -110,7 +109,7 @@ export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): 
               comparator: "<=",
               day: windowStart,
               context: { memberIds: [emp.id], days: windowDays },
-              group: gKey,
+              group,
             });
           }
         }

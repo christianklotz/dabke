@@ -2,13 +2,12 @@ import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import type { Term } from "../types.js";
 import { priorityToPenalty } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
-  formatEntityScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MinHoursDaySchema = z
@@ -42,7 +41,7 @@ export function createMinHoursDayRule(config: MinHoursDayConfig): CompilationRul
   const scope = parseEntityScope(parsed);
   const { hours, priority } = parsed;
   const minMinutes = hours * 60;
-  const gKey = validationGroup(`min ${hours}h/day${formatEntityScope(scope)}`);
+  const group = ruleGroup(`min-hours-day:${hours}`, `Min ${hours}h per day`, scope);
 
   return {
     compile(b) {
@@ -79,7 +78,7 @@ export function createMinHoursDayRule(config: MinHoursDayConfig): CompilationRul
               comparator: ">=",
               day,
               context: { memberIds: [emp.id], days: [day] },
-              group: gKey,
+              group,
             });
           }
         }

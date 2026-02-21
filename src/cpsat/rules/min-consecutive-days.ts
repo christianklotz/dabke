@@ -1,13 +1,12 @@
 import * as z from "zod";
 import type { CompilationRule } from "../model-builder.js";
 import { priorityToPenalty } from "../utils.js";
-import { validationGroup } from "../validation.types.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
-  formatEntityScope,
+  ruleGroup,
 } from "./scope.types.js";
 
 const MinConsecutiveDaysSchema = z
@@ -41,7 +40,7 @@ export function createMinConsecutiveDaysRule(config: MinConsecutiveDaysConfig): 
   const parsed = MinConsecutiveDaysSchema.parse(config);
   const scope = parseEntityScope(parsed);
   const { days, priority } = parsed;
-  const gKey = validationGroup(`min ${days} consecutive days${formatEntityScope(scope)}`);
+  const group = ruleGroup(`min-consecutive-days:${days}`, `Min ${days} consecutive days`, scope);
 
   return {
     compile(b) {
@@ -150,7 +149,7 @@ export function createMinConsecutiveDaysRule(config: MinConsecutiveDaysConfig): 
               comparator: ">=",
               day: dayLabel,
               context: { memberIds: [emp.id], days: b.days.slice(i, i + days) },
-              group: gKey,
+              group,
             });
           }
         }

@@ -515,7 +515,7 @@ export class ModelBuilder {
             timeSlots: [coverageWindow],
             roles: cov.roles,
             skills: cov.skills,
-            reason: `Coverage for ${coverageLabel} on ${cov.day} (${coverageWindow}) cannot be met: no eligible team members available.`,
+            message: `Coverage for ${coverageLabel} on ${cov.day} (${coverageWindow}) cannot be met: no eligible team members available.`,
             suggestions: [
               cov.roles && cov.roles.length > 0
                 ? `Add team members with role "${cov.roles.join(" or ")}"`
@@ -550,7 +550,7 @@ export class ModelBuilder {
             {
               key: "no_patterns",
               severity: cov.priority === "MANDATORY" ? "impossible" : "warning",
-              reason: "no shift patterns overlap this time",
+              message: "no shift patterns overlap this time",
               suggestions: [
                 "Add shift patterns that overlap this coverage window",
                 "Adjust the coverage window to match available shifts",
@@ -582,7 +582,7 @@ export class ModelBuilder {
             {
               key: "no_assignable",
               severity: cov.priority === "MANDATORY" ? "impossible" : "warning",
-              reason: "no eligible team members can work overlapping shift patterns",
+              message: "no eligible team members can work overlapping shift patterns",
               suggestions: [
                 "Adjust shift pattern role requirements",
                 "Add shift patterns that eligible team members can work",
@@ -616,7 +616,7 @@ export class ModelBuilder {
             {
               key: "mandatory_time_off",
               severity: cov.priority === "MANDATORY" ? "impossible" : "warning",
-              reason: "all eligible team members are on mandatory time off",
+              message: "all eligible team members are on mandatory time off",
               suggestions: [
                 "Adjust mandatory time-off requests",
                 "Add more team members with the required role or skills",
@@ -630,7 +630,7 @@ export class ModelBuilder {
             {
               key: `insufficient:${availableMembers.size}`,
               severity: cov.priority === "MANDATORY" ? "impossible" : "warning",
-              reason: `only ${availableMembers.size} team members available, need ${cov.targetCount}`,
+              message: `only ${availableMembers.size} team members available, need ${cov.targetCount}`,
               suggestions: [
                 "Add more team members with the required role or skills",
                 `Reduce coverage target to ${availableMembers.size}`,
@@ -695,7 +695,7 @@ export class ModelBuilder {
         );
         if (ranges.length === 0) continue;
 
-        const reason = `Coverage for ${coverageLabel} on ${cov.day} (${ranges.join(", ")}) cannot be met: ${issue.reason}.`;
+        const message = `Coverage for ${coverageLabel} on ${cov.day} (${ranges.join(", ")}) cannot be met: ${issue.message}.`;
 
         if (issue.severity === "impossible") {
           this.reporter.reportCoverageError({
@@ -703,7 +703,7 @@ export class ModelBuilder {
             timeSlots: ranges,
             roles: cov.roles,
             skills: cov.skills,
-            reason,
+            message,
             suggestions: issue.suggestions,
             group: cov.group,
           });
@@ -824,7 +824,7 @@ export class ModelBuilder {
 type BucketIssueGroup = {
   key: string;
   severity: "impossible" | "warning";
-  reason: string;
+  message: string;
   suggestions: string[];
   bucketStarts: number[];
   values?: Record<string, number>;

@@ -1,21 +1,16 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { defineSemanticTimes } from "../../src/cpsat/semantic-time.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import {
   ValidationReporterImpl,
   summarizeValidation,
 } from "../../src/cpsat/validation-reporter.js";
-import { resetValidationGroupCounter } from "../../src/cpsat/validation.types.js";
 import type { TimeOfDay } from "../../src/types.js";
 import type { SolverResponse } from "../../src/client.types.js";
 
 const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 
-describe("groupKey propagation", () => {
-  beforeEach(() => {
-    resetValidationGroupCounter();
-  });
-
+describe("group propagation", () => {
   it("should propagate group from coverage through to validation passed items", () => {
     const times = defineSemanticTimes({
       weekday_open: { startTime: t(9), endTime: t(18) },
@@ -34,10 +29,10 @@ describe("groupKey propagation", () => {
     const days = ["2026-02-02", "2026-02-03"];
     const resolved = times.resolve(coverage, days);
 
-    // Check that resolved coverage has group with correct description
-    expect(resolved[0]?.group?.description).toBe("2x staff during weekday_open (mon, tue)");
-    expect(resolved[1]?.group?.description).toBe("2x staff during weekday_open (mon, tue)");
-    // Same group identity
+    // Check that resolved coverage has group with correct title
+    expect(resolved[0]?.group?.title).toBe("2x staff during weekday_open (mon, tue)");
+    expect(resolved[1]?.group?.title).toBe("2x staff during weekday_open (mon, tue)");
+    // Same group key
     expect(resolved[0]?.group?.key).toBe(resolved[1]?.group?.key);
 
     const reporter = new ValidationReporterImpl();
@@ -66,18 +61,17 @@ describe("groupKey propagation", () => {
 
     const validation = reporter.getValidation();
 
-    // All passed items should share the same group key
+    // All passed items should share the same group
     expect(validation.passed.length).toBeGreaterThan(0);
     const firstKey = validation.passed[0]?.group?.key;
     for (const passed of validation.passed) {
       expect(passed.group?.key).toBe(firstKey);
-      expect(passed.group?.description).toBe("2x staff during weekday_open (mon, tue)");
     }
 
     // When summarized, they should all be grouped together
     const summaries = summarizeValidation(validation);
     expect(summaries.length).toBe(1);
-    expect(summaries[0]?.description).toBe("2x staff during weekday_open (mon, tue)");
+    expect(summaries[0]?.title).toBe("2x staff during weekday_open (mon, tue)");
     expect(summaries[0]?.status).toBe("passed");
     // With 15-minute buckets, 9:00-18:00 = 9 hours = 36 slots per day, 2 days = 72 slots
     expect(summaries[0]?.passedCount).toBe(72);
@@ -126,8 +120,8 @@ describe("groupKey propagation", () => {
     // Should have 2 groups - one for morning, one for afternoon
     expect(summaries.length).toBe(2);
 
-    const morningGroup = summaries.find((s) => s.description === "1x staff during morning");
-    const afternoonGroup = summaries.find((s) => s.description === "2x staff during afternoon");
+    const morningGroup = summaries.find((s) => s.title === "1x staff during morning");
+    const afternoonGroup = summaries.find((s) => s.title === "2x staff during afternoon");
 
     expect(morningGroup).toBeDefined();
     expect(afternoonGroup).toBeDefined();
@@ -177,6 +171,6 @@ describe("groupKey propagation", () => {
 
     // Should have exactly 1 group
     expect(summaries.length).toBe(1);
-    expect(summaries[0]?.description).toBe("2x staff during working_hours");
+    expect(summaries[0]?.title).toBe("2x staff during working_hours");
   });
 });
