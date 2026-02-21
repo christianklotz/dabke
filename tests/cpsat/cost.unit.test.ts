@@ -121,7 +121,7 @@ describe("resolveRules for cost rules", () => {
 
   it("minimizeCost() maps to minimize-cost config entry", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -130,7 +130,7 @@ describe("resolveRules for cost rules", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     expect(config.ruleConfigs).toContainEqual(expect.objectContaining({ name: "minimize-cost" }));
@@ -138,7 +138,7 @@ describe("resolveRules for cost rules", () => {
 
   it("dayMultiplier() maps to day-cost-multiplier config entry", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -147,7 +147,7 @@ describe("resolveRules for cost rules", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const entry = config.ruleConfigs!.find((r) => r.name === "day-cost-multiplier");
@@ -157,7 +157,7 @@ describe("resolveRules for cost rules", () => {
 
   it("daySurcharge() maps to day-cost-surcharge config entry", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -166,7 +166,7 @@ describe("resolveRules for cost rules", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const entry = config.ruleConfigs!.find((r) => r.name === "day-cost-surcharge");
@@ -176,7 +176,7 @@ describe("resolveRules for cost rules", () => {
 
   it("timeSurcharge() maps to time-cost-surcharge config entry", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
       coverage: [cover("dinner", "waiter", 1)],
       shiftPatterns: [shift("s", t(17), t(22))],
@@ -185,7 +185,7 @@ describe("resolveRules for cost rules", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const entry = config.ruleConfigs!.find((r) => r.name === "time-cost-surcharge");
@@ -195,7 +195,7 @@ describe("resolveRules for cost rules", () => {
 
   it("overtimeMultiplier() maps to overtime-weekly-multiplier config entry", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -204,7 +204,7 @@ describe("resolveRules for cost rules", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const entry = config.ruleConfigs!.find((r) => r.name === "overtime-weekly-multiplier");
@@ -215,7 +215,7 @@ describe("resolveRules for cost rules", () => {
 
   it("tieredOvertimeMultiplier() maps to overtime-tiered-multiplier config entry", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -230,7 +230,7 @@ describe("resolveRules for cost rules", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const entry = config.ruleConfigs!.find((r) => r.name === "overtime-tiered-multiplier");
@@ -251,7 +251,7 @@ describe("pay validation", () => {
 
   it("throws when cost rules present but members lack pay", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -262,8 +262,8 @@ describe("pay validation", () => {
       def.createSchedulerConfig({
         schedulingPeriod: period,
         members: [
-          { id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } },
-          { id: "bob", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } },
+          { id: "bob", roleIds: ["waiter"] },
         ],
       }),
     ).toThrow("Missing pay: bob");
@@ -271,7 +271,7 @@ describe("pay validation", () => {
 
   it("throws listing all members missing pay", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -282,8 +282,8 @@ describe("pay validation", () => {
       def.createSchedulerConfig({
         schedulingPeriod: period,
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
         ],
       }),
     ).toThrow("Missing pay: alice, bob");
@@ -291,7 +291,7 @@ describe("pay validation", () => {
 
   it("throws when overtime rules present but members lack pay", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -301,14 +301,14 @@ describe("pay validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"] }],
+        members: [{ id: "alice", roleIds: ["waiter"] }],
       }),
     ).toThrow("Missing pay: alice");
   });
 
   it("allows salaried pay with cost rules", () => {
     const def = defineSchedule({
-      roles: ["waiter", "manager"] as const,
+      roleIds: ["waiter", "manager"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -319,8 +319,8 @@ describe("pay validation", () => {
       def.createSchedulerConfig({
         schedulingPeriod: period,
         members: [
-          { id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } },
-          { id: "carol", roles: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } },
+          { id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } },
+          { id: "carol", roleIds: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } },
         ],
       }),
     ).not.toThrow();
@@ -328,7 +328,7 @@ describe("pay validation", () => {
 
   it("does not throw when all members have pay", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -338,14 +338,14 @@ describe("pay validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+        members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
       }),
     ).not.toThrow();
   });
 
   it("does not throw when no cost rules present", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -355,7 +355,7 @@ describe("pay validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"] }],
+        members: [{ id: "alice", roleIds: ["waiter"] }],
       }),
     ).not.toThrow();
   });
@@ -368,7 +368,7 @@ describe("pay validation", () => {
 describe("calculateScheduleCost", () => {
   it("computes correct totals for hourly members", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -377,7 +377,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -404,7 +404,7 @@ describe("calculateScheduleCost", () => {
 
   it("includes premium costs from dayMultiplier", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -413,7 +413,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-14", end: "2026-02-14" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -438,7 +438,7 @@ describe("calculateScheduleCost", () => {
 
   it("includes premium costs from daySurcharge", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -447,7 +447,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-14", end: "2026-02-14" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -472,7 +472,7 @@ describe("calculateScheduleCost", () => {
 
   it("includes premium costs from timeSurcharge", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { dinner: time({ startTime: t(18), endTime: t(23) }) },
       coverage: [cover("dinner", "waiter", 1)],
       shiftPatterns: [shift("dinner_shift", t(18), t(23))],
@@ -481,7 +481,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -507,7 +507,7 @@ describe("calculateScheduleCost", () => {
 
   it("includes overtime costs from overtimeMultiplier", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
@@ -520,7 +520,7 @@ describe("calculateScheduleCost", () => {
         dateRange: { start: "2026-02-09", end: "2026-02-13" },
         dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
       },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -550,7 +550,7 @@ describe("calculateScheduleCost", () => {
 
   it("includes overtime costs from dailyOvertimeMultiplier", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { work: time({ startTime: t(8), endTime: t(20) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("long", t(8), t(20))],
@@ -559,7 +559,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -585,7 +585,7 @@ describe("calculateScheduleCost", () => {
 
   it("includes overtime costs from tieredOvertimeMultiplier", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
@@ -606,7 +606,7 @@ describe("calculateScheduleCost", () => {
         dateRange: { start: "2026-02-09", end: "2026-02-13" },
         dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
       },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -637,7 +637,7 @@ describe("calculateScheduleCost", () => {
 
   it("computes salaried employee base cost", () => {
     const def = defineSchedule({
-      roles: ["manager"] as const,
+      roleIds: ["manager"] as const,
       times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "manager", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
@@ -649,7 +649,7 @@ describe("calculateScheduleCost", () => {
         dateRange: { start: "2026-02-09", end: "2026-02-13" },
         dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
       },
-      members: [{ id: "carol", roles: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
+      members: [{ id: "carol", roleIds: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -676,7 +676,7 @@ describe("calculateScheduleCost", () => {
 
   it("aggregates by day correctly", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 2)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -686,8 +686,8 @@ describe("calculateScheduleCost", () => {
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-10" } },
       members: [
-        { id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } },
-        { id: "bob", roles: ["waiter"], pay: { hourlyRate: 1500 } },
+        { id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } },
+        { id: "bob", roleIds: ["waiter"], pay: { hourlyRate: 1500 } },
       ],
     });
 
@@ -715,7 +715,7 @@ describe("calculateScheduleCost", () => {
 
   it("returns empty breakdown when no cost rules present", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -724,7 +724,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     const builder = new ModelBuilder(config);
@@ -746,7 +746,7 @@ describe("calculateScheduleCost", () => {
 
   it("uses open-ended category strings from custom rules", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -755,7 +755,7 @@ describe("calculateScheduleCost", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     // Simulate a custom rule that uses a custom category
@@ -796,7 +796,7 @@ describe("calculateScheduleCost", () => {
 describe("cost rule ordering", () => {
   it("minimize-cost is ordered before modifier rules", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -805,7 +805,7 @@ describe("cost rule ordering", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-15" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     // minimize-cost should come first in ruleConfigs
@@ -816,7 +816,7 @@ describe("cost rule ordering", () => {
 
   it("minimize-cost is ordered before overtime rules", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -825,7 +825,7 @@ describe("cost rule ordering", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-15" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const costIdx = config.ruleConfigs!.findIndex((r) => r.name === "minimize-cost");
@@ -843,7 +843,7 @@ describe("cost rule ordering", () => {
 describe("CostContext on ModelBuilder", () => {
   it("costContext is set after minimizeCost compiles", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -852,7 +852,7 @@ describe("CostContext on ModelBuilder", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -865,7 +865,7 @@ describe("CostContext on ModelBuilder", () => {
 
   it("costContext normalization accounts for salaried members", () => {
     const def = defineSchedule({
-      roles: ["waiter", "manager"] as const,
+      roleIds: ["waiter", "manager"] as const,
       times: { work: time({ startTime: t(9), endTime: t(17) }) },
       coverage: [cover("work", "waiter", 1)],
       shiftPatterns: [shift("day", t(9), t(17))],
@@ -875,8 +875,8 @@ describe("CostContext on ModelBuilder", () => {
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
       members: [
-        { id: "alice", roles: ["waiter"], pay: { hourlyRate: 1000 } },
-        { id: "carol", roles: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } },
+        { id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
+        { id: "carol", roleIds: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } },
       ],
     });
 
@@ -891,7 +891,7 @@ describe("CostContext on ModelBuilder", () => {
 
   it("costContext is undefined when no minimizeCost rule", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -900,7 +900,7 @@ describe("CostContext on ModelBuilder", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     const builder = new ModelBuilder(config);
@@ -916,7 +916,7 @@ describe("CostContext on ModelBuilder", () => {
 describe("pay propagation", () => {
   it("hourly pay propagates to member", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -924,7 +924,7 @@ describe("pay propagation", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2500 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2500 } }],
     });
 
     expect(config.members[0]!.pay).toEqual({ hourlyRate: 2500 });
@@ -932,7 +932,7 @@ describe("pay propagation", () => {
 
   it("salaried pay propagates to member", () => {
     const def = defineSchedule({
-      roles: ["manager"] as const,
+      roleIds: ["manager"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "manager", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -940,7 +940,7 @@ describe("pay propagation", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "carol", roles: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
+      members: [{ id: "carol", roleIds: ["manager"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
     });
 
     expect(config.members[0]!.pay).toEqual({ annual: 5200000, hoursPerWeek: 40 });
@@ -948,7 +948,7 @@ describe("pay propagation", () => {
 
   it("undefined pay propagates as undefined", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -956,7 +956,7 @@ describe("pay propagation", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     expect(config.members[0]!.pay).toBeUndefined();

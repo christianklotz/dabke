@@ -278,15 +278,15 @@ describe("CP-SAT time-off rule: schema validation", () => {
 describe("CP-SAT time-off rule: validate()", () => {
   const baseContext: RuleValidationContext = {
     members: [
-      { id: "alice", roles: ["barista"] },
-      { id: "bob", roles: ["barista"] },
-      { id: "charlie", roles: ["manager"] },
+      { id: "alice", roleIds: ["barista"] },
+      { id: "bob", roleIds: ["barista"] },
+      { id: "charlie", roleIds: ["manager"] },
     ],
     days: ["2024-02-01", "2024-02-02", "2024-02-03"],
     shiftPatterns: [
       {
         id: "morning",
-        roles: ["barista"],
+        roleIds: ["barista"],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
       },

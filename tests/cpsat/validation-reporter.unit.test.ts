@@ -50,7 +50,7 @@ describe("ValidationReporterImpl", () => {
       reporter.reportCoverageError({
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "No eligible members available",
         suggestions: ["Add members with role barista"],
       });
@@ -62,7 +62,7 @@ describe("ValidationReporterImpl", () => {
         type: "coverage",
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "No eligible members available",
         suggestions: ["Add members with role barista"],
       });
@@ -119,7 +119,7 @@ describe("ValidationReporterImpl", () => {
       reporter.reportCoverageViolation({
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         targetCount: 2,
         actualCount: 1,
         shortfall: 1,
@@ -133,7 +133,7 @@ describe("ValidationReporterImpl", () => {
         type: "coverage",
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         targetCount: 2,
         actualCount: 1,
         shortfall: 1,
@@ -169,7 +169,7 @@ describe("ValidationReporterImpl", () => {
       reporter.reportCoveragePassed({
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "2 baristas scheduled",
       });
 
@@ -180,7 +180,7 @@ describe("ValidationReporterImpl", () => {
         type: "coverage",
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "2 baristas scheduled",
       });
     });
@@ -214,8 +214,8 @@ describe("ValidationReporterImpl", () => {
       const errorData = {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00", "14:00-18:00"],
-        roles: ["barista"],
-        skills: ["espresso", "latte"],
+        roleIds: ["barista"],
+        skillIds: ["espresso", "latte"],
         message: "No eligible members available",
       };
 
@@ -278,21 +278,21 @@ describe("ValidationReporterImpl", () => {
       reporter.reportCoverageError({
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "Error 1",
       });
 
       reporter.reportCoverageError({
         day: "2024-02-01",
         timeSlots: ["14:00-18:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "Error 2",
       });
 
       reporter.reportCoverageError({
         day: "2024-02-02",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "Error 3",
       });
 
@@ -308,7 +308,7 @@ describe("ValidationReporterImpl", () => {
       const commonData = {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
       };
 
       reporter.reportCoverageError({ ...commonData, message: "Error" });
@@ -348,7 +348,7 @@ describe("ValidationReporterImpl", () => {
         comparator: ">=",
         day: "2024-02-01",
         timeSlot: "09:00",
-        roles: ["barista"],
+        roleIds: ["barista"],
         context: { days: ["2024-02-01"] },
       });
 
@@ -374,7 +374,7 @@ describe("ValidationReporterImpl", () => {
         type: "coverage",
         day: "2024-02-01",
         timeSlots: ["09:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         targetCount: 2,
         actualCount: 1,
         shortfall: 1,
@@ -392,7 +392,7 @@ describe("ValidationReporterImpl", () => {
         comparator: ">=",
         day: "2024-02-01",
         timeSlot: "09:00",
-        roles: ["barista"],
+        roleIds: ["barista"],
         context: { days: ["2024-02-01"] },
       });
 
@@ -412,7 +412,7 @@ describe("ValidationReporterImpl", () => {
         type: "coverage",
         day: "2024-02-01",
         timeSlots: ["09:00"],
-        roles: ["barista"],
+        roleIds: ["barista"],
         message: "2x barista on 2024-02-01 at 09:00",
       });
     });
@@ -451,7 +451,7 @@ describe("ValidationReporterImpl", () => {
         comparator: ">=",
         day: "2024-02-01",
         timeSlot: "09:00",
-        roles: ["barista"],
+        roleIds: ["barista"],
         context: { days: ["2024-02-01"] },
         group: grp,
       });
@@ -491,7 +491,7 @@ describe("ValidationReporterImpl", () => {
         comparator: ">=",
         day: "2024-02-01",
         timeSlot: "09:00",
-        roles: ["barista"],
+        roleIds: ["barista"],
         context: { days: ["2024-02-01"] },
         group: grp,
       });
@@ -531,7 +531,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:00",
           group: morningGroup,
         },
@@ -540,7 +540,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:15"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:15",
           group: morningGroup,
         },
@@ -549,7 +549,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-02",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-02 at 09:00",
           group: morningGroup,
         },
@@ -581,7 +581,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:00",
           group: morningGroup,
         },
@@ -590,7 +590,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["14:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "3x barista on 2024-02-01 at 14:00",
           group: afternoonGroup,
         },
@@ -618,7 +618,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           targetCount: 2,
           actualCount: 1,
           shortfall: 1,
@@ -632,7 +632,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:15"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:15",
           group: morningGroup,
         },
@@ -655,7 +655,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "No eligible members",
           group: morningGroup,
         },
@@ -681,7 +681,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:00",
           group: morningGroup,
         },
@@ -703,7 +703,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:00"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:00",
         },
         {
@@ -711,7 +711,7 @@ describe("summarizeValidation", () => {
           type: "coverage" as const,
           day: "2024-02-01",
           timeSlots: ["09:15"],
-          roles: ["barista"],
+          roleIds: ["barista"],
           message: "2x barista on 2024-02-01 at 09:15",
         },
       ],

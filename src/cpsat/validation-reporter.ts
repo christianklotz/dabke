@@ -52,16 +52,16 @@ function coverageId(
   category: "error" | "violation" | "passed",
   day: string,
   timeSlots: readonly string[],
-  roles?: readonly string[],
-  skills?: readonly string[],
+  roleIds?: readonly string[],
+  skillIds?: readonly string[],
 ): string {
   const parts = [
     category,
     "coverage",
     day,
     [...timeSlots].toSorted().join(",") || "_",
-    roles && roles.length > 0 ? [...roles].toSorted().join(",") : "_",
-    skills ? [...skills].toSorted().join(",") : "_",
+    roleIds && roleIds.length > 0 ? [...roleIds].toSorted().join(",") : "_",
+    skillIds ? [...skillIds].toSorted().join(",") : "_",
   ];
   return parts.join(":");
 }
@@ -98,7 +98,7 @@ export class ValidationReporterImpl implements ValidationReporter {
   }
 
   reportCoverageError(error: Omit<CoverageError, "type" | "id">): void {
-    const id = coverageId("error", error.day, error.timeSlots, error.roles, error.skills);
+    const id = coverageId("error", error.day, error.timeSlots, error.roleIds, error.skillIds);
     this.#errors.push({ id, type: "coverage", ...error });
   }
 
@@ -118,8 +118,8 @@ export class ValidationReporterImpl implements ValidationReporter {
       "violation",
       violation.day,
       violation.timeSlots,
-      violation.roles,
-      violation.skills,
+      violation.roleIds,
+      violation.skillIds,
     );
     this.#violations.push({ id, type: "coverage", ...violation });
   }
@@ -130,7 +130,7 @@ export class ValidationReporterImpl implements ValidationReporter {
   }
 
   reportCoveragePassed(passed: Omit<CoveragePassed, "type" | "id">): void {
-    const id = coverageId("passed", passed.day, passed.timeSlots, passed.roles, passed.skills);
+    const id = coverageId("passed", passed.day, passed.timeSlots, passed.roleIds, passed.skillIds);
     this.#passed.push({ id, type: "coverage", ...passed });
   }
 
@@ -181,13 +181,13 @@ export class ValidationReporterImpl implements ValidationReporter {
       const tracked = this.#trackedConstraints.get(violation.constraintId);
 
       if (tracked?.type === "coverage") {
-        const roles = tracked.roles?.join(", ") ?? "staff";
+        const roles = tracked.roleIds?.join(", ") ?? "staff";
         const slot = tracked.timeSlot ?? "all day";
         this.reportCoverageViolation({
           day: tracked.day ?? "",
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
-          roles: tracked.roles,
-          skills: tracked.skills,
+          roleIds: tracked.roleIds,
+          skillIds: tracked.skillIds,
           targetCount: violation.targetValue,
           actualCount: violation.actualValue,
           shortfall: violation.violationAmount,
@@ -222,8 +222,8 @@ export class ValidationReporterImpl implements ValidationReporter {
         this.reportCoveragePassed({
           day: tracked.day ?? "",
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
-          roles: tracked.roles,
-          skills: tracked.skills,
+          roleIds: tracked.roleIds,
+          skillIds: tracked.skillIds,
           message: tracked.description,
           group: tracked.group,
         });

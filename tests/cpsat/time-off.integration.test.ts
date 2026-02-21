@@ -480,9 +480,9 @@ describe("CP-SAT: time-off rule", () => {
     it("handles multiple members with different time-off patterns", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "emp1", roles: ["waiter"] },
-          { id: "emp2", roles: ["waiter"] },
-          { id: "emp3", roles: ["waiter"] },
+          { id: "emp1", roleIds: ["waiter"] },
+          { id: "emp2", roleIds: ["waiter"] },
+          { id: "emp3", roleIds: ["waiter"] },
         ],
         shifts: [
           {
@@ -541,20 +541,20 @@ describe("CP-SAT: time-off rule", () => {
     it("handles role-based time-off affecting multiple members", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "chef1", roles: ["chef"] },
-          { id: "chef2", roles: ["chef"] },
-          { id: "waiter1", roles: ["waiter"] },
+          { id: "chef1", roleIds: ["chef"] },
+          { id: "chef2", roleIds: ["chef"] },
+          { id: "waiter1", roleIds: ["waiter"] },
         ],
         shifts: [
           {
             id: "morning",
-            roles: ["chef"],
+            roleIds: ["chef"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
           },
           {
             id: "evening",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -563,7 +563,7 @@ describe("CP-SAT: time-off rule", () => {
         coverage: [
           {
             day: "2024-02-05",
-            roles: ["chef"],
+            roleIds: ["chef"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,
@@ -571,7 +571,7 @@ describe("CP-SAT: time-off rule", () => {
           },
           {
             day: "2024-02-05",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 1,
@@ -649,9 +649,9 @@ describe("CP-SAT: time-off rule", () => {
     it("blocks members with matching skill", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
-          { id: "bob", roles: ["waiter"], skills: ["keyholder"] },
-          { id: "charlie", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: ["waiter"], skillIds: ["keyholder"] },
+          { id: "charlie", roleIds: ["waiter"] },
         ],
         shift: {
           id: "day",
@@ -680,9 +680,9 @@ describe("CP-SAT: time-off rule", () => {
     it("allows non-skilled members to work", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
-          { id: "bob", roles: ["waiter"] },
-          { id: "charlie", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: ["waiter"] },
+          { id: "charlie", roleIds: ["waiter"] },
         ],
         shift: {
           id: "day",
@@ -718,8 +718,8 @@ describe("CP-SAT: time-off rule", () => {
     it("combines time-off with max-hours-week constraint", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["worker"] },
-          { id: "bob", roles: ["worker"] },
+          { id: "alice", roleIds: ["worker"] },
+          { id: "bob", roleIds: ["worker"] },
         ],
         shift: {
           id: "day",
@@ -766,8 +766,8 @@ describe("CP-SAT: time-off rule", () => {
     it("combines time-off with min-rest-between-shifts", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["nurse"] },
-          { id: "bob", roles: ["nurse"] },
+          { id: "alice", roleIds: ["nurse"] },
+          { id: "bob", roleIds: ["nurse"] },
         ],
         shiftPatterns: [
           {
@@ -785,7 +785,7 @@ describe("CP-SAT: time-off rule", () => {
         coverage: ["2024-02-05", "2024-02-06", "2024-02-07"].flatMap((day) => [
           {
             day,
-            roles: ["nurse"],
+            roleIds: ["nurse"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 19, minutes: 0 },
             targetCount: 1,

@@ -19,7 +19,7 @@ describe("group propagation", () => {
     const coverage = times.coverage([
       {
         semanticTime: "weekday_open",
-        roles: ["staff"],
+        roleIds: ["staff"],
         targetCount: 2,
         dayOfWeek: ["monday", "tuesday"],
       },
@@ -39,8 +39,8 @@ describe("group propagation", () => {
 
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["staff"] },
-        { id: "bob", roles: ["staff"] },
+        { id: "alice", roleIds: ["staff"] },
+        { id: "bob", roleIds: ["staff"] },
       ],
       shiftPatterns: [{ id: "day_shift", startTime: t(9), endTime: t(18) }],
       schedulingPeriod: { dateRange: { start: "2026-02-02", end: "2026-02-03" } },
@@ -84,8 +84,8 @@ describe("group propagation", () => {
     });
 
     const coverage = times.coverage([
-      { semanticTime: "morning", roles: ["staff"], targetCount: 1 },
-      { semanticTime: "afternoon", roles: ["staff"], targetCount: 2 },
+      { semanticTime: "morning", roleIds: ["staff"], targetCount: 1 },
+      { semanticTime: "afternoon", roleIds: ["staff"], targetCount: 2 },
     ]);
 
     const days = ["2026-02-02"];
@@ -95,8 +95,8 @@ describe("group propagation", () => {
 
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["staff"] },
-        { id: "bob", roles: ["staff"] },
+        { id: "alice", roleIds: ["staff"] },
+        { id: "bob", roleIds: ["staff"] },
       ],
       shiftPatterns: [{ id: "day_shift", startTime: t(9), endTime: t(17) }],
       schedulingPeriod: { dateRange: { start: "2026-02-02", end: "2026-02-02" } },
@@ -137,7 +137,7 @@ describe("group propagation", () => {
     });
 
     const coverage = times.coverage([
-      { semanticTime: "working_hours", roles: ["staff"], targetCount: 2 },
+      { semanticTime: "working_hours", roleIds: ["staff"], targetCount: 2 },
     ]);
 
     const days = ["2026-02-02", "2026-02-03", "2026-02-04"];
@@ -147,8 +147,8 @@ describe("group propagation", () => {
 
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["staff"] },
-        { id: "bob", roles: ["staff"] },
+        { id: "alice", roleIds: ["staff"] },
+        { id: "bob", roleIds: ["staff"] },
       ],
       shiftPatterns: [{ id: "day_shift", startTime: t(9), endTime: t(17) }],
       schedulingPeriod: { dateRange: { start: "2026-02-02", end: "2026-02-04" } },

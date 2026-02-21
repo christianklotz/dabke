@@ -21,8 +21,8 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
     // Full shift available weekdays only, Saturday shift available Saturday only
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["staff"] },
-        { id: "bob", roles: ["staff"] },
+        { id: "alice", roleIds: ["staff"] },
+        { id: "bob", roleIds: ["staff"] },
       ],
       shiftPatterns: [
         // Full shift for weekdays only
@@ -50,7 +50,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-06",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -59,7 +59,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-07",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -101,12 +101,12 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
     // Based on cafeRealisticRota eval scenario
     const builder = new ModelBuilder({
       members: [
-        { id: "martina", roles: ["staff"] },
-        { id: "diana", roles: ["staff"] },
-        { id: "kholoud", roles: ["staff"], skills: ["student"] },
-        { id: "milroy", roles: ["staff"] },
-        { id: "shruti", roles: ["staff"] },
-        { id: "mauro", roles: ["staff"], skills: ["no_weekends"] },
+        { id: "martina", roleIds: ["staff"] },
+        { id: "diana", roleIds: ["staff"] },
+        { id: "kholoud", roleIds: ["staff"], skillIds: ["student"] },
+        { id: "milroy", roleIds: ["staff"] },
+        { id: "shruti", roleIds: ["staff"] },
+        { id: "mauro", roleIds: ["staff"], skillIds: ["no_weekends"] },
       ],
       shiftPatterns: [
         // Full shift for weekdays
@@ -150,7 +150,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-02",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -159,7 +159,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-03",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 2,
           priority: "MANDATORY",
         },
@@ -167,7 +167,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-04",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 2,
           priority: "MANDATORY",
         },
@@ -175,7 +175,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-05",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 2,
           priority: "MANDATORY",
         },
@@ -183,7 +183,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-06",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 18, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 2,
           priority: "MANDATORY",
         },
@@ -192,7 +192,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-07",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 2,
           priority: "MANDATORY",
         },
@@ -254,7 +254,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
 
   it("pattern without dayOfWeek can be used on any day", async () => {
     const builder = new ModelBuilder({
-      members: [{ id: "alice", roles: ["staff"] }],
+      members: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
         // Pattern available on any day
         {
@@ -272,7 +272,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-07", // Saturday
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -280,7 +280,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-08", // Sunday
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -297,7 +297,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
 
   it("reports infeasible when no patterns available for a day", async () => {
     const builder = new ModelBuilder({
-      members: [{ id: "alice", roles: ["staff"] }],
+      members: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
         // Only available on weekdays
         {
@@ -316,7 +316,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
           day: "2026-02-07",
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 14, minutes: 0 },
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },

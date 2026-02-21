@@ -45,11 +45,11 @@ export function getMemberIdsForScope(
     }
     case "roles":
       return members
-        .filter((e) => e.roles.some((r) => entity.roleIds.includes(r)))
+        .filter((e) => e.roleIds.some((r) => entity.roleIds.includes(r)))
         .map((e) => e.id);
     case "skills":
       return members
-        .filter((e) => e.skills?.some((s) => entity.skillIds.includes(s)))
+        .filter((e) => e.skillIds?.some((s) => entity.skillIds.includes(s)))
         .map((e) => e.id);
     case "global":
     default:

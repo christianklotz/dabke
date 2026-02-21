@@ -16,8 +16,8 @@ describe("CP-SAT: minimize-cost rule", () => {
   it("prefers cheaper hourly member when coverage allows", async () => {
     const config = createBaseConfig({
       members: [
-        { id: "expensive", roles: ["waiter"], pay: { hourlyRate: 3000 } },
-        { id: "cheap", roles: ["waiter"], pay: { hourlyRate: 1000 } },
+        { id: "expensive", roleIds: ["waiter"], pay: { hourlyRate: 3000 } },
+        { id: "cheap", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       targetCount: 1,
@@ -43,8 +43,8 @@ describe("CP-SAT: minimize-cost rule", () => {
   it("assigns both members when coverage requires it", async () => {
     const config = createBaseConfig({
       members: [
-        { id: "expensive", roles: ["waiter"], pay: { hourlyRate: 3000 } },
-        { id: "cheap", roles: ["waiter"], pay: { hourlyRate: 1000 } },
+        { id: "expensive", roleIds: ["waiter"], pay: { hourlyRate: 3000 } },
+        { id: "cheap", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       targetCount: 2,
@@ -69,8 +69,8 @@ describe("CP-SAT: minimize-cost rule", () => {
   it("post-solve cost calculation matches expectations", async () => {
     const config = createBaseConfig({
       members: [
-        { id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } },
-        { id: "bob", roles: ["waiter"], pay: { hourlyRate: 1500 } },
+        { id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } },
+        { id: "bob", roleIds: ["waiter"], pay: { hourlyRate: 1500 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       targetCount: 1,

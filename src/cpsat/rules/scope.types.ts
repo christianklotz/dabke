@@ -471,9 +471,9 @@ export function resolveMembersFromScope(
       return members.filter((e) => idSet.has(e.id));
     }
     case "roles":
-      return members.filter((e) => e.roles.some((r) => scope.roleIds.includes(r)));
+      return members.filter((e) => e.roleIds.some((r) => scope.roleIds.includes(r)));
     case "skills":
-      return members.filter((e) => e.skills?.some((s) => scope.skillIds.includes(s)));
+      return members.filter((e) => e.skillIds?.some((s) => scope.skillIds.includes(s)));
     case "global":
     default:
       return members;

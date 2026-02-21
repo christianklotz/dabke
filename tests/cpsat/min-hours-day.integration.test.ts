@@ -13,13 +13,13 @@ describe("CP-SAT: min-hours-day rule", () => {
     const shiftPatterns = [
       {
         id: "short",
-        roles: ["server"] as [string],
+        roleIds: ["server"] as [string],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
       },
       {
         id: "long",
-        roles: ["server"] as [string],
+        roleIds: ["server"] as [string],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
       },
@@ -27,7 +27,7 @@ describe("CP-SAT: min-hours-day rule", () => {
     const coverage = [
       {
         day: "2024-02-01",
-        roles: ["server"] as [string],
+        roleIds: ["server"] as [string],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 13, minutes: 0 },
         targetCount: 1,

@@ -7,7 +7,7 @@ const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
 describe("ShiftPattern dayOfWeek restriction", () => {
   it("should only create assignment variables for patterns available on that day", () => {
     const builder = new ModelBuilder({
-      members: [{ id: "alice", roles: ["staff"] }],
+      members: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
         // Full shift only available on weekdays
         {
@@ -33,7 +33,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
           day: "2026-02-06",
           startTime: t(9),
           endTime: t(18),
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -41,7 +41,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
           day: "2026-02-07",
           startTime: t(9),
           endTime: t(14),
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -69,7 +69,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
 
   it("should report error when no patterns are available for coverage on a day", () => {
     const builder = new ModelBuilder({
-      members: [{ id: "alice", roles: ["staff"] }],
+      members: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
         // Only weekday shift
         {
@@ -88,7 +88,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
           day: "2026-02-07",
           startTime: t(9),
           endTime: t(14),
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         },
@@ -103,7 +103,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
 
   it("should allow patterns without dayOfWeek restriction on any day", () => {
     const builder = new ModelBuilder({
-      members: [{ id: "alice", roles: ["staff"] }],
+      members: [{ id: "alice", roleIds: ["staff"] }],
       shiftPatterns: [
         // Pattern available any day (no dayOfWeek restriction)
         { id: "any_shift", startTime: t(9), endTime: t(17) },
@@ -117,7 +117,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
           day: "2026-02-02",
           startTime: t(9),
           endTime: t(17),
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         }, // Monday
@@ -125,7 +125,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
           day: "2026-02-07",
           startTime: t(9),
           endTime: t(17),
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 1,
           priority: "MANDATORY",
         }, // Saturday
@@ -146,8 +146,8 @@ describe("ShiftPattern dayOfWeek restriction", () => {
   it("should correctly filter patterns in coverage constraint building", () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["staff"] },
-        { id: "bob", roles: ["staff"] },
+        { id: "alice", roleIds: ["staff"] },
+        { id: "bob", roleIds: ["staff"] },
       ],
       shiftPatterns: [
         // Full shift for weekdays only
@@ -181,7 +181,7 @@ describe("ShiftPattern dayOfWeek restriction", () => {
           day: "2026-02-07",
           startTime: t(8, 30),
           endTime: t(14, 30),
-          roles: ["staff"],
+          roleIds: ["staff"],
           targetCount: 2,
           priority: "MANDATORY",
         },

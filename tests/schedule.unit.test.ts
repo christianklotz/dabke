@@ -130,8 +130,8 @@ describe("cover()", () => {
   });
 
   it("supports skills option", () => {
-    const entry = cover("lunch", "waiter", 1, { skills: ["senior"] });
-    expect(entry.options.skills).toEqual(["senior"]);
+    const entry = cover("lunch", "waiter", 1, { skillIds: ["senior"] });
+    expect(entry.options.skillIds).toEqual(["senior"]);
   });
 
   it("creates a variant coverage entry", () => {
@@ -199,18 +199,18 @@ describe("shift()", () => {
     expect(sp.id).toBe("morning");
     expect(sp.startTime).toEqual(t(11, 30));
     expect(sp.endTime).toEqual(t(15));
-    expect(sp.roles).toBeUndefined();
+    expect(sp.roleIds).toBeUndefined();
     expect(sp.dayOfWeek).toBeUndefined();
     expect(sp.locationId).toBeUndefined();
   });
 
   it("passes through options as flat fields", () => {
     const sp = shift("kitchen", t(6), t(14), {
-      roles: ["chef", "prep_cook"],
+      roleIds: ["chef", "prep_cook"],
       dayOfWeek: weekdays,
       locationId: "kitchen",
     });
-    expect(sp.roles).toEqual(["chef", "prep_cook"]);
+    expect(sp.roleIds).toEqual(["chef", "prep_cook"]);
     expect(sp.dayOfWeek).toEqual(weekdays);
     expect(sp.locationId).toBe("kitchen");
   });
@@ -323,7 +323,7 @@ describe("rule functions", () => {
 
 describe("defineSchedule() validation", () => {
   const minConfig = () => ({
-    roles: ["waiter"] as const,
+    roleIds: ["waiter"] as const,
     times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
     coverage: [cover("lunch", "waiter", 1)],
     shiftPatterns: [shift("lunch_shift", t(12), t(15))],
@@ -339,8 +339,8 @@ describe("defineSchedule() validation", () => {
     expect(() =>
       defineSchedule({
         ...minConfig(),
-        roles: ["waiter"] as const,
-        skills: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
+        skillIds: ["waiter"] as const,
       }),
     ).toThrow("both a role and a skill");
   });
@@ -349,7 +349,7 @@ describe("defineSchedule() validation", () => {
     expect(() =>
       defineSchedule({
         ...minConfig(),
-        shiftPatterns: [shift("s", t(9), t(17), { roles: ["chef"] })],
+        shiftPatterns: [shift("s", t(9), t(17), { roleIds: ["chef"] })],
       }),
     ).toThrow('unknown role "chef"');
   });
@@ -357,7 +357,7 @@ describe("defineSchedule() validation", () => {
   it("throws if coverage references unknown target", () => {
     expect(() =>
       defineSchedule({
-        roles: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
         times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
         coverage: [cover("lunch", "chef" as "waiter", 1)],
         shiftPatterns: [shift("s", t(12), t(15))],
@@ -368,8 +368,8 @@ describe("defineSchedule() validation", () => {
   it("throws if coverage OR group references non-role", () => {
     expect(() =>
       defineSchedule({
-        roles: ["waiter"] as const,
-        skills: ["senior"] as const,
+        roleIds: ["waiter"] as const,
+        skillIds: ["senior"] as const,
         times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
         // "senior" is a skill, not a role, so this should throw at runtime
         coverage: [cover("lunch", ["waiter", "senior"] as unknown as ["waiter", "waiter"], 1)],
@@ -381,10 +381,10 @@ describe("defineSchedule() validation", () => {
   it("throws if coverage skill filter references unknown skill", () => {
     expect(() =>
       defineSchedule({
-        roles: ["waiter"] as const,
-        skills: ["senior"] as const,
+        roleIds: ["waiter"] as const,
+        skillIds: ["senior"] as const,
         times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
-        coverage: [cover("lunch", "waiter", 1, { skills: ["unknown" as "senior"] })],
+        coverage: [cover("lunch", "waiter", 1, { skillIds: ["unknown" as "senior"] })],
         shiftPatterns: [shift("s", t(12), t(15))],
       }),
     ).toThrow('skill filter "unknown"');
@@ -397,8 +397,8 @@ describe("defineSchedule() validation", () => {
 
 describe("createSchedulerConfig()", () => {
   const schedule = defineSchedule({
-    roles: ["waiter", "runner", "manager"],
-    skills: ["senior", "keyholder"],
+    roleIds: ["waiter", "runner", "manager"],
+    skillIds: ["senior", "keyholder"],
 
     times: {
       lunch: time({ startTime: t(12), endTime: t(15) }),
@@ -414,14 +414,14 @@ describe("createSchedulerConfig()", () => {
       cover("lunch", "manager", 1),
       cover("dinner", ["manager", "runner"] as const, 1),
       cover("dinner", "keyholder", 1),
-      cover("lunch", "waiter", 1, { skills: ["senior"] }),
+      cover("lunch", "waiter", 1, { skillIds: ["senior"] }),
     ],
 
     shiftPatterns: [
       shift("morning", t(11, 30), t(15)),
       shift("evening", t(17), t(22)),
       shift("full_day", t(11, 30), t(22)),
-      shift("kitchen", t(6), t(14), { roles: ["runner"], locationId: "kitchen" }),
+      shift("kitchen", t(6), t(14), { roleIds: ["runner"], locationId: "kitchen" }),
     ],
 
     rules: [
@@ -438,10 +438,10 @@ describe("createSchedulerConfig()", () => {
   });
 
   const members = [
-    { id: "alice", roles: ["waiter"], skills: ["senior"] },
-    { id: "bob", roles: ["waiter"] },
-    { id: "charlie", roles: ["runner"] },
-    { id: "mauro", roles: ["manager"], skills: ["keyholder"] },
+    { id: "alice", roleIds: ["waiter"], skillIds: ["senior"] },
+    { id: "bob", roleIds: ["waiter"] },
+    { id: "charlie", roleIds: ["runner"] },
+    { id: "mauro", roleIds: ["manager"], skillIds: ["keyholder"] },
   ];
 
   const period = {
@@ -467,13 +467,13 @@ describe("createSchedulerConfig()", () => {
 
     expect(config.members[0]).toEqual({
       id: "alice",
-      roles: ["waiter"],
-      skills: ["senior"],
+      roleIds: ["waiter"],
+      skillIds: ["senior"],
     });
     expect(config.members[3]).toEqual({
       id: "mauro",
-      roles: ["manager"],
-      skills: ["keyholder"],
+      roleIds: ["manager"],
+      skillIds: ["keyholder"],
     });
   });
 
@@ -485,7 +485,7 @@ describe("createSchedulerConfig()", () => {
 
     const kitchen = config.shiftPatterns.find((p) => p.id === "kitchen");
     expect(kitchen).toBeDefined();
-    expect(kitchen!.roles).toEqual(["runner"]);
+    expect(kitchen!.roleIds).toEqual(["runner"]);
     expect(kitchen!.locationId).toBe("kitchen");
   });
 
@@ -542,7 +542,7 @@ describe("createSchedulerConfig()", () => {
 
   it("translates timeOff with from only", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -551,7 +551,7 @@ describe("createSchedulerConfig()", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     const rule = config.ruleConfigs!.find((r) => r.name === "time-off")!;
@@ -561,7 +561,7 @@ describe("createSchedulerConfig()", () => {
 
   it("translates timeOff with until only", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -570,7 +570,7 @@ describe("createSchedulerConfig()", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     const rule = config.ruleConfigs!.find((r) => r.name === "time-off")!;
@@ -580,7 +580,7 @@ describe("createSchedulerConfig()", () => {
 
   it("translates timeOff with both from and until", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -589,7 +589,7 @@ describe("createSchedulerConfig()", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "bob", roles: ["waiter"] }],
+      members: [{ id: "bob", roleIds: ["waiter"] }],
     });
 
     const rule = config.ruleConfigs!.find((r) => r.name === "time-off")!;
@@ -619,7 +619,7 @@ describe("createSchedulerConfig()", () => {
 
   it("resolves appliesTo with member IDs", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -628,7 +628,7 @@ describe("createSchedulerConfig()", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     const rule = config.ruleConfigs!.find((r) => r.name === "max-hours-day");
@@ -638,7 +638,7 @@ describe("createSchedulerConfig()", () => {
 
   it("omits priority when not specified (rule schema provides the default)", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -647,7 +647,7 @@ describe("createSchedulerConfig()", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     const rule = config.ruleConfigs!.find((r) => r.name === "max-hours-day");
@@ -657,7 +657,7 @@ describe("createSchedulerConfig()", () => {
 
   it("merges runtime rules", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -666,7 +666,7 @@ describe("createSchedulerConfig()", () => {
 
     const config = def.createSchedulerConfig({
       schedulingPeriod: period,
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
       runtimeRules: [
         timeOff({
           appliesTo: "alice",
@@ -682,7 +682,7 @@ describe("createSchedulerConfig()", () => {
 
   it("applies dayOfWeek filter from config", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -693,7 +693,7 @@ describe("createSchedulerConfig()", () => {
       schedulingPeriod: {
         dateRange: { start: "2025-02-03", end: "2025-02-09" },
       },
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     // The scheduling period should have the dayOfWeek filter
@@ -713,8 +713,8 @@ describe("createSchedulerConfig()", () => {
 
 describe("runtime validation", () => {
   const def = defineSchedule({
-    roles: ["waiter"] as const,
-    skills: ["senior"] as const,
+    roleIds: ["waiter"] as const,
+    skillIds: ["senior"] as const,
     times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
     coverage: [cover("lunch", "waiter", 1)],
     shiftPatterns: [shift("s", t(12), t(15))],
@@ -727,7 +727,7 @@ describe("runtime validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "waiter", roles: ["waiter"] }],
+        members: [{ id: "waiter", roleIds: ["waiter"] }],
       }),
     ).toThrow("collides with a declared role");
   });
@@ -736,14 +736,14 @@ describe("runtime validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "senior", roles: ["waiter"] }],
+        members: [{ id: "senior", roleIds: ["waiter"] }],
       }),
     ).toThrow("collides with a declared skill");
   });
 
   it("throws if appliesTo target is unknown", () => {
     const def2 = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -753,15 +753,15 @@ describe("runtime validation", () => {
     expect(() =>
       def2.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"] }],
+        members: [{ id: "alice", roleIds: ["waiter"] }],
       }),
     ).toThrow('appliesTo target "nonexistent"');
   });
 
   it("throws if appliesTo spans multiple namespaces", () => {
     const def2 = defineSchedule({
-      roles: ["waiter"] as const,
-      skills: ["senior"] as const,
+      roleIds: ["waiter"] as const,
+      skillIds: ["senior"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -771,14 +771,14 @@ describe("runtime validation", () => {
     expect(() =>
       def2.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"], skills: ["senior"] }],
+        members: [{ id: "alice", roleIds: ["waiter"], skillIds: ["senior"] }],
       }),
     ).toThrow("span multiple namespaces");
   });
 
   it("throws if assignTogether references unknown member ID", () => {
     const def2 = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -789,8 +789,8 @@ describe("runtime validation", () => {
       def2.createSchedulerConfig({
         schedulingPeriod: period,
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
         ],
       }),
     ).toThrow('unknown member "bbo"');
@@ -800,7 +800,7 @@ describe("runtime validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waitr"] }],
+        members: [{ id: "alice", roleIds: ["waitr"] }],
       }),
     ).toThrow('unknown role "waitr"');
   });
@@ -809,7 +809,7 @@ describe("runtime validation", () => {
     expect(() =>
       def.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"], skills: ["senoir"] }],
+        members: [{ id: "alice", roleIds: ["waiter"], skillIds: ["senoir"] }],
       }),
     ).toThrow('unknown skill "senoir"');
   });
@@ -819,8 +819,8 @@ describe("runtime validation", () => {
       def.createSchedulerConfig({
         schedulingPeriod: period,
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "alice", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
         ],
       }),
     ).toThrow('Duplicate member ID "alice"');
@@ -828,7 +828,7 @@ describe("runtime validation", () => {
 
   it("throws if timeOff has no time scope", () => {
     const def2 = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
@@ -838,7 +838,7 @@ describe("runtime validation", () => {
     expect(() =>
       def2.createSchedulerConfig({
         schedulingPeriod: period,
-        members: [{ id: "alice", roles: ["waiter"] }],
+        members: [{ id: "alice", roleIds: ["waiter"] }],
       }),
     ).toThrow("requires at least one time scope");
   });
@@ -851,8 +851,8 @@ describe("runtime validation", () => {
 describe("end-to-end config structure", () => {
   it("produces a config compatible with ModelBuilder", () => {
     const def = defineSchedule({
-      roles: ["waiter", "manager"],
-      skills: ["senior"],
+      roleIds: ["waiter", "manager"],
+      skillIds: ["senior"],
 
       times: {
         lunch: time({ startTime: t(12), endTime: t(15) }),
@@ -870,9 +870,9 @@ describe("end-to-end config structure", () => {
         dateRange: { start: "2025-02-10", end: "2025-02-14" },
       },
       members: [
-        { id: "alice", roles: ["waiter"], skills: ["senior"] },
-        { id: "bob", roles: ["waiter"] },
-        { id: "charlie", roles: ["manager"] },
+        { id: "alice", roleIds: ["waiter"], skillIds: ["senior"] },
+        { id: "bob", roleIds: ["waiter"] },
+        { id: "charlie", roleIds: ["manager"] },
       ],
     });
 
@@ -888,7 +888,7 @@ describe("end-to-end config structure", () => {
 
     // Verify coverage has skill-based entries
     const skillCoverage = config.coverage.filter(
-      (c) => "skills" in c && c.skills?.includes("senior"),
+      (c) => "skillIds" in c && c.skillIds?.includes("senior"),
     );
     expect(skillCoverage.length).toBeGreaterThan(0);
   });
@@ -901,7 +901,7 @@ describe("end-to-end config structure", () => {
 describe("variant coverage", () => {
   it("resolves variant coverage through defineSchedule", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
       coverage: [cover("dinner", "waiter", { count: 3 }, { count: 1, dates: ["2025-02-05"] })],
       shiftPatterns: [shift("evening", t(17), t(22))],
@@ -912,9 +912,9 @@ describe("variant coverage", () => {
         dateRange: { start: "2025-02-03", end: "2025-02-07" },
       },
       members: [
-        { id: "alice", roles: ["waiter"] },
-        { id: "bob", roles: ["waiter"] },
-        { id: "charlie", roles: ["waiter"] },
+        { id: "alice", roleIds: ["waiter"] },
+        { id: "bob", roleIds: ["waiter"] },
+        { id: "charlie", roleIds: ["waiter"] },
       ],
     });
 
@@ -933,7 +933,7 @@ describe("variant coverage", () => {
 
   it("resolves variant with dayOfWeek scoping", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
       coverage: [
         cover(
@@ -950,10 +950,10 @@ describe("variant coverage", () => {
       // 2025-02-03 is Monday
       schedulingPeriod: { dateRange: { start: "2025-02-03", end: "2025-02-09" } },
       members: [
-        { id: "a", roles: ["waiter"] },
-        { id: "b", roles: ["waiter"] },
-        { id: "c", roles: ["waiter"] },
-        { id: "d", roles: ["waiter"] },
+        { id: "a", roleIds: ["waiter"] },
+        { id: "b", roleIds: ["waiter"] },
+        { id: "c", roleIds: ["waiter"] },
+        { id: "d", roleIds: ["waiter"] },
       ],
     });
 
@@ -974,8 +974,8 @@ describe("variant coverage", () => {
 
   it("resolves variant with skill-only target", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
-      skills: ["keyholder"] as const,
+      roleIds: ["waiter"] as const,
+      skillIds: ["keyholder"] as const,
       times: { opening: time({ startTime: t(6), endTime: t(8) }) },
       coverage: [cover("opening", "keyholder", { count: 1 }, { count: 2, dayOfWeek: weekend })],
       shiftPatterns: [shift("morning", t(6), t(8))],
@@ -985,8 +985,8 @@ describe("variant coverage", () => {
       // 2025-02-07 Fri, 2025-02-08 Sat
       schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
       members: [
-        { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
-        { id: "bob", roles: ["waiter"], skills: ["keyholder"] },
+        { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
+        { id: "bob", roleIds: ["waiter"], skillIds: ["keyholder"] },
       ],
     });
 
@@ -997,12 +997,12 @@ describe("variant coverage", () => {
 
     expect(fri?.targetCount).toBe(1);
     expect(sat?.targetCount).toBe(2);
-    expect(fri?.skills).toEqual(["keyholder"]);
+    expect(fri?.skillIds).toEqual(["keyholder"]);
   });
 
   it("resolves variant with OR-role target", () => {
     const def = defineSchedule({
-      roles: ["manager", "supervisor"] as const,
+      roleIds: ["manager", "supervisor"] as const,
       times: { service: time({ startTime: t(11), endTime: t(22) }) },
       coverage: [
         cover("service", ["manager", "supervisor"], { count: 1 }, { count: 2, dayOfWeek: weekend }),
@@ -1014,8 +1014,8 @@ describe("variant coverage", () => {
       // 2025-02-07 Fri, 2025-02-08 Sat
       schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
       members: [
-        { id: "alice", roles: ["manager"] },
-        { id: "bob", roles: ["supervisor"] },
+        { id: "alice", roleIds: ["manager"] },
+        { id: "bob", roleIds: ["supervisor"] },
       ],
     });
 
@@ -1026,12 +1026,12 @@ describe("variant coverage", () => {
 
     expect(fri?.targetCount).toBe(1);
     expect(sat?.targetCount).toBe(2);
-    expect(fri?.roles).toEqual(["manager", "supervisor"]);
+    expect(fri?.roleIds).toEqual(["manager", "supervisor"]);
   });
 
   it("emits no coverage for days without matching variant", () => {
     const def = defineSchedule({
-      roles: ["waiter"] as const,
+      roleIds: ["waiter"] as const,
       times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
       coverage: [cover("dinner", "waiter", { count: 4, dayOfWeek: weekend })],
       shiftPatterns: [shift("evening", t(17), t(22))],
@@ -1040,7 +1040,7 @@ describe("variant coverage", () => {
     const config = def.createSchedulerConfig({
       // 2025-02-03 is Monday
       schedulingPeriod: { dateRange: { start: "2025-02-03", end: "2025-02-07" } },
-      members: [{ id: "alice", roles: ["waiter"] }],
+      members: [{ id: "alice", roleIds: ["waiter"] }],
     });
 
     // Only weekdays in range, variant only covers weekends — no coverage
@@ -1049,7 +1049,7 @@ describe("variant coverage", () => {
 
   it("can mix variant and simple coverage for different roles", () => {
     const def = defineSchedule({
-      roles: ["waiter", "manager"] as const,
+      roleIds: ["waiter", "manager"] as const,
       times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
       coverage: [
         cover("dinner", "waiter", { count: 2 }, { count: 4, dayOfWeek: weekend }),
@@ -1062,11 +1062,11 @@ describe("variant coverage", () => {
       // 2025-02-07 Fri, 2025-02-08 Sat
       schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
       members: [
-        { id: "a", roles: ["waiter"] },
-        { id: "b", roles: ["waiter"] },
-        { id: "c", roles: ["waiter"] },
-        { id: "d", roles: ["waiter"] },
-        { id: "m", roles: ["manager"] },
+        { id: "a", roleIds: ["waiter"] },
+        { id: "b", roleIds: ["waiter"] },
+        { id: "c", roleIds: ["waiter"] },
+        { id: "d", roleIds: ["waiter"] },
+        { id: "m", roleIds: ["manager"] },
       ],
     });
 
@@ -1075,13 +1075,13 @@ describe("variant coverage", () => {
     expect(config.coverage).toHaveLength(4);
 
     const waiterFri = config.coverage.find(
-      (c) => c.day === "2025-02-07" && c.roles?.includes("waiter"),
+      (c) => c.day === "2025-02-07" && c.roleIds?.includes("waiter"),
     );
     const waiterSat = config.coverage.find(
-      (c) => c.day === "2025-02-08" && c.roles?.includes("waiter"),
+      (c) => c.day === "2025-02-08" && c.roleIds?.includes("waiter"),
     );
     const managerFri = config.coverage.find(
-      (c) => c.day === "2025-02-07" && c.roles?.includes("manager"),
+      (c) => c.day === "2025-02-07" && c.roleIds?.includes("manager"),
     );
 
     expect(waiterFri?.targetCount).toBe(2);

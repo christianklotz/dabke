@@ -12,8 +12,8 @@ describe("Role-based shift assignment (integration)", () => {
   it("assigns any member to shifts with no roles", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["server"] },
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["server"] },
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
@@ -27,7 +27,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["server"], // Coverage still needs a role for tracking
+          roleIds: ["server"], // Coverage still needs a role for tracking
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -51,13 +51,13 @@ describe("Role-based shift assignment (integration)", () => {
   it("only assigns members with matching role to role-restricted shifts", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["server"] },
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["server"] },
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "server_shift",
-          roles: ["server"], // Only servers
+          roleIds: ["server"], // Only servers
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -66,7 +66,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["server"],
+          roleIds: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -89,14 +89,14 @@ describe("Role-based shift assignment (integration)", () => {
   it("assigns members with any matching role to multi-role shifts", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["server"] },
-        { id: "bob", roles: ["runner"] },
-        { id: "charlie", roles: ["chef"] },
+        { id: "alice", roleIds: ["server"] },
+        { id: "bob", roleIds: ["runner"] },
+        { id: "charlie", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "floor_shift",
-          roles: ["server", "runner"], // Servers OR runners
+          roleIds: ["server", "runner"], // Servers OR runners
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -106,7 +106,7 @@ describe("Role-based shift assignment (integration)", () => {
         // Need 1 server and 1 runner - both can work the floor_shift
         {
           day: "2024-01-01",
-          roles: ["server"],
+          roleIds: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -114,7 +114,7 @@ describe("Role-based shift assignment (integration)", () => {
         },
         {
           day: "2024-01-01",
-          roles: ["runner"],
+          roleIds: ["runner"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -138,13 +138,13 @@ describe("Role-based shift assignment (integration)", () => {
   it("returns infeasible when no members match required role", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["chef"] },
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["chef"] },
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "server_shift",
-          roles: ["server"], // Only servers - but we have no servers!
+          roleIds: ["server"], // Only servers - but we have no servers!
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -153,7 +153,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["server"],
+          roleIds: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -172,13 +172,13 @@ describe("Role-based shift assignment (integration)", () => {
   it("allows multi-role member to work shift matching any of their roles", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["server", "host"] }, // Multi-role
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["server", "host"] }, // Multi-role
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "host_shift",
-          roles: ["host"],
+          roleIds: ["host"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -187,7 +187,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["host"],
+          roleIds: ["host"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -210,13 +210,13 @@ describe("Role-based shift assignment (integration)", () => {
   it("handles mixed patterns - some with roles, some without", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["server"] },
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["server"] },
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "morning",
-          roles: ["server"], // Only servers
+          roleIds: ["server"], // Only servers
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 13, minutes: 0 },
         },
@@ -231,7 +231,7 @@ describe("Role-based shift assignment (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["server"],
+          roleIds: ["server"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 13, minutes: 0 },
           targetCount: 1,
@@ -239,7 +239,7 @@ describe("Role-based shift assignment (integration)", () => {
         },
         {
           day: "2024-01-01",
-          roles: ["chef"],
+          roleIds: ["chef"],
           startTime: { hours: 13, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,

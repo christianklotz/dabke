@@ -14,8 +14,8 @@
  * } from "dabke";
  *
  * export default defineSchedule({
- *   roles: ["cashier", "floor_lead", "stocker"],
- *   skills: ["keyholder"],
+ *   roleIds: ["cashier", "floor_lead", "stocker"],
+ *   skillIds: ["keyholder"],
  *
  *   times: {
  *     opening: time({ startTime: t(8), endTime: t(10) }),
@@ -183,8 +183,8 @@ export function time(
  * scheduling period.
  */
 export interface CoverageOptions {
-  /** Additional skill filter (AND logic with the target role). */
-  skills?: [string, ...string[]];
+  /** Additional skill ID filter (AND logic with the target role). */
+  skillIds?: [string, ...string[]];
   /** Restrict to specific days of the week. */
   dayOfWeek?: readonly DayOfWeek[];
   /** Restrict to specific dates (YYYY-MM-DD). */
@@ -230,11 +230,11 @@ export interface CoverageEntry<T extends string = string, R extends string = str
  * shape.
  *
  * **Target resolution.** The `target` parameter is resolved against declared
- * `roles` and `skills`:
+ * `roleIds` and `skillIds`:
  *
  * - Single string: matched against roles first, then skills.
  * - Array of strings: OR logic (any of the listed roles).
- * - With `skills` option (simple form only): role AND skill(s) filter.
+ * - With `skillIds` option (simple form only): role AND skill(s) filter.
  *
  * @param timeName - Name of a declared semantic time
  * @param target - Role name, skill name, or array of role names (OR)
@@ -258,7 +258,7 @@ export interface CoverageEntry<T extends string = string, R extends string = str
  *
  * @example Role with skill filter (role AND skill)
  * ```ts
- * cover("day_shift", "nurse", 1, { skills: ["charge_nurse"] })
+ * cover("day_shift", "nurse", 1, { skillIds: ["charge_nurse"] })
  * ```
  *
  * @example Day-of-week scoping (simple form)
@@ -343,23 +343,23 @@ export function cover<T extends string, R extends string>(
  * @remarks
  * Shift patterns define when people can work: the concrete time slots
  * the solver may assign members to. Each pattern repeats across all
- * scheduling days unless filtered by `dayOfWeek` or `roles`.
+ * scheduling days unless filtered by `dayOfWeek` or `roleIds`.
  *
  * @example
  * ```typescript
  * shift("early", t(6), t(14)),
  * shift("day", t(9), t(17)),
- * shift("night", t(22), t(6), { roles: ["nurse", "doctor"] }),
+ * shift("night", t(22), t(6), { roleIds: ["nurse", "doctor"] }),
  * ```
  */
 export function shift(
   id: string,
   startTime: TimeOfDay,
   endTime: TimeOfDay,
-  opts?: Pick<ShiftPattern, "roles" | "dayOfWeek" | "locationId">,
+  opts?: Pick<ShiftPattern, "roleIds" | "dayOfWeek" | "locationId">,
 ): ShiftPattern {
   const pattern: ShiftPattern = { id, startTime, endTime };
-  if (opts?.roles) pattern.roles = opts.roles;
+  if (opts?.roleIds) pattern.roleIds = opts.roleIds;
   if (opts?.dayOfWeek) pattern.dayOfWeek = opts.dayOfWeek as DayOfWeek[];
   if (opts?.locationId) pattern.locationId = opts.locationId;
   return pattern;
@@ -860,10 +860,10 @@ export interface RuntimeArgs {
 export interface ScheduleDefinition {
   /** Produce a {@link ModelBuilderConfig} for the solver. */
   createSchedulerConfig(args: RuntimeArgs): ModelBuilderConfig;
-  /** Declared role names. */
-  readonly roles: readonly string[];
-  /** Declared skill names. */
-  readonly skills: readonly string[];
+  /** Declared role IDs. */
+  readonly roleIds: readonly string[];
+  /** Declared skill IDs. */
+  readonly skillIds: readonly string[];
   /** Names of declared semantic times. */
   readonly timeNames: readonly string[];
   /** Shift pattern IDs. */
@@ -886,10 +886,10 @@ export interface ScheduleConfig<
   S extends readonly string[],
   T extends Record<string, SemanticTimeEntry>,
 > {
-  /** Declared role names. */
-  roles: R;
-  /** Declared skill names. */
-  skills?: S;
+  /** Declared role IDs. */
+  roleIds: R;
+  /** Declared skill IDs. */
+  skillIds?: S;
   /** Named semantic time periods. */
   times: T;
   /** Staffing requirements per time period (entries stack additively). */
@@ -918,7 +918,7 @@ export interface ScheduleConfig<
  * import { defineSchedule, t, time, cover, shift, maxHoursPerDay } from "dabke";
  *
  * export default defineSchedule({
- *   roles: ["agent", "supervisor"],
+ *   roleIds: ["agent", "supervisor"],
  *   times: { peak: time({ startTime: t(9), endTime: t(17) }) },
  *   coverage: [cover("peak", "agent", 4)],
  *   shiftPatterns: [shift("day", t(9), t(17))],
@@ -931,8 +931,8 @@ export function defineSchedule<
   const S extends readonly string[],
   const T extends Record<string, SemanticTimeEntry>,
 >(config: ScheduleConfig<R, S, T>): ScheduleDefinition {
-  const roles = new Set<string>(config.roles);
-  const skills = new Set<string>(config.skills ?? []);
+  const roles = new Set<string>(config.roleIds);
+  const skills = new Set<string>(config.skillIds ?? []);
 
   // Validate role/skill disjointness
   for (const skill of skills) {
@@ -945,8 +945,8 @@ export function defineSchedule<
 
   // Validate shift pattern role references
   for (const sp of config.shiftPatterns) {
-    if (sp.roles) {
-      for (const role of sp.roles) {
+    if (sp.roleIds) {
+      for (const role of sp.roleIds) {
         if (!roles.has(role)) {
           throw new Error(
             `Shift pattern "${sp.id}" references unknown role "${role}". ` +
@@ -980,9 +980,9 @@ export function defineSchedule<
         );
       }
     }
-    // Validate skills option
-    if (entry.options.skills) {
-      for (const s of entry.options.skills) {
+    // Validate skillIds option
+    if (entry.options.skillIds) {
+      for (const s of entry.options.skillIds) {
         if (!skills.has(s)) {
           throw new Error(
             `Coverage for "${entry.timeName}" uses skill filter "${s}" ` +
@@ -1002,8 +1002,8 @@ export function defineSchedule<
   const shiftPatterns = config.shiftPatterns;
 
   return {
-    roles: config.roles as readonly string[],
-    skills: (config.skills ?? []) as readonly string[],
+    roleIds: config.roleIds as readonly string[],
+    skillIds: (config.skillIds ?? []) as readonly string[],
     timeNames: Object.keys(config.times) as readonly string[],
     shiftPatternIds: config.shiftPatterns.map((sp) => sp.id) as readonly string[],
     ruleNames: (config.rules ?? []).map((r: RuleEntry) => r._rule) as readonly string[],
@@ -1027,9 +1027,9 @@ export function defineSchedule<
         }
       }
 
-      // Validate member roles/skills reference declared roles/skills
+      // Validate member roleIds/skillIds reference declared roles/skills
       for (const member of args.members) {
-        for (const role of member.roles) {
+        for (const role of member.roleIds) {
           if (!roles.has(role)) {
             throw new Error(
               `Member "${member.id}" references unknown role "${role}". ` +
@@ -1037,8 +1037,8 @@ export function defineSchedule<
             );
           }
         }
-        if (member.skills) {
-          for (const skill of member.skills) {
+        if (member.skillIds) {
+          for (const skill of member.skillIds) {
             if (!skills.has(skill)) {
               throw new Error(
                 `Member "${member.id}" references unknown skill "${skill}". ` +
@@ -1154,29 +1154,29 @@ function buildSimpleCoverageTarget<T extends string>(
   if (Array.isArray(entry.target)) {
     return {
       ...base,
-      roles: entry.target as [string, ...string[]],
+      roleIds: entry.target as [string, ...string[]],
     } satisfies MixedCoverageRequirement<T>;
   }
 
   const singleTarget = entry.target as string;
   if (roles.has(singleTarget)) {
-    if (entry.options.skills) {
+    if (entry.options.skillIds) {
       return {
         ...base,
-        roles: [singleTarget] as [string, ...string[]],
-        skills: entry.options.skills,
+        roleIds: [singleTarget] as [string, ...string[]],
+        skillIds: entry.options.skillIds,
       } satisfies MixedCoverageRequirement<T>;
     }
     return {
       ...base,
-      roles: [singleTarget] as [string, ...string[]],
+      roleIds: [singleTarget] as [string, ...string[]],
     } satisfies MixedCoverageRequirement<T>;
   }
 
   if (skills.has(singleTarget)) {
     return {
       ...base,
-      skills: [singleTarget] as [string, ...string[]],
+      skillIds: [singleTarget] as [string, ...string[]],
     } satisfies MixedCoverageRequirement<T>;
   }
 
@@ -1194,18 +1194,18 @@ function buildVariantCoverageRequirement<T extends string>(
   const variants = entry.variants! as unknown as [CoverageVariant, ...CoverageVariant[]];
 
   const resolveTarget = (): {
-    roles?: [string, ...string[]];
-    skills?: [string, ...string[]];
+    roleIds?: [string, ...string[]];
+    skillIds?: [string, ...string[]];
   } => {
     if (Array.isArray(entry.target)) {
-      return { roles: entry.target as [string, ...string[]] };
+      return { roleIds: entry.target as [string, ...string[]] };
     }
     const singleTarget = entry.target as string;
     if (roles.has(singleTarget)) {
-      return { roles: [singleTarget] as [string, ...string[]] };
+      return { roleIds: [singleTarget] as [string, ...string[]] };
     }
     if (skills.has(singleTarget)) {
-      return { skills: [singleTarget] as [string, ...string[]] };
+      return { skillIds: [singleTarget] as [string, ...string[]] };
     }
     throw new Error(`Coverage target "${singleTarget}" is not a declared role or skill.`);
   };

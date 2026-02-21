@@ -14,7 +14,7 @@ describe("CP-SAT compilation integration", () => {
   it("solves compiled models end-to-end", async () => {
     const builder = new ModelBuilder({
       ...createBaseConfig({
-        roles: ["cashier"],
+        roleIds: ["cashier"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -36,7 +36,7 @@ describe("CP-SAT compilation integration", () => {
 
   it("reports infeasible status for conflicting mandatory rules", async () => {
     const baseConfig = createBaseConfig({
-      roles: ["cook"],
+      roleIds: ["cook"],
       memberIds: ["solo"],
       shift: {
         id: "day",
@@ -77,19 +77,19 @@ describe("CP-SAT compilation integration", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "john", roles: ["staff"] },
-          { id: "mary", roles: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
+          { id: "mary", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "morning",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 13, minutes: 30 },
           },
           {
             id: "afternoon",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -99,7 +99,7 @@ describe("CP-SAT compilation integration", () => {
           // Early morning: only morning shift covers this
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 10, minutes: 0 },
             targetCount: 1,
@@ -108,7 +108,7 @@ describe("CP-SAT compilation integration", () => {
           // Late afternoon: only afternoon shift covers this
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 1,
@@ -145,19 +145,19 @@ describe("CP-SAT compilation integration", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "john", roles: ["staff"] },
-          { id: "mary", roles: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
+          { id: "mary", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "morning",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 13, minutes: 30 },
           },
           {
             id: "afternoon",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -166,7 +166,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 12, minutes: 30 },
             targetCount: 1,
@@ -174,7 +174,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -206,13 +206,13 @@ describe("CP-SAT compilation integration", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "john", roles: ["staff"] },
-          { id: "mary", roles: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
+          { id: "mary", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "full_day",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -221,7 +221,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -245,17 +245,17 @@ describe("CP-SAT compilation integration", () => {
       // Without max-shifts-day rule, one person CAN work both patterns
 
       const builder = new ModelBuilder({
-        members: [{ id: "john", roles: ["staff"] }],
+        members: [{ id: "john", roleIds: ["staff"] }],
         shiftPatterns: [
           {
             id: "morning",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
           },
           {
             id: "afternoon",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -264,7 +264,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
             targetCount: 1,
@@ -272,7 +272,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 1,
@@ -298,17 +298,17 @@ describe("CP-SAT compilation integration", () => {
       const response = await solveWithRules(
         client,
         {
-          members: [{ id: "john", roles: ["staff"] }],
+          members: [{ id: "john", roleIds: ["staff"] }],
           shiftPatterns: [
             {
               id: "morning",
-              roles: ["staff"],
+              roleIds: ["staff"],
               startTime: { hours: 8, minutes: 0 },
               endTime: { hours: 12, minutes: 0 },
             },
             {
               id: "afternoon",
-              roles: ["staff"],
+              roleIds: ["staff"],
               startTime: { hours: 14, minutes: 0 },
               endTime: { hours: 18, minutes: 0 },
             },
@@ -317,7 +317,7 @@ describe("CP-SAT compilation integration", () => {
           coverage: [
             {
               day: "2024-02-01",
-              roles: ["staff"],
+              roleIds: ["staff"],
               startTime: { hours: 8, minutes: 0 },
               endTime: { hours: 12, minutes: 0 },
               targetCount: 1,
@@ -325,7 +325,7 @@ describe("CP-SAT compilation integration", () => {
             },
             {
               day: "2024-02-01",
-              roles: ["staff"],
+              roleIds: ["staff"],
               startTime: { hours: 14, minutes: 0 },
               endTime: { hours: 18, minutes: 0 },
               targetCount: 1,
@@ -353,26 +353,26 @@ describe("CP-SAT compilation integration", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["staff"] },
-          { id: "bob", roles: ["staff"] },
-          { id: "charlie", roles: ["staff"] },
+          { id: "alice", roleIds: ["staff"] },
+          { id: "bob", roleIds: ["staff"] },
+          { id: "charlie", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "opening",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 11, minutes: 0 },
           },
           {
             id: "midday",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
           },
           {
             id: "closing",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 15, minutes: 0 },
             endTime: { hours: 19, minutes: 0 },
           },
@@ -381,7 +381,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 11, minutes: 0 },
             targetCount: 1,
@@ -389,7 +389,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -397,7 +397,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-02-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 15, minutes: 0 },
             endTime: { hours: 19, minutes: 0 },
             targetCount: 1,
@@ -430,15 +430,15 @@ describe("CP-SAT compilation integration", () => {
       // and happy hour (5pm-6pm) needing 1 extra waiter (3 total during that hour)
       const builder = new ModelBuilder({
         members: [
-          { id: "waiter1", roles: ["waiter"] },
-          { id: "waiter2", roles: ["waiter"] },
-          { id: "waiter3", roles: ["waiter"] },
-          { id: "waiter4", roles: ["waiter"] },
+          { id: "waiter1", roleIds: ["waiter"] },
+          { id: "waiter2", roleIds: ["waiter"] },
+          { id: "waiter3", roleIds: ["waiter"] },
+          { id: "waiter4", roleIds: ["waiter"] },
         ],
         shiftPatterns: [
           {
             id: "evening",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -448,7 +448,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner: 5pm-10pm, need 2 waiters
           {
             day: "2024-06-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -457,7 +457,7 @@ describe("CP-SAT compilation integration", () => {
           // Happy hour: 5pm-6pm, need 3 waiters total (overlaps with dinner)
           {
             day: "2024-06-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 3,
@@ -485,21 +485,21 @@ describe("CP-SAT compilation integration", () => {
       // Happy hour needs 2 bartenders (extra bartender during 5-6pm)
       const builder = new ModelBuilder({
         members: [
-          { id: "server1", roles: ["server"] },
-          { id: "server2", roles: ["server"] },
-          { id: "bartender1", roles: ["bartender"] },
-          { id: "bartender2", roles: ["bartender"] },
+          { id: "server1", roleIds: ["server"] },
+          { id: "server2", roleIds: ["server"] },
+          { id: "bartender1", roleIds: ["bartender"] },
+          { id: "bartender2", roleIds: ["bartender"] },
         ],
         shiftPatterns: [
           {
             id: "server_evening",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
           {
             id: "bar_evening",
-            roles: ["bartender"],
+            roleIds: ["bartender"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -509,7 +509,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner servers: 5pm-10pm
           {
             day: "2024-06-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -518,7 +518,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner bartender: 5pm-10pm
           {
             day: "2024-06-01",
-            roles: ["bartender"],
+            roleIds: ["bartender"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 1,
@@ -527,7 +527,7 @@ describe("CP-SAT compilation integration", () => {
           // Happy hour bartenders: 5pm-6pm (overlaps, need 2 total)
           {
             day: "2024-06-01",
-            roles: ["bartender"],
+            roleIds: ["bartender"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 2,
@@ -560,12 +560,12 @@ describe("CP-SAT compilation integration", () => {
       const builder = new ModelBuilder({
         members: Array.from({ length: 6 }, (_, i) => ({
           id: `staff${i + 1}`,
-          roles: ["staff"],
+          roleIds: ["staff"],
         })),
         shiftPatterns: [
           {
             id: "full_day",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 20, minutes: 0 },
           },
@@ -575,7 +575,7 @@ describe("CP-SAT compilation integration", () => {
           // All day: 8am-8pm
           {
             day: "2024-06-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 20, minutes: 0 },
             targetCount: 2,
@@ -584,7 +584,7 @@ describe("CP-SAT compilation integration", () => {
           // Lunch rush: 12pm-2pm
           {
             day: "2024-06-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 12, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 4,
@@ -593,7 +593,7 @@ describe("CP-SAT compilation integration", () => {
           // Peak hour: 12:30pm-1:30pm
           {
             day: "2024-06-01",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 12, minutes: 30 },
             endTime: { hours: 13, minutes: 30 },
             targetCount: 6,
@@ -617,21 +617,21 @@ describe("CP-SAT compilation integration", () => {
       // Without max-shifts-day rule, members can work both shifts
       const builder = new ModelBuilder({
         members: [
-          { id: "server1", roles: ["server"] },
-          { id: "server2", roles: ["server"] },
-          { id: "server3", roles: ["server"] },
-          { id: "server4", roles: ["server"] },
+          { id: "server1", roleIds: ["server"] },
+          { id: "server2", roleIds: ["server"] },
+          { id: "server3", roleIds: ["server"] },
+          { id: "server4", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
             id: "lunch_shift",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
           },
           {
             id: "dinner_shift",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -641,7 +641,7 @@ describe("CP-SAT compilation integration", () => {
           // Lunch: 11am-2pm, need 2 servers
           {
             day: "2024-06-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 2,
@@ -650,7 +650,7 @@ describe("CP-SAT compilation integration", () => {
           // Dinner: 5pm-10pm, need 2 servers
           {
             day: "2024-06-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -678,14 +678,14 @@ describe("CP-SAT compilation integration", () => {
       // Scenario: Need 5 waiters during peak but only have 3
       const builder = new ModelBuilder({
         members: [
-          { id: "waiter1", roles: ["waiter"] },
-          { id: "waiter2", roles: ["waiter"] },
-          { id: "waiter3", roles: ["waiter"] },
+          { id: "waiter1", roleIds: ["waiter"] },
+          { id: "waiter2", roleIds: ["waiter"] },
+          { id: "waiter3", roleIds: ["waiter"] },
         ],
         shiftPatterns: [
           {
             id: "evening",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
           },
@@ -694,7 +694,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-06-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -703,7 +703,7 @@ describe("CP-SAT compilation integration", () => {
           // Happy hour needs 5 total - but we only have 3 waiters!
           {
             day: "2024-06-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 5,
@@ -736,7 +736,7 @@ describe("CP-SAT compilation integration", () => {
       // So a per-week cap should limit Fri and Sat separately.
 
       const baseConfig = createBaseConfig({
-        roles: ["server"],
+        roleIds: ["server"],
         memberIds: ["alice"],
         shift: {
           id: "day",
@@ -815,13 +815,13 @@ describe("CP-SAT compilation integration", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["staff"] },
-          { id: "bob", roles: ["staff"] },
+          { id: "alice", roleIds: ["staff"] },
+          { id: "bob", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "day_shift",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -829,7 +829,7 @@ describe("CP-SAT compilation integration", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: weekdays.map((day) => ({
           day,
-          roles: ["staff"],
+          roleIds: ["staff"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -854,11 +854,11 @@ describe("CP-SAT compilation integration", () => {
     it("covers Wednesday Feb 7 specifically when included in range", async () => {
       // Minimal test: just Wed Feb 7
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["staff"] }],
+        members: [{ id: "alice", roleIds: ["staff"] }],
         shiftPatterns: [
           {
             id: "day_shift",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -867,7 +867,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-02-07",
-            roles: ["staff"],
+            roleIds: ["staff"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -892,7 +892,7 @@ describe("CP-SAT compilation integration", () => {
       // Coverage only requires 10-12 window (where both patterns work)
       // member should only be assigned to ONE of them due to NoOverlap
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -909,7 +909,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
             targetCount: 1,
@@ -933,8 +933,8 @@ describe("CP-SAT compilation integration", () => {
       // Two members can each work one of the overlapping shifts
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"] },
-          { id: "bob", roles: ["server"] },
+          { id: "alice", roleIds: ["server"] },
+          { id: "bob", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -952,7 +952,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 11, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 2,
@@ -978,7 +978,7 @@ describe("CP-SAT compilation integration", () => {
       // Coverage spans longer than any single pattern
       // With only one member and NoOverlap, this is infeasible
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -995,7 +995,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,
@@ -1016,7 +1016,7 @@ describe("CP-SAT compilation integration", () => {
     it("allows member to work two non-overlapping shifts on same day", async () => {
       // Split shift: morning (8-12) then evening (17-21) with gap
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -1033,7 +1033,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 12, minutes: 0 },
             targetCount: 1,
@@ -1041,7 +1041,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 21, minutes: 0 },
             targetCount: 1,
@@ -1075,7 +1075,7 @@ describe("CP-SAT compilation integration", () => {
     it("allows member to work adjacent (touching) shifts", async () => {
       // Back-to-back shifts: morning ends at 14:00, afternoon starts at 14:00
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "morning",
@@ -1092,7 +1092,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 1,
@@ -1126,8 +1126,8 @@ describe("CP-SAT compilation integration", () => {
       // With two members, one can do night and other can do early
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"] },
-          { id: "bob", roles: ["server"] },
+          { id: "alice", roleIds: ["server"] },
+          { id: "bob", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -1145,7 +1145,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 22, minutes: 0 },
             endTime: { hours: 23, minutes: 59 },
             targetCount: 1,
@@ -1153,7 +1153,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-01-02",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 5, minutes: 0 },
             endTime: { hours: 9, minutes: 0 },
             targetCount: 1,
@@ -1189,7 +1189,7 @@ describe("CP-SAT compilation integration", () => {
     it("returns infeasible when single member must cover overlapping cross-midnight shifts", async () => {
       // Only one member, must cover both night and early which overlap
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "night",
@@ -1206,7 +1206,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 22, minutes: 0 },
             endTime: { hours: 23, minutes: 59 },
             targetCount: 1,
@@ -1214,7 +1214,7 @@ describe("CP-SAT compilation integration", () => {
           },
           {
             day: "2024-01-02",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 5, minutes: 0 },
             endTime: { hours: 9, minutes: 0 },
             targetCount: 1,
@@ -1236,7 +1236,7 @@ describe("CP-SAT compilation integration", () => {
     it("shift partially overlapping coverage window contributes to coverage", async () => {
       // 10-18 shift should contribute to 12-14 lunch coverage
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "full_day",
@@ -1248,7 +1248,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 12, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,
@@ -1270,8 +1270,8 @@ describe("CP-SAT compilation integration", () => {
       // Coverage 10-14, served by 10-12 shift + 12-14 shift
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"] },
-          { id: "bob", roles: ["server"] },
+          { id: "alice", roleIds: ["server"] },
+          { id: "bob", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -1289,7 +1289,7 @@ describe("CP-SAT compilation integration", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 1,

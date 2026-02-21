@@ -19,7 +19,7 @@ describe("CP-SAT: weekStartsOn inheritance", () => {
     // So a per-week cap should limit Fri and Sat separately.
 
     const baseConfig = createBaseConfig({
-      roles: ["server"],
+      roleIds: ["server"],
       memberIds: ["alice"],
       shift: {
         id: "day",

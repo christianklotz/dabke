@@ -26,8 +26,8 @@ describe("Skill-based scheduling (integration)", () => {
     // Scenario: Opening requires keyholder - block non-keyholders via time-off
     const baseConfig = createBaseConfig({
       members: [
-        { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
-        { id: "bob", roles: ["waiter"] }, // No keyholder skill
+        { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
+        { id: "bob", roleIds: ["waiter"] }, // No keyholder skill
       ],
       shift: {
         id: "opening",
@@ -67,8 +67,8 @@ describe("Skill-based scheduling (integration)", () => {
     // Scenario: Prefer keyholders for opening shifts
     const baseConfig = createBaseConfig({
       members: [
-        { id: "alice", roles: ["waiter"], skills: ["keyholder"] },
-        { id: "bob", roles: ["waiter"] },
+        { id: "alice", roleIds: ["waiter"], skillIds: ["keyholder"] },
+        { id: "bob", roleIds: ["waiter"] },
       ],
       shift: {
         id: "opening",
@@ -102,13 +102,13 @@ describe("Skill-based scheduling (integration)", () => {
     // Scenario: Kitchen shift only for chefs
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["waiter"] },
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["waiter"] },
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "kitchen",
-          roles: ["chef"], // Only chefs
+          roleIds: ["chef"], // Only chefs
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -117,7 +117,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["chef"],
+          roleIds: ["chef"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -140,13 +140,13 @@ describe("Skill-based scheduling (integration)", () => {
   it("multi-role members can work shifts matching any of their roles", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["waiter", "host"] }, // Multi-role
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["waiter", "host"] }, // Multi-role
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "floor",
-          roles: ["waiter", "host"], // Floor roles
+          roleIds: ["waiter", "host"], // Floor roles
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -155,7 +155,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["waiter"],
+          roleIds: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -178,13 +178,13 @@ describe("Skill-based scheduling (integration)", () => {
   it("returns infeasible when no members match required role", async () => {
     const builder = new ModelBuilder({
       members: [
-        { id: "alice", roles: ["chef"] },
-        { id: "bob", roles: ["chef"] },
+        { id: "alice", roleIds: ["chef"] },
+        { id: "bob", roleIds: ["chef"] },
       ],
       shiftPatterns: [
         {
           id: "floor",
-          roles: ["waiter"], // Need waiters, but have none!
+          roleIds: ["waiter"], // Need waiters, but have none!
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -193,7 +193,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["waiter"],
+          roleIds: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -212,14 +212,14 @@ describe("Skill-based scheduling (integration)", () => {
     // Scenario: Floor shift for waiters, prefer those with senior skill
     const baseConfig = createBaseConfig({
       members: [
-        { id: "alice", roles: ["waiter"], skills: ["senior"] },
-        { id: "bob", roles: ["waiter"] },
-        { id: "charlie", roles: ["waiter"], skills: ["senior"] },
+        { id: "alice", roleIds: ["waiter"], skillIds: ["senior"] },
+        { id: "bob", roleIds: ["waiter"] },
+        { id: "charlie", roleIds: ["waiter"], skillIds: ["senior"] },
       ],
       shiftPatterns: [
         {
           id: "floor",
-          roles: ["waiter"],
+          roleIds: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -228,7 +228,7 @@ describe("Skill-based scheduling (integration)", () => {
       coverage: [
         {
           day: "2024-01-01",
-          roles: ["waiter"],
+          roleIds: ["waiter"],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 2,

@@ -11,7 +11,7 @@ describe("CP-SAT: max-hours-week rule", () => {
 
   it("caps weekly assignments and shifts remaining work to other members", async () => {
     const baseConfig = createBaseConfig({
-      roles: ["bartender"],
+      roleIds: ["bartender"],
       memberIds: ["alice", "bob"],
       shift: {
         id: "swing",

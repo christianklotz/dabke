@@ -11,7 +11,7 @@ describe("CP-SAT: member-assignment-priority rule", () => {
 
   it("favors members with higher assignment priority", async () => {
     const baseConfig = createBaseConfig({
-      roles: ["stocker"],
+      roleIds: ["stocker"],
       shift: {
         id: "day",
         startTime: { hours: 10, minutes: 0 },
@@ -41,7 +41,7 @@ describe("CP-SAT: member-assignment-priority rule", () => {
     // Only one member available (alice with low preference), coverage requires 1
     // The soft preference should not prevent assignment
     const baseConfig = createBaseConfig({
-      roles: ["stocker"],
+      roleIds: ["stocker"],
       memberIds: ["alice"],
       shift: {
         id: "day",
@@ -69,7 +69,7 @@ describe("CP-SAT: member-assignment-priority rule", () => {
     // Bob has high preference, but we need 2 members to cover
     // Alice (no preference specified) should also be assigned
     const baseConfig = createBaseConfig({
-      roles: ["stocker"],
+      roleIds: ["stocker"],
       memberIds: ["alice", "bob"],
       shift: {
         id: "day",

@@ -42,8 +42,8 @@
  * } from "dabke";
  *
  * const schedule = defineSchedule({
- *   roles: ["nurse", "doctor"],
- *   skills: ["charge_nurse"],
+ *   roleIds: ["nurse", "doctor"],
+ *   skillIds: ["charge_nurse"],
  *
  *   times: {
  *     morning_round: time({ startTime: t(7), endTime: t(9) }),
@@ -81,9 +81,9 @@
  *     dateRange: { start: "2026-02-09", end: "2026-02-15" },
  *   },
  *   members: [
- *     { id: "alice", roles: ["nurse"], skills: ["charge_nurse"] },
- *     { id: "bob", roles: ["nurse"] },
- *     { id: "carol", roles: ["doctor"] },
+ *     { id: "alice", roleIds: ["nurse"], skillIds: ["charge_nurse"] },
+ *     { id: "bob", roleIds: ["nurse"] },
+ *     { id: "carol", roleIds: ["doctor"] },
  *   ],
  * });
  *

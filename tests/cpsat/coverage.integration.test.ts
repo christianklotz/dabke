@@ -22,9 +22,9 @@ describe("Coverage requirements (integration)", () => {
       // During 5-6pm overlap: should need max(2,2) = 2 (not 4)
       const builder = new ModelBuilder({
         members: [
-          { id: "bar1", roles: ["bar"] },
-          { id: "bar2", roles: ["bar"] },
-          { id: "bar3", roles: ["bar"] },
+          { id: "bar1", roleIds: ["bar"] },
+          { id: "bar2", roleIds: ["bar"] },
+          { id: "bar3", roleIds: ["bar"] },
         ],
         shiftPatterns: [
           {
@@ -37,7 +37,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["bar"],
+            roleIds: ["bar"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -45,7 +45,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roles: ["bar"],
+            roleIds: ["bar"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
             targetCount: 2,
@@ -66,9 +66,9 @@ describe("Coverage requirements (integration)", () => {
     it("handles overlapping coverage for different roles", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "waiter1", roles: ["waiter"] },
-          { id: "waiter2", roles: ["waiter"] },
-          { id: "bar1", roles: ["bar"] },
+          { id: "waiter1", roleIds: ["waiter"] },
+          { id: "waiter2", roleIds: ["waiter"] },
+          { id: "bar1", roleIds: ["bar"] },
         ],
         shiftPatterns: [
           {
@@ -81,7 +81,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -89,7 +89,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roles: ["bar"],
+            roleIds: ["bar"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 1,
@@ -116,8 +116,8 @@ describe("Coverage requirements (integration)", () => {
     it("handles adjacent non-overlapping coverage periods", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "waiter1", roles: ["waiter"], skills: ["can_close"] },
-          { id: "waiter2", roles: ["waiter"] },
+          { id: "waiter1", roleIds: ["waiter"], skillIds: ["can_close"] },
+          { id: "waiter2", roleIds: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -130,7 +130,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 17, minutes: 0 },
             endTime: { hours: 22, minutes: 0 },
             targetCount: 2,
@@ -138,8 +138,8 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roles: ["waiter"],
-            skills: ["can_close"],
+            roleIds: ["waiter"],
+            skillIds: ["can_close"],
             startTime: { hours: 22, minutes: 0 },
             endTime: { hours: 23, minutes: 0 },
             targetCount: 1,
@@ -160,9 +160,9 @@ describe("Coverage requirements (integration)", () => {
     it("handles staggered overlapping shifts", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "emp1", roles: ["waiter"] },
-          { id: "emp2", roles: ["waiter"] },
-          { id: "emp3", roles: ["waiter"] },
+          { id: "emp1", roleIds: ["waiter"] },
+          { id: "emp2", roleIds: ["waiter"] },
+          { id: "emp3", roleIds: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -180,7 +180,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 7, minutes: 30 },
             endTime: { hours: 10, minutes: 0 },
             targetCount: 1,
@@ -188,7 +188,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 10, minutes: 0 },
             endTime: { hours: 16, minutes: 0 },
             targetCount: 2,
@@ -209,9 +209,9 @@ describe("Coverage requirements (integration)", () => {
     it("handles fully contained coverage period", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "emp1", roles: ["waiter"] },
-          { id: "emp2", roles: ["waiter"] },
-          { id: "emp3", roles: ["waiter"] },
+          { id: "emp1", roleIds: ["waiter"] },
+          { id: "emp2", roleIds: ["waiter"] },
+          { id: "emp3", roleIds: ["waiter"] },
         ],
         shiftPatterns: [
           {
@@ -224,7 +224,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 8, minutes: 0 },
             endTime: { hours: 20, minutes: 0 },
             targetCount: 1,
@@ -232,7 +232,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            roles: ["waiter"],
+            roleIds: ["waiter"],
             startTime: { hours: 12, minutes: 0 },
             endTime: { hours: 14, minutes: 0 },
             targetCount: 2,
@@ -255,9 +255,9 @@ describe("Coverage requirements (integration)", () => {
     it("assigns members matching skill-only coverage requirement", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"], skills: ["keyholder"] },
-          { id: "bob", roles: ["server"] },
-          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
+          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: ["server"] },
+          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -270,7 +270,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skills: ["keyholder"],
+            skillIds: ["keyholder"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -292,9 +292,9 @@ describe("Coverage requirements (integration)", () => {
     it("assigns members matching role AND skills combination", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"], skills: ["keyholder"] },
-          { id: "bob", roles: ["server"] },
-          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
+          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: ["server"] },
+          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -307,8 +307,8 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
-            skills: ["keyholder"],
+            roleIds: ["server"],
+            skillIds: ["keyholder"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -332,11 +332,11 @@ describe("Coverage requirements (integration)", () => {
         members: [
           {
             id: "alice",
-            roles: ["server"],
-            skills: ["keyholder", "senior"],
+            roleIds: ["server"],
+            skillIds: ["keyholder", "senior"],
           },
-          { id: "bob", roles: ["server"], skills: ["keyholder"] },
-          { id: "charlie", roles: ["server"], skills: ["senior"] },
+          { id: "bob", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "charlie", roleIds: ["server"], skillIds: ["senior"] },
         ],
         shiftPatterns: [
           {
@@ -349,7 +349,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skills: ["keyholder", "senior"],
+            skillIds: ["keyholder", "senior"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -371,8 +371,8 @@ describe("Coverage requirements (integration)", () => {
     it("returns infeasible when no members match skill-only requirement", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"] },
-          { id: "bob", roles: ["server"] },
+          { id: "alice", roleIds: ["server"] },
+          { id: "bob", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -385,7 +385,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skills: ["keyholder"],
+            skillIds: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -403,8 +403,8 @@ describe("Coverage requirements (integration)", () => {
     it("returns infeasible when no members match role + skills combination", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"] },
-          { id: "bob", roles: ["chef"], skills: ["keyholder"] },
+          { id: "alice", roleIds: ["server"] },
+          { id: "bob", roleIds: ["chef"], skillIds: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -417,8 +417,8 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
-            skills: ["keyholder"],
+            roleIds: ["server"],
+            skillIds: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -436,9 +436,9 @@ describe("Coverage requirements (integration)", () => {
     it("handles mixed coverage - role-only, skill-only, and combined", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"], skills: ["keyholder"] },
-          { id: "bob", roles: ["server"] },
-          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
+          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: ["server"] },
+          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -451,7 +451,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -459,7 +459,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            skills: ["keyholder"],
+            skillIds: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -480,13 +480,13 @@ describe("Coverage requirements (integration)", () => {
     it("skill-only coverage respects shift pattern role restrictions", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"], skills: ["keyholder"] },
-          { id: "charlie", roles: ["chef"], skills: ["keyholder"] },
+          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "charlie", roleIds: ["chef"], skillIds: ["keyholder"] },
         ],
         shiftPatterns: [
           {
             id: "opening",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
           },
@@ -495,7 +495,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skills: ["keyholder"],
+            skillIds: ["keyholder"],
             startTime: { hours: 7, minutes: 0 },
             endTime: { hours: 15, minutes: 0 },
             targetCount: 1,
@@ -517,8 +517,8 @@ describe("Coverage requirements (integration)", () => {
     it("handles soft priority skill-only coverage", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"] },
-          { id: "bob", roles: ["server"], skills: ["keyholder"] },
+          { id: "alice", roleIds: ["server"] },
+          { id: "bob", roleIds: ["server"], skillIds: ["keyholder"] },
         ],
         shiftPatterns: [
           {
@@ -531,7 +531,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            roles: ["server"],
+            roleIds: ["server"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -539,7 +539,7 @@ describe("Coverage requirements (integration)", () => {
           },
           {
             day: "2024-01-01",
-            skills: ["keyholder"],
+            skillIds: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 1,
@@ -561,9 +561,9 @@ describe("Coverage requirements (integration)", () => {
     it("multiple members can satisfy skill-only coverage with higher target count", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["server"], skills: ["keyholder"] },
-          { id: "bob", roles: ["server"], skills: ["keyholder"] },
-          { id: "charlie", roles: ["server"] },
+          { id: "alice", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: ["server"], skillIds: ["keyholder"] },
+          { id: "charlie", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
@@ -576,7 +576,7 @@ describe("Coverage requirements (integration)", () => {
         coverage: [
           {
             day: "2024-01-01",
-            skills: ["keyholder"],
+            skillIds: ["keyholder"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
             targetCount: 2,

@@ -15,10 +15,10 @@ describe("CP-SAT: scope resolution", () => {
       // Coverage requires only 1 person per day so constraints are satisfiable
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["worker", "student"] },
-          { id: "bob", roles: ["worker", "manager"] },
+          { id: "alice", roleIds: ["worker", "student"] },
+          { id: "bob", roleIds: ["worker", "manager"] },
         ],
-        roles: ["worker"],
+        roleIds: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -78,10 +78,10 @@ describe("CP-SAT: scope resolution", () => {
     it("role-scoped rules override global rules for matching members", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["worker", "student"] },
-          { id: "bob", roles: ["worker"] },
+          { id: "alice", roleIds: ["worker", "student"] },
+          { id: "bob", roleIds: ["worker"] },
         ],
-        roles: ["worker"],
+        roleIds: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -138,15 +138,15 @@ describe("CP-SAT: scope resolution", () => {
     it("applies skill-scoped rules only to members with that skill", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["worker"], skills: ["certified"] },
-          { id: "bob", roles: ["worker"], skills: [] },
+          { id: "alice", roleIds: ["worker"], skillIds: ["certified"] },
+          { id: "bob", roleIds: ["worker"], skillIds: [] },
           {
             id: "charlie",
-            roles: ["worker"],
-            skills: ["certified", "senior"],
+            roleIds: ["worker"],
+            skillIds: ["certified", "senior"],
           },
         ],
-        roles: ["worker"],
+        roleIds: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -205,10 +205,10 @@ describe("CP-SAT: scope resolution", () => {
     it("member scope takes precedence over role scope", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["worker", "student"] },
-          { id: "bob", roles: ["worker", "student"] },
+          { id: "alice", roleIds: ["worker", "student"] },
+          { id: "bob", roleIds: ["worker", "student"] },
         ],
-        roles: ["worker"],
+        roleIds: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },
@@ -264,10 +264,10 @@ describe("CP-SAT: scope resolution", () => {
     it("role scope takes precedence over global scope", async () => {
       const baseConfig = createBaseConfig({
         members: [
-          { id: "alice", roles: ["worker", "intern"] },
-          { id: "bob", roles: ["worker"] },
+          { id: "alice", roleIds: ["worker", "intern"] },
+          { id: "bob", roleIds: ["worker"] },
         ],
-        roles: ["worker"],
+        roleIds: ["worker"],
         shift: {
           id: "day",
           startTime: { hours: 9, minutes: 0 },

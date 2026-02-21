@@ -18,8 +18,8 @@ describe("CP-SAT: overtime rules", () => {
     // With overtime after 24h at 1.5x, solver should spread work to avoid overtime.
     const config = createBaseConfig({
       members: [
-        { id: "alice", roles: ["worker"], pay: { hourlyRate: 2000 } },
-        { id: "bob", roles: ["worker"], pay: { hourlyRate: 2000 } },
+        { id: "alice", roleIds: ["worker"], pay: { hourlyRate: 2000 } },
+        { id: "bob", roleIds: ["worker"], pay: { hourlyRate: 2000 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       schedulingPeriod: {
@@ -54,7 +54,7 @@ describe("CP-SAT: overtime rules", () => {
   it("weekly overtime multiplier: post-solve cost includes overtime", async () => {
     // Force a single member to work all 5 days = 40h, overtime after 24h
     const config = createBaseConfig({
-      members: [{ id: "alice", roles: ["worker"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["worker"], pay: { hourlyRate: 2000 } }],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       schedulingPeriod: {
         dateRange: { start: "2026-02-09", end: "2026-02-13" },
@@ -91,7 +91,7 @@ describe("CP-SAT: overtime rules", () => {
 
   it("weekly overtime surcharge: post-solve cost includes flat surcharge", async () => {
     const config = createBaseConfig({
-      members: [{ id: "alice", roles: ["worker"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["worker"], pay: { hourlyRate: 2000 } }],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       schedulingPeriod: {
         dateRange: { start: "2026-02-09", end: "2026-02-13" },
@@ -128,7 +128,7 @@ describe("CP-SAT: overtime rules", () => {
 
   it("tiered overtime multiplier: correct cost across tiers", async () => {
     const config = createBaseConfig({
-      members: [{ id: "alice", roles: ["worker"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["worker"], pay: { hourlyRate: 2000 } }],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       schedulingPeriod: {
         dateRange: { start: "2026-02-09", end: "2026-02-13" },
@@ -184,8 +184,8 @@ describe("CP-SAT: salaried members", () => {
     // Solver should load work onto the salaried member (cheaper overall).
     const config = createBaseConfig({
       members: [
-        { id: "hourly", roles: ["worker"], pay: { hourlyRate: 3000 } },
-        { id: "salaried", roles: ["worker"], pay: { annual: 5200000, hoursPerWeek: 40 } },
+        { id: "hourly", roleIds: ["worker"], pay: { hourlyRate: 3000 } },
+        { id: "salaried", roleIds: ["worker"], pay: { annual: 5200000, hoursPerWeek: 40 } },
       ],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       schedulingPeriod: {
@@ -215,7 +215,7 @@ describe("CP-SAT: salaried members", () => {
 
   it("salaried member cost is weekly salary", async () => {
     const config = createBaseConfig({
-      members: [{ id: "carol", roles: ["worker"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
+      members: [{ id: "carol", roleIds: ["worker"], pay: { annual: 5200000, hoursPerWeek: 40 } }],
       shift: { id: "day", startTime: { hours: 9, minutes: 0 }, endTime: { hours: 17, minutes: 0 } },
       schedulingPeriod: {
         dateRange: { start: "2026-02-09", end: "2026-02-11" },

@@ -14,8 +14,8 @@ function configField(entry: CpsatRuleConfigEntry, field: string): unknown {
 }
 
 const members = [
-  { id: "alice", roles: ["role"] },
-  { id: "bob", roles: ["role"] },
+  { id: "alice", roleIds: ["role"] },
+  { id: "bob", roleIds: ["role"] },
 ];
 
 describe("CP-SAT rule scoping resolver", () => {
@@ -76,7 +76,7 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const resolved = resolveRuleScopes(entries, [{ id: "alice", roles: ["r"] }]);
+    const resolved = resolveRuleScopes(entries, [{ id: "alice", roleIds: ["r"] }]);
     expect(resolved).toHaveLength(1);
 
     const rule = resolved[0]!;
@@ -156,9 +156,9 @@ describe("CP-SAT rule scoping resolver", () => {
 
   it("expands skill-scoped rules to member IDs", () => {
     const membersWithSkills = [
-      { id: "alice", roles: ["role"], skills: ["first-aid"] },
-      { id: "bob", roles: ["role"], skills: [] },
-      { id: "charlie", roles: ["role"], skills: ["first-aid", "cpr"] },
+      { id: "alice", roleIds: ["role"], skillIds: ["first-aid"] },
+      { id: "bob", roleIds: ["role"], skillIds: [] },
+      { id: "charlie", roleIds: ["role"], skillIds: ["first-aid", "cpr"] },
     ];
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -197,8 +197,8 @@ describe("CP-SAT rule scoping resolver", () => {
     // any members (e.g., due to case mismatch) would cause the rule to fall back to
     // global scope, affecting ALL members instead of none.
     const membersWithCasing = [
-      { id: "Alice", roles: ["role"] }, // Capital A
-      { id: "Bob", roles: ["role"] }, // Capital B
+      { id: "Alice", roleIds: ["role"] }, // Capital A
+      { id: "Bob", roleIds: ["role"] }, // Capital B
     ];
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -250,9 +250,9 @@ describe("CP-SAT rule scoping resolver", () => {
 
   it("role-scoped rules claim members before global rules", () => {
     const membersWithRoles = [
-      { id: "alice", roles: ["student"] },
-      { id: "bob", roles: ["manager"] },
-      { id: "charlie", roles: ["student", "manager"] },
+      { id: "alice", roleIds: ["student"] },
+      { id: "bob", roleIds: ["manager"] },
+      { id: "charlie", roleIds: ["student", "manager"] },
     ];
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -334,9 +334,9 @@ describe("CP-SAT rule scoping resolver", () => {
     ];
 
     const membersWithCharlie = [
-      { id: "alice", roles: ["role"] },
-      { id: "bob", roles: ["role"] },
-      { id: "charlie", roles: ["role"] },
+      { id: "alice", roleIds: ["role"] },
+      { id: "bob", roleIds: ["role"] },
+      { id: "charlie", roleIds: ["role"] },
     ];
 
     const resolved = resolveRuleScopes(entries, membersWithCharlie);
@@ -383,10 +383,10 @@ describe("CP-SAT rule scoping resolver", () => {
     ];
 
     const allMembers = [
-      { id: "alice", roles: ["role"] },
-      { id: "bob", roles: ["role"] },
-      { id: "charlie", roles: ["role"] },
-      { id: "diana", roles: ["role"] },
+      { id: "alice", roleIds: ["role"] },
+      { id: "bob", roleIds: ["role"] },
+      { id: "charlie", roleIds: ["role"] },
+      { id: "diana", roleIds: ["role"] },
     ];
 
     const resolved = resolveRuleScopes(entries, allMembers);

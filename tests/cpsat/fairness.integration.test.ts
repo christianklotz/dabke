@@ -33,13 +33,13 @@ describe("Fair distribution (integration)", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "anne", roles: ["staff"] },
-          { id: "john", roles: ["staff"] },
+          { id: "anne", roleIds: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["staff"] as [string, ...string[]],
+            roleIds: ["staff"] as [string, ...string[]],
             startTime: { hours: 8, minutes: 30 },
             endTime: { hours: 17, minutes: 30 },
           },
@@ -47,7 +47,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
-          roles: ["staff"] as [string, ...string[]],
+          roleIds: ["staff"] as [string, ...string[]],
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 17, minutes: 30 },
           targetCount: 1,
@@ -100,14 +100,14 @@ describe("Fair distribution (integration)", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "anne", roles: ["staff"] },
-          { id: "john", roles: ["staff"] },
-          { id: "mary", roles: ["staff"] },
+          { id: "anne", roleIds: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
+          { id: "mary", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["staff"] as [string, ...string[]],
+            roleIds: ["staff"] as [string, ...string[]],
             startTime: { hours: 8, minutes: 30 },
             endTime: { hours: 17, minutes: 30 },
           },
@@ -115,7 +115,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
-          roles: ["staff"] as [string, ...string[]],
+          roleIds: ["staff"] as [string, ...string[]],
           startTime: { hours: 8, minutes: 30 },
           endTime: { hours: 17, minutes: 30 },
           targetCount: 1,
@@ -157,13 +157,13 @@ describe("Fair distribution (integration)", () => {
       // Fairness should still apply but preference should win
       const baseConfig = {
         members: [
-          { id: "anne", roles: ["staff"] },
-          { id: "john", roles: ["staff"] },
+          { id: "anne", roleIds: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["staff"] as [string],
+            roleIds: ["staff"] as [string],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -171,7 +171,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-08" } },
         coverage: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"].map((day) => ({
           day,
-          roles: ["staff"] as [string, ...string[]],
+          roleIds: ["staff"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,
@@ -212,13 +212,13 @@ describe("Fair distribution (integration)", () => {
 
       const builder = new ModelBuilder({
         members: [
-          { id: "anne", roles: ["staff"] },
-          { id: "john", roles: ["staff"] },
+          { id: "anne", roleIds: ["staff"] },
+          { id: "john", roleIds: ["staff"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["staff"] as [string, ...string[]],
+            roleIds: ["staff"] as [string, ...string[]],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 17, minutes: 0 },
           },
@@ -226,7 +226,7 @@ describe("Fair distribution (integration)", () => {
         schedulingPeriod: { dateRange: { start: days[0]!, end: days[days.length - 1]! } },
         coverage: days.map((day) => ({
           day,
-          roles: ["staff"] as [string, ...string[]],
+          roleIds: ["staff"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
           targetCount: 1,

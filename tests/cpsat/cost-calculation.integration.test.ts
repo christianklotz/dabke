@@ -27,7 +27,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
 
   it("full v2 API cost flow with multiple rules", async () => {
     const restaurant = defineSchedule({
-      roles: ["waiter"],
+      roleIds: ["waiter"],
       times: {
         lunch: time({ startTime: t(12), endTime: t(15) }),
       },
@@ -43,7 +43,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     // Feb 14 2026 = Saturday
     const config = restaurant.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-14", end: "2026-02-14" } },
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);
@@ -74,7 +74,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
 
   it("solver prefers cheaper member with cost optimization", async () => {
     const shop = defineSchedule({
-      roles: ["clerk"],
+      roleIds: ["clerk"],
       times: {
         shift: time({ startTime: t(9), endTime: t(17) }),
       },
@@ -86,8 +86,8 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     const config = shop.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
       members: [
-        { id: "expensive", roles: ["clerk"], pay: { hourlyRate: 5000 } },
-        { id: "cheap", roles: ["clerk"], pay: { hourlyRate: 1500 } },
+        { id: "expensive", roleIds: ["clerk"], pay: { hourlyRate: 5000 } },
+        { id: "cheap", roleIds: ["clerk"], pay: { hourlyRate: 1500 } },
       ],
     });
 
@@ -113,7 +113,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
 
   it("timeSurcharge affects cost correctly for night shift", async () => {
     const bar = defineSchedule({
-      roles: ["bartender"],
+      roleIds: ["bartender"],
       times: {
         night: time({ startTime: t(20), endTime: t(23) }),
       },
@@ -124,7 +124,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
 
     const config = bar.createSchedulerConfig({
       schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "mike", roles: ["bartender"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "mike", roleIds: ["bartender"], pay: { hourlyRate: 2000 } }],
     });
 
     const builder = new ModelBuilder(config);

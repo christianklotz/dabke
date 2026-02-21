@@ -13,11 +13,11 @@ describe("Validation diagnostics (integration)", () => {
   describe("Compile-time errors", () => {
     it("reports coverage error when no eligible team members exist", () => {
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["server"] }],
+        members: [{ id: "alice", roleIds: ["server"] }],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -26,7 +26,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -45,11 +45,11 @@ describe("Validation diagnostics (integration)", () => {
 
     it("reports coverage error when mandatory time-off blocks all members", () => {
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["barista"] }],
+        members: [{ id: "alice", roleIds: ["barista"] }],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -58,7 +58,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -89,11 +89,11 @@ describe("Validation diagnostics (integration)", () => {
   describe("Solve-time violations", () => {
     it("returns coverage violations when soft coverage target cannot be fully met", async () => {
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["barista"] }],
+        members: [{ id: "alice", roleIds: ["barista"] }],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -102,7 +102,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 2,
@@ -131,13 +131,13 @@ describe("Validation diagnostics (integration)", () => {
     it("marks coverage as passed when mandatory coverage is fully satisfied", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["barista"] },
-          { id: "bob", roles: ["barista"] },
+          { id: "alice", roleIds: ["barista"] },
+          { id: "bob", roleIds: ["barista"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -146,7 +146,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -171,18 +171,18 @@ describe("Validation diagnostics (integration)", () => {
       expect(validation.passed.length).toBeGreaterThan(0);
       const coveragePassed = validation.passed.find((p) => p.type === "coverage");
       expect(coveragePassed).toBeDefined();
-      expect(coveragePassed?.roles).toEqual(["barista"]);
+      expect(coveragePassed?.roleIds).toEqual(["barista"]);
     }, 30_000);
   });
 
   describe("Post-solve time-off validation", () => {
     it("detects when non-mandatory time-off preference is violated", async () => {
       const builder = new ModelBuilder({
-        members: [{ id: "alice", roles: ["barista"] }],
+        members: [{ id: "alice", roleIds: ["barista"] }],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -191,7 +191,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -240,13 +240,13 @@ describe("Validation diagnostics (integration)", () => {
     it("reports time-off as passed when member is not scheduled during requested time", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["barista"] },
-          { id: "bob", roles: ["barista"] },
+          { id: "alice", roleIds: ["barista"] },
+          { id: "bob", roleIds: ["barista"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -255,7 +255,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -308,13 +308,13 @@ describe("Validation diagnostics (integration)", () => {
     it("validates time-off with role scoping", async () => {
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["barista"] },
-          { id: "bob", roles: ["server"] },
+          { id: "alice", roleIds: ["barista"] },
+          { id: "bob", roleIds: ["server"] },
         ],
         shiftPatterns: [
           {
             id: "day",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
@@ -323,7 +323,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,
@@ -334,7 +334,7 @@ describe("Validation diagnostics (integration)", () => {
           {
             name: "time-off",
 
-            roles: ["barista"], // Scoped to baristas only
+            roleIds: ["barista"], // Scoped to baristas only
             specificDates: ["2024-02-01"],
             priority: "LOW",
           },
@@ -376,19 +376,19 @@ describe("Validation diagnostics (integration)", () => {
       // and her afternoon time-off should pass
       const builder = new ModelBuilder({
         members: [
-          { id: "alice", roles: ["barista"] },
-          { id: "bob", roles: ["barista"] },
+          { id: "alice", roleIds: ["barista"] },
+          { id: "bob", roleIds: ["barista"] },
         ],
         shiftPatterns: [
           {
             id: "morning",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
           },
           {
             id: "afternoon",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 14, minutes: 0 },
             endTime: { hours: 18, minutes: 0 },
           },
@@ -397,7 +397,7 @@ describe("Validation diagnostics (integration)", () => {
         coverage: [
           {
             day: "2024-02-01",
-            roles: ["barista"],
+            roleIds: ["barista"],
             startTime: { hours: 9, minutes: 0 },
             endTime: { hours: 13, minutes: 0 },
             targetCount: 1,

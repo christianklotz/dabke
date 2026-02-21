@@ -44,10 +44,10 @@ export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 export interface SchedulingMember {
   /** Unique identifier for this member. Must not contain colons. */
   id: string;
-  /** Roles this member can fill (e.g. "nurse", "doctor"). */
-  roles: string[];
-  /** Skills this member has (e.g. "charge_nurse", "forklift"). */
-  skills?: string[];
+  /** Role IDs this member can fill (e.g. "nurse", "doctor"). */
+  roleIds: string[];
+  /** Skill IDs this member has (e.g. "charge_nurse", "forklift"). */
+  skillIds?: string[];
   /** Base pay. Required when cost rules are used. */
   pay?: HourlyPay | SalariedPay;
 }
@@ -67,8 +67,8 @@ export interface SchedulingMember {
  * @example
  * // Role-restricted shifts
  * const patterns: ShiftPattern[] = [
- *   { id: "ward_day", startTime: { hours: 7 }, endTime: { hours: 15 }, roles: ["nurse", "doctor"] },
- *   { id: "reception", startTime: { hours: 8 }, endTime: { hours: 16 }, roles: ["admin"] },
+ *   { id: "ward_day", startTime: { hours: 7 }, endTime: { hours: 15 }, roleIds: ["nurse", "doctor"] },
+ *   { id: "reception", startTime: { hours: 8 }, endTime: { hours: 16 }, roleIds: ["admin"] },
  * ];
  */
 export interface ShiftPattern {
@@ -79,7 +79,7 @@ export interface ShiftPattern {
   id: string;
 
   /**
-   * Restricts who can be assigned to this shift based on their roles.
+   * Restricts who can be assigned to this shift based on their role IDs.
    *
    * - If omitted: anyone can work this shift
    * - If provided: only team members whose roles overlap with this list can be assigned
@@ -88,7 +88,7 @@ export interface ShiftPattern {
    * Use it when different roles have different schedules (e.g., kitchen staff starts
    * earlier than floor staff).
    */
-  roles?: [string, ...string[]];
+  roleIds?: [string, ...string[]];
 
   /**
    * Restricts which days of the week this shift pattern can be used.
@@ -149,16 +149,16 @@ interface CoverageRequirementBase extends TimeInterval {
  */
 interface RoleBasedCoverageRequirement extends CoverageRequirementBase {
   /**
-   * Roles that satisfy this coverage (OR logic).
+   * Role IDs that satisfy this coverage (OR logic).
    * A person matches if they have ANY of these roles.
    * Must have at least one role.
    */
-  roles: [string, ...string[]];
+  roleIds: [string, ...string[]];
   /**
-   * Additional skill filter (AND logic with roles).
+   * Additional skill ID filter (AND logic with roles).
    * If provided, team members must have ALL specified skills in addition to matching a role.
    */
-  skills?: [string, ...string[]];
+  skillIds?: [string, ...string[]];
 }
 
 /**
@@ -169,19 +169,19 @@ interface SkillBasedCoverageRequirement extends CoverageRequirementBase {
   /**
    * Must not be present for skill-based coverage.
    */
-  roles?: never;
+  roleIds?: never;
   /**
-   * Skills required to satisfy this coverage (ALL required, AND logic).
+   * Skill IDs required to satisfy this coverage (ALL required, AND logic).
    * Must have at least one skill.
    */
-  skills: [string, ...string[]];
+  skillIds: [string, ...string[]];
 }
 
 /**
  * Defines staffing needs for a specific time period.
  *
  * This is a discriminated union that enforces at compile time that at least
- * one of `roles` or `skills` must be provided:
+ * one of `roleIds` or `skillIds` must be provided:
  *
  * - Role-based: `{ roles: ["waiter"], ... }` - anyone with ANY of these roles (OR logic)
  * - Role + skill: `{ roles: ["waiter"], skills: ["senior"], ... }` - role AND skills
@@ -189,19 +189,19 @@ interface SkillBasedCoverageRequirement extends CoverageRequirementBase {
  *
  * @example
  * // Need 2 waiters during lunch (role-based)
- * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 14 }, roles: ["waiter"], targetCount: 2, priority: "MANDATORY" }
+ * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 14 }, roleIds: ["waiter"], targetCount: 2, priority: "MANDATORY" }
  *
  * @example
  * // Need 1 manager OR supervisor during service (OR logic on roles)
- * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 22 }, roles: ["manager", "supervisor"], targetCount: 1, priority: "MANDATORY" }
+ * { day: "2024-01-01", startTime: { hours: 11 }, endTime: { hours: 22 }, roleIds: ["manager", "supervisor"], targetCount: 1, priority: "MANDATORY" }
  *
  * @example
  * // Need 1 keyholder for opening (skill-only, any role)
- * { day: "2024-01-01", startTime: { hours: 6 }, endTime: { hours: 8 }, skills: ["keyholder"], targetCount: 1, priority: "MANDATORY" }
+ * { day: "2024-01-01", startTime: { hours: 6 }, endTime: { hours: 8 }, skillIds: ["keyholder"], targetCount: 1, priority: "MANDATORY" }
  *
  * @example
  * // Need 1 senior waiter for training shift (role + skill filter)
- * { day: "2024-01-01", startTime: { hours: 9 }, endTime: { hours: 17 }, roles: ["waiter"], skills: ["senior"], targetCount: 1, priority: "HIGH" }
+ * { day: "2024-01-01", startTime: { hours: 9 }, endTime: { hours: 17 }, roleIds: ["waiter"], skillIds: ["senior"], targetCount: 1, priority: "HIGH" }
  */
 export type CoverageRequirement = RoleBasedCoverageRequirement | SkillBasedCoverageRequirement;
 

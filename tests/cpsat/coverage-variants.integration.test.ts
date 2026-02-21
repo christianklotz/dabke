@@ -22,7 +22,7 @@ describe("Variant coverage (integration)", () => {
       // Scenario: normally need 3 waiters, but only 1 on a specific date.
       // This is the key scenario that simple cover() cannot express.
       const schedule = defineSchedule({
-        roles: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
         times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
         coverage: [cover("dinner", "waiter", { count: 3 }, { count: 1, dates: ["2025-02-05"] })],
         shiftPatterns: [shift("evening", t(17), t(22))],
@@ -31,9 +31,9 @@ describe("Variant coverage (integration)", () => {
       const config = schedule.createSchedulerConfig({
         schedulingPeriod: { dateRange: { start: "2025-02-04", end: "2025-02-06" } },
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
-          { id: "charlie", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
+          { id: "charlie", roleIds: ["waiter"] },
         ],
       });
 
@@ -64,7 +64,7 @@ describe("Variant coverage (integration)", () => {
     it("increases staffing on a specific date above the default", async () => {
       // Scenario: normally need 2 waiters, but 4 on New Year's Eve.
       const schedule = defineSchedule({
-        roles: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
         times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
         coverage: [cover("dinner", "waiter", { count: 2 }, { count: 4, dates: ["2025-02-05"] })],
         shiftPatterns: [shift("evening", t(17), t(22))],
@@ -73,10 +73,10 @@ describe("Variant coverage (integration)", () => {
       const config = schedule.createSchedulerConfig({
         schedulingPeriod: { dateRange: { start: "2025-02-04", end: "2025-02-06" } },
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
-          { id: "charlie", roles: ["waiter"] },
-          { id: "diana", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
+          { id: "charlie", roleIds: ["waiter"] },
+          { id: "diana", roleIds: ["waiter"] },
         ],
       });
 
@@ -107,7 +107,7 @@ describe("Variant coverage (integration)", () => {
     it("applies three-tier variant: weekday, weekend, specific date", async () => {
       // Scenario: 2 on weekdays, 4 on weekends, 6 on a specific Saturday
       const schedule = defineSchedule({
-        roles: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
         times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
         coverage: [
           cover(
@@ -125,12 +125,12 @@ describe("Variant coverage (integration)", () => {
         // 2025-02-07 Fri, 2025-02-08 Sat, 2025-02-09 Sun
         schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-09" } },
         members: [
-          { id: "a", roles: ["waiter"] },
-          { id: "b", roles: ["waiter"] },
-          { id: "c", roles: ["waiter"] },
-          { id: "d", roles: ["waiter"] },
-          { id: "e", roles: ["waiter"] },
-          { id: "f", roles: ["waiter"] },
+          { id: "a", roleIds: ["waiter"] },
+          { id: "b", roleIds: ["waiter"] },
+          { id: "c", roleIds: ["waiter"] },
+          { id: "d", roleIds: ["waiter"] },
+          { id: "e", roleIds: ["waiter"] },
+          { id: "f", roleIds: ["waiter"] },
         ],
       });
 
@@ -161,7 +161,7 @@ describe("Variant coverage (integration)", () => {
     it("only emits coverage for days matching a scoped variant", async () => {
       // Scenario: coverage only on weekends, nothing on weekdays
       const schedule = defineSchedule({
-        roles: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
         times: { brunch: time({ startTime: t(10), endTime: t(14) }) },
         coverage: [cover("brunch", "waiter", { count: 2, dayOfWeek: weekend })],
         shiftPatterns: [shift("brunch_shift", t(10), t(14))],
@@ -171,8 +171,8 @@ describe("Variant coverage (integration)", () => {
         // 2025-02-07 Fri, 2025-02-08 Sat, 2025-02-09 Sun
         schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-09" } },
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
         ],
       });
 
@@ -202,7 +202,7 @@ describe("Variant coverage (integration)", () => {
       // Waiter coverage varies by day (variant form)
       // Manager coverage is constant (simple form)
       const schedule = defineSchedule({
-        roles: ["waiter", "manager"] as const,
+        roleIds: ["waiter", "manager"] as const,
         times: { dinner: time({ startTime: t(17), endTime: t(22) }) },
         coverage: [
           cover("dinner", "waiter", { count: 2 }, { count: 1, dates: ["2025-02-05"] }),
@@ -214,9 +214,9 @@ describe("Variant coverage (integration)", () => {
       const config = schedule.createSchedulerConfig({
         schedulingPeriod: { dateRange: { start: "2025-02-04", end: "2025-02-06" } },
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
-          { id: "charlie", roles: ["manager"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
+          { id: "charlie", roleIds: ["manager"] },
         ],
       });
 
@@ -248,7 +248,7 @@ describe("Variant coverage (integration)", () => {
     it("combines time variants with coverage variants", async () => {
       // Dinner starts later on weekends AND needs more staff
       const schedule = defineSchedule({
-        roles: ["waiter"] as const,
+        roleIds: ["waiter"] as const,
         times: {
           dinner: time(
             { startTime: t(17), endTime: t(22) },
@@ -266,8 +266,8 @@ describe("Variant coverage (integration)", () => {
         // 2025-02-07 Fri, 2025-02-08 Sat
         schedulingPeriod: { dateRange: { start: "2025-02-07", end: "2025-02-08" } },
         members: [
-          { id: "alice", roles: ["waiter"] },
-          { id: "bob", roles: ["waiter"] },
+          { id: "alice", roleIds: ["waiter"] },
+          { id: "bob", roleIds: ["waiter"] },
         ],
       });
 

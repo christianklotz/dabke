@@ -30,13 +30,13 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
 
     const config = {
       members: [
-        { id: "expensive", roles: ["waiter"], pay: { hourlyRate: 3000 } },
-        { id: "cheap", roles: ["waiter"], pay: { hourlyRate: 1000 } },
+        { id: "expensive", roleIds: ["waiter"], pay: { hourlyRate: 3000 } },
+        { id: "cheap", roleIds: ["waiter"], pay: { hourlyRate: 1000 } },
       ],
       shiftPatterns: [
         {
           id: "day",
-          roles: ["waiter"] as [string, ...string[]],
+          roleIds: ["waiter"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -44,7 +44,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       schedulingPeriod: period,
       coverage: days.map((day) => ({
         day,
-        roles: ["waiter"] as [string, ...string[]],
+        roleIds: ["waiter"] as [string, ...string[]],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
         targetCount: 1,
@@ -82,11 +82,11 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
     const days = resolveDaysFromPeriod(period);
 
     const config = {
-      members: [{ id: "alice", roles: ["waiter"], pay: { hourlyRate: 2000 } }],
+      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
       shiftPatterns: [
         {
           id: "day",
-          roles: ["waiter"] as [string, ...string[]],
+          roleIds: ["waiter"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
           endTime: { hours: 17, minutes: 0 },
         },
@@ -94,7 +94,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       schedulingPeriod: period,
       coverage: days.map((day) => ({
         day,
-        roles: ["waiter"] as [string, ...string[]],
+        roleIds: ["waiter"] as [string, ...string[]],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
         targetCount: 1,

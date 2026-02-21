@@ -43,8 +43,8 @@ weekdays, weekend,
 } from "dabke";
 
 const schedule = defineSchedule({
-roles: ["nurse", "doctor"],
-skills: ["charge_nurse"],
+roleIds: ["nurse", "doctor"],
+skillIds: ["charge_nurse"],
 
 times: {
 morning_round: time({ startTime: t(7), endTime: t(9) }),
@@ -83,9 +83,9 @@ schedulingPeriod: {
 dateRange: { start: "2026-02-09", end: "2026-02-15" },
 },
 members: [
-{ id: "alice", roles: ["nurse"], skills: ["charge_nurse"] },
-{ id: "bob", roles: ["nurse"] },
-{ id: "carol", roles: ["doctor"] },
+{ id: "alice", roleIds: ["nurse"], skillIds: ["charge_nurse"] },
+{ id: "bob", roleIds: ["nurse"] },
+{ id: "carol", roleIds: ["doctor"] },
 ],
 });
 
@@ -116,7 +116,7 @@ targets, shift pattern roles). Returns a `ScheduleDefinition` whose
 import { defineSchedule, t, time, cover, shift, maxHoursPerDay } from "dabke";
 
 export default defineSchedule({
-  roles: ["agent", "supervisor"],
+  roleIds: ["agent", "supervisor"],
   times: { peak: time({ startTime: t(9), endTime: t(17) }) },
   coverage: [cover("peak", "agent", 4)],
   shiftPatterns: [shift("day", t(9), t(17))],
@@ -134,8 +134,8 @@ Result of `defineSchedule`.
 
 **Properties:**
 - `createSchedulerConfig: ModelBuilderConfig` — Produce a `ModelBuilderConfig` for the solver.
-- `roles: readonly string[]` — Declared role names.
-- `skills: readonly string[]` — Declared skill names.
+- `roleIds: readonly string[]` — Declared role IDs.
+- `skillIds: readonly string[]` — Declared skill IDs.
 - `timeNames: readonly string[]` — Names of declared semantic times.
 - `shiftPatternIds: readonly string[]` — Shift pattern IDs.
 - `ruleNames: readonly string[]` — Internal rule identifiers in kebab-case (e.g., "max-hours-day", "time-off").
@@ -264,11 +264,11 @@ variant produce no coverage. See `CoverageVariant` for the entry
 shape.
 
 **Target resolution.** The `target` parameter is resolved against declared
-`roles` and `skills`:
+`roleIds` and `skillIds`:
 
 - Single string: matched against roles first, then skills.
 - Array of strings: OR logic (any of the listed roles).
-- With `skills` option (simple form only): role AND skill(s) filter.
+- With `skillIds` option (simple form only): role AND skill(s) filter.
 
 **Example:**
 Basic role coverage
@@ -291,7 +291,7 @@ cover("night_shift", "keyholder", 1)
 **Example:**
 Role with skill filter (role AND skill)
 ```ts
-cover("day_shift", "nurse", 1, { skills: ["charge_nurse"] })
+cover("day_shift", "nurse", 1, { skillIds: ["charge_nurse"] })
 ```
 
 **Example:**
@@ -337,7 +337,7 @@ An entry without `dayOfWeek` or `dates` applies every day in the
 scheduling period.
 
 **Properties:**
-- `skills?: [string, ...string[]]` — Additional skill filter (AND logic with the target role).
+- `skillIds?: [string, ...string[]]` — Additional skill ID filter (AND logic with the target role).
 - `dayOfWeek?: readonly DayOfWeek[]` — Restrict to specific days of the week.
 - `dates?: string[]` — Restrict to specific dates (YYYY-MM-DD).
 - `priority?: Priority` — Defaults to `"MANDATORY"`.
@@ -362,7 +362,7 @@ cover("peak_hours", "agent",
 
 **Properties:**
 - `count: number` — Number of people needed.
-- `dayOfWeek?: readonly DayOfWeek[]` — Restrict this variant to specific days of the week.
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Restrict this variant to specific days of the week.
 - `dates?: string[]` — Restrict this variant to specific dates (YYYY-MM-DD).
 - `priority?: Priority` — Defaults to `"MANDATORY"`.
 
@@ -376,17 +376,17 @@ Creates a `ShiftPattern` (time slot template).
 
 Shift patterns define when people can work: the concrete time slots
 the solver may assign members to. Each pattern repeats across all
-scheduling days unless filtered by `dayOfWeek` or `roles`.
+scheduling days unless filtered by `dayOfWeek` or `roleIds`.
 
 **Example:**
 ```typescript
 shift("early", t(6), t(14)),
 shift("day", t(9), t(17)),
-shift("night", t(22), t(6), { roles: ["nurse", "doctor"] }),
+shift("night", t(22), t(6), { roleIds: ["nurse", "doctor"] }),
 ```
 
 ```ts
-shift(id: string, startTime: TimeOfDay, endTime: TimeOfDay, opts?: Pick<ShiftPattern, "roles" | "dayOfWeek" | "locationId">): ShiftPattern
+shift(id: string, startTime: TimeOfDay, endTime: TimeOfDay, opts?: Pick<ShiftPattern, "roleIds" | "dayOfWeek" | "locationId">): ShiftPattern
 ```
 
 ---
@@ -819,22 +819,27 @@ tieredOvertimeMultiplier(tiers: [OvertimeTier, ...OvertimeTier[]], opts?: CostRu
 
 ### `TimeOfDay`
 
-Time of day representation (hours and minutes, with optional seconds/nanos).
+Time of day representation (hours and minutes).
 
 Used for defining shift start/end times and semantic time boundaries.
 Hours are in 24-hour format (0-23).
 
 **Example:**
 ```typescript
-{ hours: 9, minutes: 0 }
-{ hours: 17, minutes: 30 }
+const morningStart: TimeOfDay = {
+  hours: 9,
+  minutes: 0
+};
+
+const afternoonEnd: TimeOfDay = {
+  hours: 17,
+  minutes: 30
+};
 ```
 
 **Properties:**
 - `hours: number`
 - `minutes: number`
-- `seconds?: number`
-- `nanos?: number`
 
 ### `DayOfWeek`
 
@@ -869,6 +874,15 @@ dayOfWeek: ['wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
 };
 ```
 
+**Example:**
+Only specific dates within the range
+```typescript
+const period: SchedulingPeriod = {
+dateRange: { start: '2025-02-03', end: '2025-02-09' },
+dates: ['2025-02-05', '2025-02-07'],
+};
+```
+
 **Properties:**
 - `dateRange: { start: string; end: string }` — The overall scheduling window (start and end are inclusive).
 Dates should be in YYYY-MM-DD format.
@@ -886,8 +900,8 @@ coverage requirements, rules, and constraints.
 
 **Properties:**
 - `id: string` — Unique identifier for this member. Must not contain colons.
-- `roles: string[]` — Roles this member can fill (e.g. "nurse", "doctor").
-- `skills?: string[]` — Skills this member has (e.g. "charge_nurse", "forklift").
+- `roleIds: string[]` — Role IDs this member can fill (e.g. "nurse", "doctor").
+- `skillIds?: string[]` — Skill IDs this member has (e.g. "charge_nurse", "forklift").
 - `pay?: HourlyPay | SalariedPay` — Base pay. Required when cost rules are used.
 
 ### `HourlyPay`
