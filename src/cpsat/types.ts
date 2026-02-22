@@ -32,6 +32,8 @@ export interface SalariedPay {
  *
  * - `"LOW"`, `"MEDIUM"`, `"HIGH"`: soft constraints with increasing penalty for violations
  * - `"MANDATORY"`: hard constraint; the solver will not produce a solution that violates it
+ *
+ * @category Supporting Types
  */
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
 

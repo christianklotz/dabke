@@ -86,12 +86,18 @@ import type { OvertimeTier } from "./cpsat/rules/overtime-tiered-multiplier.js";
  * ```ts
  * t(17, 30)  // { hours: 17, minutes: 30 }
  * ```
+ *
+ * @category Time Periods
  */
 export function t(hours: number, minutes = 0): TimeOfDay {
   return { hours, minutes };
 }
 
-/** Monday through Friday. */
+/**
+ * Monday through Friday.
+ *
+ * @category Time Periods
+ */
 export const weekdays: readonly DayOfWeek[] = [
   "monday",
   "tuesday",
@@ -100,7 +106,11 @@ export const weekdays: readonly DayOfWeek[] = [
   "friday",
 ] as const;
 
-/** Saturday and Sunday. */
+/**
+ * Saturday and Sunday.
+ *
+ * @category Time Periods
+ */
 export const weekend: readonly DayOfWeek[] = ["saturday", "sunday"] as const;
 
 // ============================================================================
@@ -108,43 +118,33 @@ export const weekend: readonly DayOfWeek[] = ["saturday", "sunday"] as const;
 // ============================================================================
 
 /**
- * Defines a named time window.
+ * Define a named semantic time period.
  *
  * @remarks
- * A semantic time is any recurring period you need to reference:
- * service hours, delivery windows, peak periods, weekly events. Times
- * may overlap (e.g., "dinner" 18:00-22:00 and "happy_hour"
- * 17:30-18:30, or "lunch" 12:00-14:00 with "peak_lunch"
- * 13:00-13:30). Coverage and rules reference these names; each
- * generates independent constraints.
+ * Each entry has `startTime`/`endTime` and optional `dayOfWeek` or `dates`
+ * scoping. Entries without scoping are the default.
  *
- * Every argument is a {@link SemanticTimeVariant} with `startTime`/`endTime`
- * and optional `dayOfWeek`/`dates` scoping. An entry without scoping is the
- * default (applies when no scoped entry matches). At most one default is
- * allowed. If no default, the time only exists on the scoped days.
+ * @example
+ * ```typescript
+ * times: {
+ *   // Simple: same times every day
+ *   lunch: time({ startTime: t(12), endTime: t(15) }),
  *
+ *   // Variants: different times on weekends
+ *   dinner: time(
+ *     { startTime: t(17), endTime: t(21) },
+ *     { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
+ *   ),
+ *
+ *   // Point-in-time window (keyholder at opening)
+ *   opening: time({ startTime: t(8, 30), endTime: t(9) }),
+ * }
+ * ```
+ *
+ * @privateRemarks
  * Resolution precedence: `dates` > `dayOfWeek` > default.
  *
- * @example Every day
- * ```typescript
- * day_shift: time({ startTime: t(7), endTime: t(15) }),
- * ```
- *
- * @example Default with weekend variant
- * ```typescript
- * peak_hours: time(
- *   { startTime: t(9), endTime: t(17) },
- *   { startTime: t(10), endTime: t(15), dayOfWeek: weekend },
- * ),
- * ```
- *
- * @example No default (specific days only)
- * ```typescript
- * happy_hour: time(
- *   { startTime: t(16), endTime: t(18), dayOfWeek: ["monday", "tuesday"] },
- *   { startTime: t(17), endTime: t(19), dayOfWeek: ["friday"] },
- * ),
- * ```
+ * @category Time Periods
  */
 export function time(
   ...entries: [SemanticTimeVariant, ...SemanticTimeVariant[]]
@@ -215,74 +215,37 @@ export interface CoverageEntry<T extends string = string, R extends string = str
  * Defines a staffing requirement for a semantic time period.
  *
  * @remarks
- * Two call forms are supported:
- *
- * **Simple form** `cover(time, target, count, opts?)` creates a single
- * constraint. Use `dayOfWeek`/`dates` in `opts` to restrict which days
- * it applies to.
- *
- * **Variant form** `cover(time, target, ...variants)` accepts one or more
- * {@link CoverageVariant} entries with day-specific counts. For each
- * scheduling day, exactly one variant is selected using the same
- * precedence as {@link time}: `dates` > `dayOfWeek` > default (unscoped).
- * At most one variant may be unscoped (the default). Days with no matching
- * variant produce no coverage. See {@link CoverageVariant} for the entry
- * shape.
- *
- * **Target resolution.** The `target` parameter is resolved against declared
- * `roleIds` and `skillIds`:
- *
- * - Single string: matched against roles first, then skills.
- * - Array of strings: OR logic (any of the listed roles).
- * - With `skillIds` option (simple form only): role AND skill(s) filter.
+ * Entries for the same time and role **stack additively**.
+ * For weekday vs weekend staffing, use mutually exclusive `dayOfWeek`
+ * on both entries.
  *
  * @param timeName - Name of a declared semantic time
- * @param target - Role name, skill name, or array of role names (OR)
- * @param count - Number of people needed (simple form)
- * @param opts - See {@link CoverageOptions} (simple form)
+ * @param target - Role name (string), array of role names (OR logic), or skill name
+ * @param count - Number of people needed
+ * @param opts - Options: `skillIds` (AND filter), `dayOfWeek`, `dates`, `priority`
  *
- * @example Basic role coverage
- * ```ts
- * cover("day_shift", "nurse", 3)
+ * @example
+ * ```typescript
+ * coverage: [
+ *   // 2 waiters during lunch
+ *   cover("lunch", "waiter", 2),
+ *
+ *   // 1 manager OR supervisor during dinner
+ *   cover("dinner", ["manager", "supervisor"], 1),
+ *
+ *   // 1 person with keyholder skill at opening
+ *   cover("opening", "keyholder", 1),
+ *
+ *   // 1 senior waiter (role + skill AND)
+ *   cover("lunch", "waiter", 1, { skillIds: ["senior"] }),
+ *
+ *   // Different counts by day (mutually exclusive dayOfWeek!)
+ *   cover("lunch", "waiter", 2, { dayOfWeek: weekdays }),
+ *   cover("lunch", "waiter", 3, { dayOfWeek: weekend }),
+ * ]
  * ```
  *
- * @example OR logic (any of the listed roles)
- * ```ts
- * cover("day_shift", ["manager", "team_lead"], 1)
- * ```
- *
- * @example Skill-based coverage
- * ```ts
- * cover("night_shift", "keyholder", 1)
- * ```
- *
- * @example Role with skill filter (role AND skill)
- * ```ts
- * cover("day_shift", "nurse", 1, { skillIds: ["charge_nurse"] })
- * ```
- *
- * @example Day-of-week scoping (simple form)
- * ```ts
- * cover("peak_hours", "cashier", 3, { dayOfWeek: weekdays }),
- * cover("peak_hours", "cashier", 5, { dayOfWeek: weekend }),
- * ```
- *
- * @example Default with date override (variant form)
- * ```ts
- * cover("peak_hours", "agent",
- *   { count: 4 },
- *   { count: 2, dates: ["2025-12-24"] },
- * )
- * ```
- *
- * @example Weekday vs weekend with holiday override (variant form)
- * ```ts
- * cover("peak_hours", "agent",
- *   { count: 3, dayOfWeek: weekdays },
- *   { count: 5, dayOfWeek: weekend },
- *   { count: 8, dates: ["2025-12-31"] },
- * )
- * ```
+ * @category Coverage
  */
 export function cover<T extends string, R extends string>(
   timeName: T,
@@ -338,19 +301,29 @@ export function cover<T extends string, R extends string>(
 // ============================================================================
 
 /**
- * Creates a {@link ShiftPattern} (time slot template).
+ * Define a shift pattern: a time slot available for employee assignment.
  *
  * @remarks
- * Shift patterns define when people can work: the concrete time slots
- * the solver may assign members to. Each pattern repeats across all
- * scheduling days unless filtered by `dayOfWeek` or `roleIds`.
+ * Each pattern repeats daily unless filtered by `dayOfWeek`.
  *
  * @example
  * ```typescript
- * shift("early", t(6), t(14)),
- * shift("day", t(9), t(17)),
- * shift("night", t(22), t(6), { roleIds: ["nurse", "doctor"] }),
+ * shiftPatterns: [
+ *   shift("morning", t(11, 30), t(15)),
+ *   shift("evening", t(17), t(22)),
+ *
+ *   // Role-restricted shift
+ *   shift("kitchen", t(6), t(14), { roleIds: ["chef", "prep_cook"] }),
+ *
+ *   // Day-restricted shift
+ *   shift("saturday_short", t(9), t(14), { dayOfWeek: ["saturday"] }),
+ *
+ *   // Location-specific shift
+ *   shift("terrace_lunch", t(12), t(16), { locationId: "terrace" }),
+ * ]
  * ```
+ *
+ * @category Shift Patterns
  */
 export function shift(
   id: string,
@@ -373,21 +346,13 @@ export function shift(
  * Scoping options shared by most rule functions.
  *
  * @remarks
- * Each rule function returns an opaque {@link RuleEntry} for the `rules`
- * array. Most accept a `RuleOptions` parameter for scoping and priority.
+ * Default priority is `MANDATORY`. Use `appliesTo` to scope to a
+ * role, skill, or member ID. Use time scoping options (`dayOfWeek`,
+ * `dateRange`, `dates`) to limit when the rule applies.
+ * Not all rules support all scoping options. Entity-only rules
+ * (e.g., {@link maxConsecutiveDays}) ignore time scoping.
  *
- * **Entity scoping.** `appliesTo` targets a role name, skill name, or
- * member ID. It is resolved against declared roles first, then skills,
- * then runtime member IDs. The namespaces are guaranteed disjoint by
- * validation. Unscoped rules apply to all members.
- *
- * **Time scoping.** `dayOfWeek`, `dateRange`, `dates`, and
- * `recurringPeriods` narrow when the rule is active. Unscoped rules
- * apply to every day in the scheduling period.
- *
- * **Priority.** Defaults to `MANDATORY` (hard constraint the solver
- * must satisfy). Use `LOW`, `MEDIUM`, or `HIGH` for soft preferences
- * the solver may violate when necessary.
+ * @category Rules
  */
 export interface RuleOptions {
   /** Who this rule applies to (role name, skill name, or member ID). */
@@ -492,138 +457,144 @@ function makeRule(rule: CpsatRuleName, fields: Record<string, unknown>): RuleEnt
 }
 
 /**
- * Limits how many hours a person can work in a single day.
+ * Limits hours per day.
  *
- * @example Global limit
- * ```ts
+ * @example
+ * ```typescript
  * maxHoursPerDay(10)
+ * maxHoursPerDay(4, { appliesTo: "student", dayOfWeek: weekdays })
  * ```
  *
- * @example Scoped to a role
- * ```ts
- * maxHoursPerDay(6, { appliesTo: "student" })
- * ```
+ * @category Rules
  */
 export function maxHoursPerDay(hours: number, opts?: RuleOptions): RuleEntry {
   return makeRule("max-hours-day", { hours, ...opts });
 }
 
 /**
- * Caps total hours a person can work within each scheduling week.
+ * Limits hours per scheduling week.
  *
- * @example Global cap
- * ```ts
+ * @example
+ * ```typescript
  * maxHoursPerWeek(48)
+ * maxHoursPerWeek(20, { appliesTo: "student" })
  * ```
  *
- * @example Part-time cap for a skill group
- * ```ts
- * maxHoursPerWeek(20, { appliesTo: "part_time" })
- * ```
+ * @category Rules
  */
 export function maxHoursPerWeek(hours: number, opts?: RuleOptions): RuleEntry {
   return makeRule("max-hours-week", { hours, ...opts });
 }
 
 /**
- * Ensures a person works at least a minimum number of hours per day when assigned.
+ * Minimum hours when assigned on a day.
  *
  * @example
- * ```ts
+ * ```typescript
  * minHoursPerDay(4)
  * ```
+ *
+ * @category Rules
  */
 export function minHoursPerDay(hours: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-hours-day", { hours, ...opts });
 }
 
 /**
- * Enforces a minimum total number of hours per scheduling week.
+ * Minimum hours per scheduling week.
  *
- * @example Guaranteed minimum for full-time members
- * ```ts
- * minHoursPerWeek(30, { appliesTo: "full_time" })
+ * @example
+ * ```typescript
+ * minHoursPerWeek(20, { priority: "HIGH" })
  * ```
+ *
+ * @category Rules
  */
 export function minHoursPerWeek(hours: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-hours-week", { hours, ...opts });
 }
 
 /**
- * Limits how many shifts a person can work in a single day.
+ * Maximum distinct shifts per day.
  *
- * @example One shift per day
- * ```ts
+ * @example
+ * ```typescript
  * maxShiftsPerDay(1)
+ * maxShiftsPerDay(2, { appliesTo: "student", dayOfWeek: weekend })
  * ```
+ *
+ * @category Rules
  */
 export function maxShiftsPerDay(shifts: number, opts?: RuleOptions): RuleEntry {
   return makeRule("max-shifts-day", { shifts, ...opts });
 }
 
 /**
- * Limits how many consecutive days a person can be assigned.
+ * Maximum consecutive working days.
  *
- * @example Five-day work week limit
- * ```ts
+ * @example
+ * ```typescript
  * maxConsecutiveDays(5)
  * ```
+ *
+ * @category Rules
  */
 export function maxConsecutiveDays(days: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("max-consecutive-days", { days, ...opts });
 }
 
 /**
- * Requires a minimum stretch of consecutive working days once assigned.
+ * Once working, continue for at least this many consecutive days.
  *
  * @example
- * ```ts
- * minConsecutiveDays(2)
+ * ```typescript
+ * minConsecutiveDays(2, { priority: "HIGH" })
  * ```
+ *
+ * @category Rules
  */
 export function minConsecutiveDays(days: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-consecutive-days", { days, ...opts });
 }
 
 /**
- * Enforces a minimum rest period between any two shifts a person works.
+ * Minimum rest hours between shifts.
  *
- * @example EU Working Time Directive (11 hours)
- * ```ts
- * minRestBetweenShifts(11)
+ * @example
+ * ```typescript
+ * minRestBetweenShifts(10)
  * ```
+ *
+ * @category Rules
  */
 export function minRestBetweenShifts(hours: number, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("min-rest-between-shifts", { hours, ...opts });
 }
 
 /**
- * Adds objective weight to prefer or avoid assigning team members.
+ * Prefer (`"high"`) or avoid (`"low"`) assigning. Requires `appliesTo`.
  *
- * @param level - `"high"` to prefer assigning, `"low"` to avoid
- * @param opts - Entity and time scoping (no priority; preference is the priority mechanism)
- *
- * @example Prefer assigning full-time staff
- * ```ts
- * preference("high", { appliesTo: "full_time" })
+ * @example
+ * ```typescript
+ * preference("high", { appliesTo: "waiter" })
+ * preference("low", { appliesTo: "student", dayOfWeek: weekdays })
  * ```
  *
- * @example Avoid assigning a specific member on weekends
- * ```ts
- * preference("low", { appliesTo: "alice", dayOfWeek: weekend })
- * ```
+ * @category Rules
  */
 export function preference(level: "high" | "low", opts?: Omit<RuleOptions, "priority">): RuleEntry {
   return makeRule("assignment-priority", { preference: level, ...opts });
 }
 
 /**
- * Prefers assigning a person to shift patterns at a specific location.
+ * Prefer assigning to shifts at a specific location. Requires `appliesTo`.
  *
  * @example
- * ```ts
- * preferLocation("north_wing", { appliesTo: "alice" })
+ * ```typescript
+ * preferLocation("terrace", { appliesTo: "alice" })
  * ```
+ *
+ * @category Rules
  */
 export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions): RuleEntry {
   return makeRule("location-preference", { locationId, ...opts });
@@ -640,10 +611,22 @@ export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions)
  * For salaried members, adds a fixed weekly salary cost when they have
  * any assignment that week (zero marginal cost up to contracted hours).
  *
+ * Cost modifiers adjust the calculation:
+ * - `dayMultiplier(factor, opts?)` - multiply base rate on specific days
+ * - `daySurcharge(amount, opts?)` - flat extra per hour on specific days
+ * - `timeSurcharge(amount, window, opts?)` - flat extra per hour during a time window
+ * - `overtimeMultiplier({ after, factor }, opts?)` - weekly overtime multiplier
+ * - `overtimeSurcharge({ after, amount }, opts?)` - weekly overtime surcharge
+ * - `dailyOvertimeMultiplier({ after, factor }, opts?)` - daily overtime multiplier
+ * - `dailyOvertimeSurcharge({ after, amount }, opts?)` - daily overtime surcharge
+ * - `tieredOvertimeMultiplier(tiers, opts?)` - multiple overtime thresholds
+ *
  * @example
  * ```ts
  * minimizeCost()
  * ```
+ *
+ * @category Rules
  */
 export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
   return makeRule("minimize-cost", { ...opts });
@@ -800,33 +783,37 @@ export function tieredOvertimeMultiplier(
 }
 
 /**
- * Blocks or penalizes assignments during specified time periods.
- *
- * @remarks
- * At least one time scoping field is required (`dayOfWeek`, `dateRange`,
- * `dates`, or `recurringPeriods`).
- *
- * Use `from` for "off from this time until end of day" and `until` for
- * "off from start of day until this time."
+ * Block assignments during specified periods.
+ * Requires at least one time scope (`dayOfWeek`, `dateRange`, `dates`, or `from`/`until`).
  *
  * @example
  * ```typescript
- * timeOff({ appliesTo: "mauro", dayOfWeek: weekend }),
- * timeOff({ appliesTo: "student", dayOfWeek: ["wednesday"], from: t(14) }),
- * timeOff({ appliesTo: "alice", dateRange: { start: "2024-02-01", end: "2024-02-05" } }),
+ * // Full days off
+ * timeOff({ appliesTo: "alice", dateRange: { start: "2024-02-01", end: "2024-02-05" } })
+ *
+ * // Every weekend off
+ * timeOff({ appliesTo: "mauro", dayOfWeek: weekend })
+ *
+ * // Wednesday afternoons off
+ * timeOff({ appliesTo: "student", dayOfWeek: ["wednesday"], from: t(14) })
  * ```
+ *
+ * @category Rules
  */
 export function timeOff(opts: TimeOffOptions): RuleEntry {
   return makeRule("time-off", { ...opts });
 }
 
 /**
- * Encourages or enforces that team members work the same shifts on a day.
+ * Members work the same shifts on days they are both assigned.
  *
  * @example
  * ```typescript
- * assignTogether(["alice", "bob"], { priority: "HIGH" }),
+ * assignTogether(["alice", "bob"])
+ * assignTogether(["alice", "bob", "charlie"], { priority: "HIGH" })
  * ```
+ *
+ * @category Rules
  */
 export function assignTogether(
   members: [string, string, ...string[]],
@@ -905,26 +892,58 @@ export interface ScheduleConfig<
 }
 
 /**
- * Defines a complete schedule configuration.
+ * Define a complete schedule configuration.
  *
- * @remarks
- * Validates the static config at call time (role/skill disjointness, coverage
- * targets, shift pattern roles). Returns a {@link ScheduleDefinition} whose
- * `createSchedulerConfig` method validates runtime data (member IDs,
- * `appliesTo` resolution) and produces a {@link ModelBuilderConfig}.
+ * @param config - Schedule configuration object with:
+ *   - `roleIds` (required): declared role names
+ *   - `skillIds` (optional): declared skill names
+ *   - `times` (required): named semantic time periods (see {@link time})
+ *   - `coverage` (required): staffing requirements (see {@link cover})
+ *   - `shiftPatterns` (required): available shifts (see {@link shift})
+ *   - `rules` (optional): constraints and preferences (see rule functions)
+ *   - `dayOfWeek` (optional): days the business operates (inclusion filter)
+ *   - `weekStartsOn` (optional): defaults to `"monday"`
  *
  * @example
  * ```typescript
- * import { defineSchedule, t, time, cover, shift, maxHoursPerDay } from "dabke";
+ * import {
+ *   defineSchedule, t, time, cover, shift,
+ *   maxHoursPerWeek, minRestBetweenShifts, timeOff,
+ *   weekdays, weekend,
+ * } from "dabke";
  *
  * export default defineSchedule({
- *   roleIds: ["agent", "supervisor"],
- *   times: { peak: time({ startTime: t(9), endTime: t(17) }) },
- *   coverage: [cover("peak", "agent", 4)],
- *   shiftPatterns: [shift("day", t(9), t(17))],
- *   rules: [maxHoursPerDay(8)],
+ *   roleIds: ["waiter", "runner", "manager"],
+ *   skillIds: ["senior"],
+ *
+ *   times: {
+ *     lunch: time({ startTime: t(12), endTime: t(15) }),
+ *     dinner: time(
+ *       { startTime: t(17), endTime: t(21) },
+ *       { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
+ *     ),
+ *   },
+ *
+ *   coverage: [
+ *     cover("lunch", "waiter", 2),
+ *     cover("dinner", "waiter", 4, { dayOfWeek: weekdays }),
+ *     cover("dinner", "waiter", 6, { dayOfWeek: weekend }),
+ *   ],
+ *
+ *   shiftPatterns: [
+ *     shift("morning", t(11, 30), t(15)),
+ *     shift("evening", t(17), t(22)),
+ *   ],
+ *
+ *   rules: [
+ *     maxHoursPerWeek(48),
+ *     minRestBetweenShifts(10),
+ *     timeOff({ appliesTo: "alice", dayOfWeek: weekend }),
+ *   ],
  * });
  * ```
+ *
+ * @category Schedule Definition
  */
 export function defineSchedule<
   const R extends readonly string[],

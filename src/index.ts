@@ -1,10 +1,5 @@
 /**
- * Scheduling library powered by constraint programming (CP-SAT).
- *
- * Define teams, shifts, coverage, and rules declaratively. dabke compiles
- * them into a constraint model and solves for an optimized schedule.
- *
- * @remarks
+ * @privateRemarks
  * ## Core Concepts
  *
  * **Schedule Definition**: The primary API. Small, composable functions
@@ -32,69 +27,6 @@
  * static definition with runtime data (members, scheduling period).
  * {@link ModelBuilder} compiles the config into a solver request;
  * {@link HttpSolverClient} sends it to the CP-SAT solver.
- *
- * @example Define a schedule
- * ```typescript
- * import {
- *   defineSchedule, t, time, cover, shift,
- *   maxHoursPerWeek, minRestBetweenShifts, timeOff,
- *   weekdays, weekend,
- * } from "dabke";
- *
- * const schedule = defineSchedule({
- *   roleIds: ["nurse", "doctor"],
- *   skillIds: ["charge_nurse"],
- *
- *   times: {
- *     morning_round: time({ startTime: t(7), endTime: t(9) }),
- *     day_ward: time({ startTime: t(7), endTime: t(15) }),
- *     night_ward: time({ startTime: t(23), endTime: t(7) }),
- *   },
- *
- *   coverage: [
- *     cover("morning_round", "doctor", 1),
- *     cover("day_ward", "nurse", 3, { dayOfWeek: weekdays }),
- *     cover("day_ward", "nurse", 2, { dayOfWeek: weekend }),
- *     cover("night_ward", "nurse", 2),
- *     cover("night_ward", "charge_nurse", 1),
- *   ],
- *
- *   shiftPatterns: [
- *     shift("day", t(7), t(15)),
- *     shift("night", t(23), t(7)),
- *   ],
- *
- *   rules: [
- *     maxHoursPerWeek(40),
- *     minRestBetweenShifts(11),
- *     timeOff({ appliesTo: "alice", dayOfWeek: weekend }),
- *   ],
- * });
- * ```
- *
- * @example Solve a schedule
- * ```typescript
- * import { ModelBuilder, HttpSolverClient, parseSolverResponse } from "dabke";
- *
- * const config = schedule.createSchedulerConfig({
- *   schedulingPeriod: {
- *     dateRange: { start: "2026-02-09", end: "2026-02-15" },
- *   },
- *   members: [
- *     { id: "alice", roleIds: ["nurse"], skillIds: ["charge_nurse"] },
- *     { id: "bob", roleIds: ["nurse"] },
- *     { id: "carol", roleIds: ["doctor"] },
- *   ],
- * });
- *
- * const builder = new ModelBuilder(config);
- * const { request, canSolve, validation } = builder.compile();
- * if (canSolve) {
- *   const client = new HttpSolverClient(fetch, "http://localhost:8080");
- *   const response = await client.solve(request);
- *   const result = parseSolverResponse(response);
- * }
- * ```
  *
  * @packageDocumentation
  */

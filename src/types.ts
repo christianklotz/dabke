@@ -12,6 +12,8 @@ import * as z from "zod";
 
 /**
  * Day of the week identifier.
+ *
+ * @category Supporting Types
  */
 export type DayOfWeek =
   | "monday"
@@ -37,23 +39,9 @@ export const DayOfWeekSchema = z.union([
 ]);
 
 /**
- * Time of day representation (hours and minutes).
+ * Time of day (24-hour format).
  *
- * Used for defining shift start/end times and semantic time boundaries.
- * Hours are in 24-hour format (0-23).
- *
- * @example
- * ```typescript
- * const morningStart: TimeOfDay = {
- *   hours: 9,
- *   minutes: 0
- * };
- *
- * const afternoonEnd: TimeOfDay = {
- *   hours: 17,
- *   minutes: 30
- * };
- * ```
+ * @category Supporting Types
  */
 export interface TimeOfDay {
   hours: number;

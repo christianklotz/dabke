@@ -3,15 +3,20 @@
 /**
  * Generates llms.txt and src/llms.ts from TSDoc in the source files.
  *
- * All content comes from TSDoc. The generator controls only ordering:
- * which symbols appear and in what section order. The overview comes
- * from @packageDocumentation in index.ts; sections group symbols under
- * headings.
+ * Symbols opt in via `@category <Section Name>` in their TSDoc. The
+ * generator discovers all categorized exports, groups them by category,
+ * and renders them in the order defined by SECTION_ORDER. Symbols
+ * without `@category` are excluded from llms.txt (they remain in
+ * TypeDoc and IDE tooltips).
+ *
+ * The overview comes from `@packageDocumentation` in index.ts.
  *
  * TSDoc filtering:
- *   - @internal members are excluded from interface property lists
- *   - @privateRemarks content is omitted
- *   - {@link Foo} references are converted to plain `Foo` in output
+ *   - `@category` controls inclusion and grouping
+ *   - `@internal` members are excluded from interface property lists
+ *   - `@privateRemarks` content is omitted
+ *   - Only the first `@example` per symbol is rendered
+ *   - `{@link Foo}` references are converted to plain `Foo` in output
  */
 
 import * as ts from "typescript";
@@ -26,75 +31,18 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 // ============================================================================
 // Document structure.
 //
-// Each section has a heading and a list of exported symbol names whose
-// TSDoc is extracted and rendered. Order here is the reading order in
-// llms.txt. All descriptive content comes from TSDoc in the source files.
+// Section order for llms.txt. Only categories listed here are rendered;
+// any @category value not in this list is ignored with a warning.
+// All descriptive content comes from TSDoc in the source files.
 // ============================================================================
 
-interface Section {
-  heading: string;
-  symbols: string[];
-}
-
-const SECTIONS: Section[] = [
-  {
-    heading: "Schedule Definition",
-    symbols: ["defineSchedule", "ScheduleDefinition", "RuntimeArgs"],
-  },
-  {
-    heading: "Time Periods",
-    symbols: ["t", "time", "weekdays", "weekend"],
-  },
-  {
-    heading: "Coverage",
-    symbols: ["cover", "CoverageOptions", "CoverageVariant"],
-  },
-  {
-    heading: "Shift Patterns",
-    symbols: ["shift"],
-  },
-  {
-    heading: "Rules",
-    symbols: [
-      "RuleOptions",
-      "EntityOnlyRuleOptions",
-      "TimeOffOptions",
-      "CostRuleOptions",
-      "maxHoursPerDay",
-      "maxHoursPerWeek",
-      "minHoursPerDay",
-      "minHoursPerWeek",
-      "maxShiftsPerDay",
-      "maxConsecutiveDays",
-      "minConsecutiveDays",
-      "minRestBetweenShifts",
-      "preference",
-      "preferLocation",
-      "timeOff",
-      "assignTogether",
-      "minimizeCost",
-      "dayMultiplier",
-      "daySurcharge",
-      "timeSurcharge",
-      "overtimeMultiplier",
-      "overtimeSurcharge",
-      "dailyOvertimeMultiplier",
-      "dailyOvertimeSurcharge",
-      "tieredOvertimeMultiplier",
-    ],
-  },
-  {
-    heading: "Supporting Types",
-    symbols: [
-      "TimeOfDay",
-      "DayOfWeek",
-      "SchedulingPeriod",
-      "SchedulingMember",
-      "HourlyPay",
-      "SalariedPay",
-      "Priority",
-    ],
-  },
+const SECTION_ORDER = [
+  "Schedule Definition",
+  "Time Periods",
+  "Coverage",
+  "Shift Patterns",
+  "Rules",
+  "Supporting Types",
 ];
 
 // ============================================================================
@@ -129,11 +77,24 @@ function isInternal(node: ts.Node): boolean {
   return doc?.tags?.some((t) => t.tagName.text === "internal") ?? false;
 }
 
+/** Extract the @category value from a node's JSDoc. */
+function extractCategory(node: ts.Node): string | undefined {
+  const doc = getJSDocNode(node);
+  if (!doc?.tags) return undefined;
+  for (const tag of doc.tags) {
+    if (tag.tagName.text === "category") {
+      return (tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "").trim() || undefined;
+    }
+  }
+  return undefined;
+}
+
 function extractJSDoc(node: ts.Node): string {
   const doc = getJSDocNode(node);
   if (!doc) return "";
 
   let result = doc.comment ? ts.getTextOfJSDocComment(doc.comment) || "" : "";
+  let exampleRendered = false;
 
   for (const tag of doc.tags ?? []) {
     // Skip tags that should not appear in public output
@@ -143,11 +104,15 @@ function extractJSDoc(node: ts.Node): string {
     if (tag.tagName.text === "module") continue;
     if (tag.tagName.text === "param") continue;
     if (tag.tagName.text === "returns") continue;
+    if (tag.tagName.text === "category") continue;
 
     const text = tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "";
     if (!text) continue;
     if (tag.tagName.text === "remarks") result += `\n\n${text}`;
-    if (tag.tagName.text === "example") result += `\n\n**Example:**\n${text}`;
+    if (tag.tagName.text === "example" && !exampleRendered) {
+      result += `\n\n${text}`;
+      exampleRendered = true;
+    }
   }
   return stripLinks(result);
 }
@@ -198,7 +163,7 @@ function extractPackageDoc(program: ts.Program, filePath: string): string {
       const text = tag.comment ? ts.getTextOfJSDocComment(tag.comment) || "" : "";
       if (!text) continue;
       if (tag.tagName.text === "remarks") result += `\n\n${text}`;
-      if (tag.tagName.text === "example") result += `\n\n**Example:**\n${text}`;
+      if (tag.tagName.text === "example") result += `\n\n${text}`;
     }
     return stripLinks(result);
   }
@@ -231,7 +196,7 @@ function typeToString(checker: ts.TypeChecker, node: ts.Node, maxLen = 2000): st
 }
 
 // ============================================================================
-// Symbol lookup
+// Symbol extraction
 // ============================================================================
 
 interface DocEntry {
@@ -245,61 +210,53 @@ interface DocEntry {
   returnsDoc?: string;
 }
 
-function extractSymbol(
-  program: ts.Program,
+function extractDocEntry(
   checker: ts.TypeChecker,
   name: string,
+  node: ts.Node,
+  sf: ts.SourceFile,
 ): DocEntry | undefined {
-  for (const sf of program.getSourceFiles()) {
-    if (sf.isDeclarationFile) continue;
-    const found = findNamedExport(sf, name);
-    if (!found) continue;
-
-    if (ts.isInterfaceDeclaration(found)) {
+  if (ts.isInterfaceDeclaration(node)) {
+    return {
+      name,
+      kind: "interface",
+      description: extractJSDoc(node),
+      properties: extractProperties(checker, node),
+    };
+  }
+  if (ts.isTypeAliasDeclaration(node)) {
+    return {
+      name,
+      kind: "type",
+      description: extractJSDoc(node),
+      signature: typeToString(checker, node.type),
+    };
+  }
+  if (ts.isFunctionDeclaration(node)) {
+    const docNode = findDocumentedOverload(sf, name) ?? node;
+    return {
+      name,
+      kind: "function",
+      description: extractJSDoc(docNode),
+      parameters: docNode.parameters.map((p) => ({
+        name: p.name.getText(),
+        type: sourceType(p) ?? typeToString(checker, p),
+        description: cleanParamDescription(extractParamDoc(docNode, p.name.getText())),
+        optional: !!p.questionToken,
+      })),
+      returnType: docNode.type ? docNode.type.getText() : "void",
+      returnsDoc: extractReturnsDoc(docNode),
+    };
+  }
+  if (ts.isVariableStatement(node)) {
+    const decl = node.declarationList.declarations[0];
+    if (decl) {
       return {
         name,
-        kind: "interface",
-        description: extractJSDoc(found),
-        properties: extractProperties(checker, found),
+        kind: "const",
+        description: extractJSDoc(node),
+        signature: typeToString(checker, decl),
       };
-    }
-    if (ts.isTypeAliasDeclaration(found)) {
-      return {
-        name,
-        kind: "type",
-        description: extractJSDoc(found),
-        signature: typeToString(checker, found.type),
-      };
-    }
-    if (ts.isFunctionDeclaration(found)) {
-      // For overloaded functions the JSDoc lives on the first overload
-      // signature, but we want params/return from whichever node has
-      // the doc. Find the documented overload if it differs from found.
-      const docNode = findDocumentedOverload(sf, name) ?? found;
-      return {
-        name,
-        kind: "function",
-        description: extractJSDoc(docNode),
-        parameters: docNode.parameters.map((p) => ({
-          name: p.name.getText(),
-          type: sourceType(p) ?? typeToString(checker, p),
-          description: cleanParamDescription(extractParamDoc(docNode, p.name.getText())),
-          optional: !!p.questionToken,
-        })),
-        returnType: docNode.type ? docNode.type.getText() : "void",
-        returnsDoc: extractReturnsDoc(docNode),
-      };
-    }
-    if (ts.isVariableStatement(found)) {
-      const decl = found.declarationList.declarations[0];
-      if (decl) {
-        return {
-          name,
-          kind: "const",
-          description: extractJSDoc(found),
-          signature: typeToString(checker, decl),
-        };
-      }
     }
   }
   return undefined;
@@ -337,54 +294,64 @@ function findDocumentedOverload(
   return found;
 }
 
+/** Extract the exported name from a declaration node, if any. */
+function getExportedName(node: ts.Node): string | undefined {
+  const hasExport =
+    ts.canHaveModifiers(node) &&
+    ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+  if (!hasExport) return undefined;
+
+  if (
+    ts.isInterfaceDeclaration(node) ||
+    ts.isTypeAliasDeclaration(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isFunctionDeclaration(node)
+  ) {
+    return node.name?.text;
+  }
+  if (ts.isVariableStatement(node)) {
+    const decl = node.declarationList.declarations[0];
+    if (decl && ts.isIdentifier(decl.name)) return decl.name.text;
+  }
+  return undefined;
+}
+
 /**
- * Find an exported declaration by name.
- * For functions, returns the first matching declaration (typically the
- * first overload signature). Use {@link findDocumentedOverload} to get
- * the overload that carries JSDoc.
+ * Discover all exported symbols that have a @category tag.
+ * Returns a map from category name to ordered list of DocEntry.
  */
-function findNamedExport(sf: ts.SourceFile, name: string): ts.Node | undefined {
-  let result: ts.Node | undefined;
-  const visit = (node: ts.Node): void => {
-    if (result) return;
-    const hasExport =
-      ts.canHaveModifiers(node) &&
-      ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-    if (!hasExport) {
-      if (ts.isSourceFile(node) || ts.isModuleBlock(node)) {
-        ts.forEachChild(node, visit);
+function discoverCategories(program: ts.Program, checker: ts.TypeChecker): Map<string, DocEntry[]> {
+  const groups = new Map<string, DocEntry[]>();
+  const seen = new Set<string>();
+
+  for (const sf of program.getSourceFiles()) {
+    if (sf.isDeclarationFile) continue;
+
+    ts.forEachChild(sf, (node) => {
+      const name = getExportedName(node);
+      if (!name || seen.has(name)) return;
+
+      // For overloaded functions, check all overloads for @category.
+      // The category tag lives on the documented overload (no body).
+      let categoryNode: ts.Node = node;
+      if (ts.isFunctionDeclaration(node)) {
+        const docOverload = findDocumentedOverload(sf, name);
+        if (docOverload) categoryNode = docOverload;
       }
-      return;
-    }
-    if (
-      (ts.isInterfaceDeclaration(node) ||
-        ts.isTypeAliasDeclaration(node) ||
-        ts.isClassDeclaration(node)) &&
-      node.name?.text === name
-    ) {
-      result = node;
-      return;
-    }
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) {
-      if (node.body) {
-        result = node;
-      } else if (!result) {
-        // Keep the first overload as a fallback
-        result = node;
-      }
-      return;
-    }
-    if (ts.isVariableStatement(node)) {
-      for (const decl of node.declarationList.declarations) {
-        if (ts.isIdentifier(decl.name) && decl.name.text === name) {
-          result = node;
-          return;
-        }
-      }
-    }
-  };
-  ts.forEachChild(sf, visit);
-  return result;
+
+      const category = extractCategory(categoryNode);
+      if (!category) return;
+      seen.add(name);
+
+      const entry = extractDocEntry(checker, name, node, sf);
+      if (!entry) return;
+
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category)!.push(entry);
+    });
+  }
+
+  return groups;
 }
 
 function extractProperties(
@@ -462,8 +429,9 @@ function renderDoc(doc: DocEntry): string {
         if (doc.returnsDoc) ret += ` — ${doc.returnsDoc}`;
         out += `${ret}\n\n`;
       }
-    } else {
-      // Compact: single signature line when no @param descriptions
+    } else if (!doc.description?.includes("```")) {
+      // Compact signature line, but only when no example code block
+      // is already present (examples demonstrate usage better).
       const params = doc.parameters
         .map((p) => {
           const opt = p.optional ? "?" : "";
@@ -502,17 +470,21 @@ function main(): void {
     content += `${overview}\n\n`;
   }
 
-  // -- Sections --
-  for (const section of SECTIONS) {
-    const entries: DocEntry[] = [];
-    for (const sym of section.symbols) {
-      const doc = extractSymbol(program, checker, sym);
-      if (doc) entries.push(doc);
-      else console.warn(`Warning: symbol "${sym}" not found`);
-    }
-    if (entries.length === 0) continue;
+  // -- Sections from @category tags --
+  const discovered = discoverCategories(program, checker);
 
-    content += `---\n\n## ${section.heading}\n\n`;
+  // Warn about categories not in SECTION_ORDER
+  for (const cat of discovered.keys()) {
+    if (!SECTION_ORDER.includes(cat)) {
+      console.warn(`Warning: @category "${cat}" is not in SECTION_ORDER — skipped`);
+    }
+  }
+
+  for (const heading of SECTION_ORDER) {
+    const entries = discovered.get(heading);
+    if (!entries?.length) continue;
+
+    content += `---\n\n## ${heading}\n\n`;
     for (const entry of entries) content += renderDoc(entry);
   }
 
