@@ -116,20 +116,23 @@ export function t(hours: number, minutes = 0): TimeOfDay {
  *
  * @category Time Periods
  */
-export const weekdays: readonly [DayOfWeek, ...DayOfWeek[]] = [
+export const weekdays = [
   "monday",
   "tuesday",
   "wednesday",
   "thursday",
   "friday",
-] as const;
+] as const satisfies readonly [DayOfWeek, ...DayOfWeek[]];
 
 /**
  * Saturday and Sunday.
  *
  * @category Time Periods
  */
-export const weekend: readonly [DayOfWeek, ...DayOfWeek[]] = ["saturday", "sunday"] as const;
+export const weekend = ["saturday", "sunday"] as const satisfies readonly [
+  DayOfWeek,
+  ...DayOfWeek[],
+];
 
 // ============================================================================
 // Semantic Times
@@ -1000,8 +1003,7 @@ export interface SolveOptions {
    * Fixed assignments from a prior solve (e.g., rolling schedule).
    * These are injected as fixed variables in the solver.
    *
-   * Not yet implemented. Providing pinned assignments logs a warning
-   * and proceeds without them.
+   * Not yet implemented. Providing pinned assignments throws an error.
    */
   pinned?: ShiftAssignment[];
 }

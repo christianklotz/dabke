@@ -1,9 +1,5 @@
-import {
-  type FetcherLike,
-  type SolverClient,
-  type SolverRequest,
-  type SolverResponse,
-} from "./client.types.js";
+import { type FetcherLike, type SolverClient, type SolverRequest } from "./client.types.js";
+import { SolverResponseSchema } from "./client.schemas.js";
 
 export type {
   SolverClient,
@@ -37,7 +33,7 @@ export class HttpSolverClient implements SolverClient {
     this.#baseUrl = baseUrl.replace(/\/$/, "");
   }
 
-  async solve(request: SolverRequest, options?: { signal?: AbortSignal }): Promise<SolverResponse> {
+  async solve(request: SolverRequest, options?: { signal?: AbortSignal }) {
     const res = await this.#fetch(`${this.#baseUrl}/solve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,7 +51,7 @@ export class HttpSolverClient implements SolverClient {
       throw new Error("Solver returned an empty response");
     }
 
-    return JSON.parse(bodyText) as SolverResponse;
+    return SolverResponseSchema.parse(JSON.parse(bodyText));
   }
 
   async health(): Promise<void> {

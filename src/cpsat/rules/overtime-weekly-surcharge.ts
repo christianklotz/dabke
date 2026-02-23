@@ -19,6 +19,7 @@ import {
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
+import { patternDurationMinutes } from "./cost-utils.js";
 
 const OvertimeWeeklySurchargeSchema = z
   .object({
@@ -31,12 +32,6 @@ const OvertimeWeeklySurchargeSchema = z
 
 /** Configuration for {@link createOvertimeWeeklySurchargeRule}. */
 export type OvertimeWeeklySurchargeConfig = z.infer<typeof OvertimeWeeklySurchargeSchema>;
-
-function patternDurationMinutes(pattern: ShiftPattern): number {
-  const start = timeOfDayToMinutes(pattern.startTime);
-  const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
-  return end - start;
-}
 
 /**
  * Creates a weekly overtime flat surcharge rule.

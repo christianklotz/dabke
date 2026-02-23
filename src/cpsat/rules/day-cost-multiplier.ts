@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
 import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
-import { timeOfDayToMinutes, normalizeEndMinutes } from "../utils.js";
+import { COST_CATEGORY } from "../cost.js";
 import {
   entityScope,
   timeScope,
@@ -11,6 +11,7 @@ import {
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
+import { getHourlyRate, patternDurationMinutes } from "./cost-utils.js";
 
 const DayCostMultiplierSchema = z
   .object({
@@ -21,18 +22,6 @@ const DayCostMultiplierSchema = z
 
 /** Configuration for {@link createDayCostMultiplierRule}. */
 export type DayCostMultiplierConfig = z.infer<typeof DayCostMultiplierSchema>;
-
-function getHourlyRate(emp: SchedulingMember): number | undefined {
-  if (!emp.pay) return undefined;
-  if ("hourlyRate" in emp.pay) return emp.pay.hourlyRate;
-  return undefined;
-}
-
-function patternDurationMinutes(pattern: ShiftPattern): number {
-  const start = timeOfDayToMinutes(pattern.startTime);
-  const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
-  return end - start;
-}
 
 /**
  * Creates a day-based rate multiplier rule.
@@ -113,7 +102,7 @@ export function createDayCostMultiplierRule(config: DayCostMultiplierConfig): Co
         entries.push({
           memberId: a.memberId,
           day: a.day,
-          category: "premium",
+          category: COST_CATEGORY.PREMIUM,
           amount,
         });
       }

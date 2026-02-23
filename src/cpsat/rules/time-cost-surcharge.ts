@@ -3,6 +3,7 @@ import type { CompilationRule, CostContribution } from "../model-builder.js";
 import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { TimeOfDay } from "../../types.js";
 import type { ShiftAssignment } from "../response.js";
+import { COST_CATEGORY } from "../cost.js";
 import { timeOfDayToMinutes, normalizeEndMinutes, MINUTES_PER_DAY } from "../utils.js";
 import {
   entityScope,
@@ -158,7 +159,7 @@ export function createTimeCostSurchargeRule(config: TimeCostSurchargeConfig): Co
         entries.push({
           memberId: a.memberId,
           day: a.day,
-          category: "premium",
+          category: COST_CATEGORY.PREMIUM,
           amount,
         });
       }

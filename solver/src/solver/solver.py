@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Iterable
 
 from ortools.sat.python import cp_model
 
@@ -74,7 +74,7 @@ def _expression_range(terms: list[Term], bounds: dict[str, _VariableBounds]) -> 
     return min_expr, max_expr
 
 
-def _sum_expr(exprs: list[cp_model.LinearExpr]) -> Optional[cp_model.LinearExpr]:
+def _sum_expr(exprs: list[cp_model.LinearExpr]) -> cp_model.LinearExpr | None:
     if not exprs:
         return None
     total = exprs[0]
@@ -319,9 +319,10 @@ def solve_request(request: SolverRequest) -> SolverResponse:
         status_text = status_map.get(int(status), "ERROR")
 
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            solution_info = solver.response_proto.solution_info
             return SolverResponse(
                 status=status_text,
-                solutionInfo=solver.response_proto.solution_info or None,
+                **({"solutionInfo": solution_info} if solution_info else {}),
             )
 
         statistics: dict[str, int | float] = {
@@ -349,11 +350,13 @@ def solve_request(request: SolverRequest) -> SolverResponse:
                 )
             )
 
+        solution_info = solver.response_proto.solution_info
         return SolverResponse(
             status=status_text,
             values={name: int(solver.value(var)) for name, var in vars_map.items()},
             statistics=statistics,
-            softViolations=soft_violations if soft_violations else None,
+            **({"solutionInfo": solution_info} if solution_info else {}),
+            softViolations=soft_violations,
         )
     except Exception as exc:  # pragma: no cover - surfaced in response
         return SolverResponse(status="ERROR", error=str(exc))

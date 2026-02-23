@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { CompilationRule, CostContribution } from "../model-builder.js";
 import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
-import { timeOfDayToMinutes, normalizeEndMinutes } from "../utils.js";
+import { COST_CATEGORY } from "../cost.js";
 import {
   entityScope,
   timeScope,
@@ -11,6 +11,7 @@ import {
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
+import { patternDurationMinutes } from "./cost-utils.js";
 
 const DayCostSurchargeSchema = z
   .object({
@@ -21,12 +22,6 @@ const DayCostSurchargeSchema = z
 
 /** Configuration for {@link createDayCostSurchargeRule}. */
 export type DayCostSurchargeConfig = z.infer<typeof DayCostSurchargeSchema>;
-
-function patternDurationMinutes(pattern: ShiftPattern): number {
-  const start = timeOfDayToMinutes(pattern.startTime);
-  const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
-  return end - start;
-}
 
 /**
  * Creates a day-based flat surcharge rule.
@@ -95,7 +90,7 @@ export function createDayCostSurchargeRule(config: DayCostSurchargeConfig): Comp
         entries.push({
           memberId: a.memberId,
           day: a.day,
-          category: "premium",
+          category: COST_CATEGORY.PREMIUM,
           amount,
         });
       }

@@ -19,6 +19,7 @@ import {
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
+import { getHourlyRate, patternDurationMinutes } from "./cost-utils.js";
 
 const OvertimeTierSchema = z.object({
   after: z.number().min(0),
@@ -42,18 +43,6 @@ const OvertimeTieredMultiplierSchema = z
 
 /** Configuration for {@link createOvertimeTieredMultiplierRule}. */
 export type OvertimeTieredMultiplierConfig = z.infer<typeof OvertimeTieredMultiplierSchema>;
-
-function getHourlyRate(emp: SchedulingMember): number | undefined {
-  if (!emp.pay) return undefined;
-  if ("hourlyRate" in emp.pay) return emp.pay.hourlyRate;
-  return undefined;
-}
-
-function patternDurationMinutes(pattern: ShiftPattern): number {
-  const start = timeOfDayToMinutes(pattern.startTime);
-  const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
-  return end - start;
-}
 
 /**
  * Creates a multi-threshold weekly overtime multiplier rule.

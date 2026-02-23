@@ -27,7 +27,7 @@ import type {
   CpsatRuleName,
 } from "./rules.types.js";
 
-export const builtInCpsatRuleFactories: BuiltInCpsatRuleFactories = {
+export const builtInCpsatRuleFactories = {
   "assign-together": createAssignTogetherRule,
   "assignment-priority": createAssignmentPriorityRule,
   "location-preference": createLocationPreferenceRule,
@@ -49,7 +49,7 @@ export const builtInCpsatRuleFactories: BuiltInCpsatRuleFactories = {
   "overtime-daily-multiplier": createOvertimeDailyMultiplierRule,
   "overtime-daily-surcharge": createOvertimeDailySurchargeRule,
   "overtime-tiered-multiplier": createOvertimeTieredMultiplierRule,
-};
+} satisfies BuiltInCpsatRuleFactories;
 
 /**
  * Creates a rule factory map, preventing overriding built-in rules.

@@ -4,12 +4,7 @@ import type { CompilationRule, CostContribution } from "../model-builder.js";
 import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { ShiftAssignment } from "../response.js";
 import { COST_CATEGORY } from "../cost.js";
-import {
-  OBJECTIVE_WEIGHTS,
-  timeOfDayToMinutes,
-  normalizeEndMinutes,
-  splitIntoWeeks,
-} from "../utils.js";
+import { OBJECTIVE_WEIGHTS, splitIntoWeeks } from "../utils.js";
 import {
   entityScope,
   timeScope,
@@ -18,6 +13,7 @@ import {
   resolveMembersFromScope,
   resolveActiveDaysFromScope,
 } from "./scope.types.js";
+import { getHourlyRate, getSalariedPay, patternDurationMinutes } from "./cost-utils.js";
 
 const MinimizeCostSchema = entityScope(["members", "roles", "skills"]).and(
   timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]),
@@ -25,29 +21,6 @@ const MinimizeCostSchema = entityScope(["members", "roles", "skills"]).and(
 
 /** Configuration for {@link createMinimizeCostRule}. */
 export type MinimizeCostConfig = z.infer<typeof MinimizeCostSchema>;
-
-/** Returns the hourly rate for a member, or undefined if not hourly. */
-function getHourlyRate(member: SchedulingMember): number | undefined {
-  if (!member.pay) return undefined;
-  if ("hourlyRate" in member.pay) return member.pay.hourlyRate;
-  return undefined;
-}
-
-/** Returns salaried pay info, or undefined if not salaried. */
-function getSalariedPay(
-  member: SchedulingMember,
-): { annual: number; hoursPerWeek: number } | undefined {
-  if (!member.pay) return undefined;
-  if ("annual" in member.pay) return member.pay;
-  return undefined;
-}
-
-/** Computes shift duration in minutes from a pattern. */
-function patternDurationMinutes(pattern: ShiftPattern): number {
-  const start = timeOfDayToMinutes(pattern.startTime);
-  const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
-  return end - start;
-}
 
 /**
  * Creates the minimize-cost rule.

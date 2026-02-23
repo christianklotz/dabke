@@ -18,7 +18,7 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "scheduler-solver"}
 
 
-@app.post("/solve", response_model=SolverResponse)
+@app.post("/solve", response_model=SolverResponse, response_model_exclude_unset=True)
 async def solve(request: SolverRequest) -> SolverResponse:
     """Solve a scheduling model described by primitive constraints."""
     return solve_request(request)

@@ -25,8 +25,7 @@ Options for `Schedule.solve` and `Schedule.compile`.
 - `pinned?: ShiftAssignment[]` — Fixed assignments from a prior solve (e.g., rolling schedule).
 These are injected as fixed variables in the solver.
 
-Not yet implemented. Providing pinned assignments logs a warning
-and proceeds without them.
+Not yet implemented. Providing pinned assignments throws an error.
 
 ### `ScheduleConfig`
 
@@ -130,7 +129,7 @@ t(9)   // { hours: 9, minutes: 0 }
 Monday through Friday.
 
 ```typescript
-readonly [DayOfWeek, ...DayOfWeek[]]
+readonly ["monday", "tuesday", "wednesday", "thursday", "friday"]
 ```
 
 ### `weekend`
@@ -138,7 +137,7 @@ readonly [DayOfWeek, ...DayOfWeek[]]
 Saturday and Sunday.
 
 ```typescript
-readonly [DayOfWeek, ...DayOfWeek[]]
+readonly ["saturday", "sunday"]
 ```
 
 ### `time`

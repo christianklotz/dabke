@@ -59,19 +59,15 @@ export function normalizeEndMinutes(startMinutes: number, endMinutes: number): n
   return endMinutes < startMinutes ? endMinutes + MINUTES_PER_DAY : endMinutes;
 }
 
+const PRIORITY_PENALTIES = {
+  LOW: 1,
+  MEDIUM: 10,
+  HIGH: 25,
+  MANDATORY: 0,
+} as const satisfies Record<Priority, number>;
+
 export function priorityToPenalty(priority: Priority): number {
-  switch (priority) {
-    case "HIGH":
-      return 25;
-    case "MEDIUM":
-      return 10;
-    case "LOW":
-      return 1;
-    case "MANDATORY":
-      return 0;
-    default:
-      return 0;
-  }
+  return PRIORITY_PENALTIES[priority];
 }
 
 /**

@@ -35,6 +35,7 @@
 
 import * as z from "zod";
 import { DayOfWeekSchema, type DayOfWeek } from "../../types.js";
+import { toDayOfWeekUTC } from "../../datetime.utils.js";
 import type { SchedulingMember } from "../types.js";
 import { parseDayString } from "../utils.js";
 import { assertSafeKeySegments, type ValidationGroup } from "../validation.types.js";
@@ -499,8 +500,7 @@ export function resolveActiveDaysFromScope(scope: ParsedTimeScope, allDays: stri
       const targetDays = new Set(scope.days);
       return allDays.filter((day) => {
         const date = parseDayString(day);
-        const dayName = getDayOfWeekName(date.getUTCDay());
-        return targetDays.has(dayName);
+        return targetDays.has(toDayOfWeekUTC(date));
       });
     }
     case "recurring":
@@ -516,21 +516,6 @@ export function resolveActiveDaysFromScope(scope: ParsedTimeScope, allDays: stri
 // ============================================================================
 // Internal Helpers
 // ============================================================================
-
-type DayName = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
-
-function getDayOfWeekName(dayIndex: number): DayName {
-  const names: Record<number, DayName> = {
-    0: "sunday",
-    1: "monday",
-    2: "tuesday",
-    3: "wednesday",
-    4: "thursday",
-    5: "friday",
-    6: "saturday",
-  };
-  return names[dayIndex % 7] ?? "sunday";
-}
 
 function isDateInRecurringPeriod(
   month: number,
