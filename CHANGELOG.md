@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.82.0 (2026-02-23)
+
+### Breaking Changes
+
+- **Replace `defineSchedule` with `schedule`/`with`/`compile`/`solve` API**: the
+  `defineSchedule()` function, `ScheduleDefinition`, and `RuntimeArgs` are removed.
+  Use `schedule()` to create an immutable `Schedule`, compose data with `.with()`,
+  and execute via `.compile()` or `.solve()`.
+- **Rename `roles`/`skills` back to `roleIds`/`skillIds`**: all public type fields and
+  function options (`SchedulingMember`, `ShiftPattern`, coverage types, `ScheduleConfig`)
+  revert to `roleIds`/`skillIds` for unambiguous signaling to LLM consumers.
+- **Redesign validation message architecture**: `ValidationGroup` now uses deterministic
+  structural keys (e.g. `rule:max-hours-week:40:roles:nurse`) instead of counter-based
+  IDs. Validation items use a unified `message` field replacing `reason`/`description`.
+  `ValidationSummary.title` replaces `description`.
+- **Trim public API surface** (102 to 86 exports): remove internal types
+  (`ValidationReporter`, `ValidationContext`, `CostContext`, `ModelBuilderOptions`,
+  `CoverageRequirement`, `CpsatRuleRegistry`, `DateTime`), legacy validation, and
+  unused datetime utilities.
+- **`SolveResult` status** uses lowercase strings: `optimal`, `feasible`, `infeasible`,
+  `no_solution`.
+
+### Improvements
+
+- `solve()` runs post-solve validation automatically; `SolveResult.validation` includes
+  soft constraint violations.
+- `ScheduleConfig` requires `times`, `coverage`, `shiftPatterns`; `partialSchedule()`
+  allows partial configs for composition via `.with()`.
+- Eager validation in `.with()` for role/skill disjointness and member references.
+- All `dayOfWeek` fields typed as `readonly [DayOfWeek, ...DayOfWeek[]]` consistently.
+- Add constraint IDs, group keys, and `trackConstraint()` to all soft rules for
+  post-solve verification.
+- Add `@category` TSDoc tags to all public exports for structured documentation.
+- Restructure docs reference nav with automated category-driven generation.
+
 ## 0.81.1 (2026-02-20)
 
 ### Documentation
