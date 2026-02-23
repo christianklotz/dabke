@@ -212,6 +212,8 @@ export type ConcreteCoverageRequirement =
  *   { count: 2, dates: ["2025-12-24"] },
  * )
  * ```
+ *
+ * @category Coverage
  */
 export interface CoverageVariant {
   /** Number of people needed. */

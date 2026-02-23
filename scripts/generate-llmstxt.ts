@@ -42,6 +42,7 @@ const SECTION_ORDER = [
   "Coverage",
   "Shift Patterns",
   "Rules",
+  "Cost Optimization",
   "Supporting Types",
 ];
 
@@ -174,8 +175,16 @@ function extractPackageDoc(program: ts.Program, filePath: string): string {
 // Type formatting
 // ============================================================================
 
-/** Get the declared type text from a node's type annotation. */
+/** Get the declared type text from a node's type annotation or method signature. */
 function sourceType(node: ts.Node): string | undefined {
+  // Method signatures: render as (params) => ReturnType
+  if (ts.isMethodSignature(node)) {
+    const params = node.parameters
+      .map((p) => `${p.name.getText()}: ${p.type?.getText() ?? "unknown"}`)
+      .join(", ");
+    const ret = node.type?.getText() ?? "void";
+    return `(${params}) => ${ret}`;
+  }
   const sig = node as ts.PropertySignature | ts.ParameterDeclaration;
   return sig.type?.getText();
 }

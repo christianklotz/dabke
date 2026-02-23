@@ -4,6 +4,8 @@ import type { ValidationGroup } from "./validation.types.js";
 
 /**
  * Pay per hour in the caller's smallest currency unit (e.g., pence, cents).
+ *
+ * @category Supporting Types
  */
 export interface HourlyPay {
   /** Pay per hour in smallest currency unit. */
@@ -19,6 +21,8 @@ export interface HourlyPay {
  *
  * Note: overtime multiplier rules apply only to hourly members.
  * Overtime surcharge rules apply to all members regardless of pay type.
+ *
+ * @category Supporting Types
  */
 export interface SalariedPay {
   /** Annual salary in smallest currency unit. */
@@ -42,6 +46,8 @@ export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
  *
  * Members are assigned to shift patterns by the solver based on
  * coverage requirements, rules, and constraints.
+ *
+ * @category Supporting Types
  */
 export interface SchedulingMember {
   /** Unique identifier for this member. Must not contain colons. */
@@ -72,6 +78,8 @@ export interface SchedulingMember {
  *   { id: "ward_day", startTime: { hours: 7 }, endTime: { hours: 15 }, roleIds: ["nurse", "doctor"] },
  *   { id: "reception", startTime: { hours: 8 }, endTime: { hours: 16 }, roleIds: ["admin"] },
  * ];
+ *
+ * @category Supporting Types
  */
 export interface ShiftPattern {
   /**

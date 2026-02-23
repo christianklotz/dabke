@@ -245,6 +245,8 @@ type ValidationItem = ScheduleError | ScheduleViolation | SchedulePassed;
  * The title comes from the first item's `group.title`; for ungrouped items
  * the item's `message` is used instead.
  *
+ * @category Validation
+ *
  * @example
  * ```typescript
  * const summaries = summarizeValidation(validation);

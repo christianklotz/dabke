@@ -25,6 +25,8 @@ const normalizeFetch = (
 
 /**
  * Generic HTTP client for the solver service.
+ *
+ * @category Solver
  */
 export class HttpSolverClient implements SolverClient {
   #fetch: (input: string | URL, init?: RequestInit) => Promise<Response>;

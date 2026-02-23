@@ -181,6 +181,8 @@ export function time(
  * Day/date scoping controls which days this coverage entry applies to.
  * An entry without `dayOfWeek` or `dates` applies every day in the
  * scheduling period.
+ *
+ * @category Coverage
  */
 export interface CoverageOptions {
   /** Additional skill ID filter (AND logic with the target role). */
@@ -376,6 +378,8 @@ export interface RuleOptions {
  * Used by rules whose semantics are inherently per-day or per-week
  * (e.g., {@link minHoursPerDay}, {@link maxConsecutiveDays}) and cannot
  * be meaningfully restricted to a date range or day of week.
+ *
+ * @category Rules
  */
 export interface EntityOnlyRuleOptions {
   /** Who this rule applies to (role name, skill name, or member ID). */
@@ -391,6 +395,8 @@ export interface EntityOnlyRuleOptions {
  * At least one time scoping field is required (`dayOfWeek`, `dateRange`,
  * `dates`, or `recurringPeriods`). Use `from`/`until` to block only part
  * of a day.
+ *
+ * @category Rules
  */
 export interface TimeOffOptions {
   /** Who this rule applies to (role name, skill name, or member ID). */
@@ -411,7 +417,11 @@ export interface TimeOffOptions {
   priority?: Priority;
 }
 
-/** Options for {@link assignTogether}. */
+/**
+ * Options for {@link assignTogether}.
+ *
+ * @category Rules
+ */
 export interface AssignTogetherOptions {
   /** Defaults to `"MANDATORY"`. */
   priority?: Priority;
@@ -422,6 +432,8 @@ export interface AssignTogetherOptions {
  *
  * Cost rules are objective terms, not constraints. The `priority` field from
  * {@link RuleOptions} does not apply.
+ *
+ * @category Cost Optimization
  */
 export interface CostRuleOptions {
   /** Who this rule applies to (role name, skill name, or member ID). */
@@ -626,7 +638,7 @@ export function preferLocation(locationId: string, opts?: EntityOnlyRuleOptions)
  * minimizeCost()
  * ```
  *
- * @category Rules
+ * @category Cost Optimization
  */
 export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
   return makeRule("minimize-cost", { ...opts });
@@ -638,6 +650,8 @@ export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
  * @remarks
  * The base cost (1x) is already counted by {@link minimizeCost};
  * this rule adds only the extra portion above 1x.
+ *
+ * @category Cost Optimization
  *
  * @example Weekend multiplier
  * ```typescript
@@ -653,6 +667,8 @@ export function dayMultiplier(factor: number, opts?: CostRuleOptions): RuleEntry
  *
  * @remarks
  * The surcharge is independent of the member's base rate.
+ *
+ * @category Cost Optimization
  *
  * @example Weekend surcharge
  * ```typescript
@@ -674,6 +690,8 @@ export function daySurcharge(amountPerHour: number, opts?: CostRuleOptions): Rul
  * @param window - Time-of-day window
  * @param opts - Entity and time scoping
  *
+ * @category Cost Optimization
+ *
  * @example Night differential
  * ```typescript
  * timeSurcharge(200, { from: t(22), until: t(6) })
@@ -694,6 +712,8 @@ export function timeSurcharge(
  * Only the extra portion above 1x is added (the base cost is already
  * counted by {@link minimizeCost}).
  *
+ * @category Cost Optimization
+ *
  * @example
  * ```typescript
  * overtimeMultiplier({ after: 40, factor: 1.5 })
@@ -710,6 +730,8 @@ export function overtimeMultiplier(
  *
  * @remarks
  * The surcharge is independent of the member's base rate.
+ *
+ * @category Cost Optimization
  *
  * @example
  * ```typescript
@@ -729,6 +751,8 @@ export function overtimeSurcharge(
  * Only the extra portion above 1x is added (the base cost is already
  * counted by {@link minimizeCost}).
  *
+ * @category Cost Optimization
+ *
  * @example
  * ```typescript
  * dailyOvertimeMultiplier({ after: 8, factor: 1.5 })
@@ -745,6 +769,8 @@ export function dailyOvertimeMultiplier(
  *
  * @remarks
  * The surcharge is independent of the member's base rate.
+ *
+ * @category Cost Optimization
  *
  * @example
  * ```typescript
@@ -763,6 +789,8 @@ export function dailyOvertimeSurcharge(
  * @remarks
  * Each tier applies only to the hours between its threshold and the next.
  * Tiers must be sorted by threshold ascending.
+ *
+ * @category Cost Optimization
  *
  * @example
  * ```typescript
@@ -833,6 +861,8 @@ export function assignTogether(
  * Separates data known at runtime (team roster, date range, ad-hoc rules)
  * from the static schedule definition. Runtime rules are merged after the
  * definition's own rules and undergo the same `appliesTo` resolution.
+ *
+ * @category Schedule Definition
  */
 export interface RuntimeArgs {
   /** The scheduling period (date range + optional filters). */
@@ -843,7 +873,11 @@ export interface RuntimeArgs {
   runtimeRules?: RuleEntry[];
 }
 
-/** Result of {@link defineSchedule}. */
+/**
+ * Result of {@link defineSchedule}.
+ *
+ * @category Schedule Definition
+ */
 export interface ScheduleDefinition {
   /** Produce a {@link ModelBuilderConfig} for the solver. */
   createSchedulerConfig(args: RuntimeArgs): ModelBuilderConfig;
@@ -867,6 +901,8 @@ export interface ScheduleDefinition {
  * An unscoped entry applies every day; adding a weekend-only entry on top
  * doubles the count on those days. Use mutually exclusive `dayOfWeek` on
  * both entries to avoid stacking. See {@link cover} for details.
+ *
+ * @category Schedule Definition
  */
 export interface ScheduleConfig<
   R extends readonly string[],

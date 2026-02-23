@@ -148,6 +148,7 @@ export type SchedulePassed = CoveragePassed | RulePassed;
 // Complete validation result
 // =============================================================================
 
+/** @category Validation */
 export interface ScheduleValidation {
   readonly errors: readonly ScheduleError[];
   readonly violations: readonly ScheduleViolation[];
@@ -161,6 +162,8 @@ export interface ScheduleValidation {
 /**
  * Summary of validation items grouped by their source instruction.
  * Use `summarizeValidation()` to create these from a `ScheduleValidation`.
+ *
+ * @category Validation
  */
 export interface ValidationSummary {
   /** Deterministic group key derived from rule/coverage structure. */

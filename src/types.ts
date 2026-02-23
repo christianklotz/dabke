@@ -81,6 +81,8 @@ export interface TimeOfDay {
  *   dates: ['2025-02-05', '2025-02-07'],
  * };
  * ```
+ *
+ * @category Supporting Types
  */
 export interface SchedulingPeriod {
   /**

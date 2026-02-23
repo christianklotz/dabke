@@ -25,7 +25,11 @@ const OvertimeTierSchema = z.object({
   factor: z.number().min(1),
 });
 
-/** A single tier in a tiered overtime configuration. */
+/**
+ * A single tier in a tiered overtime configuration.
+ *
+ * @category Cost Optimization
+ */
 export type OvertimeTier = z.infer<typeof OvertimeTierSchema>;
 
 const OvertimeTieredMultiplierSchema = z

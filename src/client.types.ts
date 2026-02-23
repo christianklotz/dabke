@@ -85,6 +85,8 @@ export type SolverResponse = z.infer<typeof SolverResponseSchema>;
  * Solver outcome status.
  *
  * One of `"OPTIMAL"`, `"FEASIBLE"`, `"INFEASIBLE"`, `"TIMEOUT"`, or `"ERROR"`.
+ *
+ * @category Solver
  */
 export type SolverStatus = z.infer<typeof SolverStatusSchema>;
 
@@ -100,6 +102,7 @@ export type SoftConstraintViolation = z.infer<typeof SoftConstraintViolationSche
 // Status constants (for convenience)
 // --------------------------------------------------------------------------
 
+/** Convenience constants for {@link SolverStatus} values. */
 export const SOLVER_STATUS = {
   OPTIMAL: "OPTIMAL",
   FEASIBLE: "FEASIBLE",
@@ -112,12 +115,18 @@ export const SOLVER_STATUS = {
 // Client interface
 // --------------------------------------------------------------------------
 
+/** A `fetch` function or an object with a `fetch` method. */
 export type FetcherLike =
   | typeof fetch
   | {
       fetch: typeof fetch;
     };
 
+/**
+ * Interface for sending solver requests and receiving responses.
+ *
+ * @category Solver
+ */
 export interface SolverClient {
   solve(request: SolverRequest, options?: { signal?: AbortSignal }): Promise<SolverResponse>;
   health?(): Promise<void>;

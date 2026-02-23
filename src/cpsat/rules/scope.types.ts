@@ -86,7 +86,11 @@ type InactiveEntityFields = {
 
 type NonEmptyArray<T> = [T, ...T[]];
 
-/** Recurring calendar period for time scoping. */
+/**
+ * Recurring calendar period for time scoping.
+ *
+ * @category Rules
+ */
 export interface RecurringPeriod {
   name: string;
   startMonth: number;

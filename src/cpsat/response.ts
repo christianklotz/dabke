@@ -2,7 +2,11 @@ import type { SolverResponse } from "../client.types.js";
 import type { ShiftPattern } from "./types.js";
 import type { TimeOfDay } from "../types.js";
 
-/** A raw assignment from the solver: which member works which shift on which day. */
+/**
+ * A raw assignment from the solver: which member works which shift on which day.
+ *
+ * @category Solver
+ */
 export interface ShiftAssignment {
   /** The assigned member's ID. */
   memberId: string;
@@ -14,6 +18,8 @@ export interface ShiftAssignment {
 
 /**
  * A shift assignment with resolved times.
+ *
+ * @category Solver
  */
 export interface ResolvedShiftAssignment {
   /** The assigned member's ID. */
@@ -28,6 +34,8 @@ export interface ResolvedShiftAssignment {
 
 /**
  * Parsed solver result with assignments and metadata.
+ *
+ * @category Solver
  */
 export interface SolverResult {
   /** The solver outcome: OPTIMAL, FEASIBLE, INFEASIBLE, TIMEOUT, or ERROR. */
@@ -52,6 +60,8 @@ export interface SolverResult {
  *
  * @param response - The solver response containing variable values
  * @returns Parsed schedule result with assignments
+ *
+ * @category Solver
  *
  * @example
  * ```typescript
@@ -106,6 +116,8 @@ export function parseSolverResponse(response: SolverResponse): SolverResult {
  * @param assignments - Raw assignments from parseSolverResponse
  * @param shiftPatterns - The shift patterns used in the model
  * @returns Assignments with resolved start/end times
+ *
+ * @category Solver
  *
  * @example
  * ```typescript

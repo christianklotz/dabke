@@ -94,6 +94,11 @@ export interface CostContribution {
   entries: CostEntry[];
 }
 
+/**
+ * Result of {@link ModelBuilder.compile}.
+ *
+ * @category Model Builder
+ */
 export interface CompilationResult {
   request: SolverRequest;
   validation: ScheduleValidation;
@@ -102,6 +107,8 @@ export interface CompilationResult {
 
 /**
  * Configuration for ModelBuilder.
+ *
+ * @category Model Builder
  *
  * @example Date range with day-of-week filtering (restaurant closed Mon/Tue)
  * ```typescript
@@ -148,6 +155,8 @@ export interface ModelBuilderConfig extends ModelBuilderOptions {
 /**
  * Compilation context that creates variables, constraints, and objectives
  * and emits a `SolverRequest` for the Python CP-SAT solver service.
+ *
+ * @category Model Builder
  */
 export class ModelBuilder {
   readonly members: SchedulingMember[];
