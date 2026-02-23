@@ -6,39 +6,39 @@
 
 ## Schedule Definition
 
-### `RuntimeArgs`
+### `SolveResult`
 
-Runtime arguments passed to `ScheduleDefinition.createSchedulerConfig`.
-
-Separates data known at runtime (team roster, date range, ad-hoc rules)
-from the static schedule definition. Runtime rules are merged after the
-definition's own rules and undergo the same `appliesTo` resolution.
+Result of `Schedule.solve`.
 
 **Properties:**
-- `schedulingPeriod: SchedulingPeriod` — The scheduling period (date range + optional filters).
-- `members: SchedulingMember[]` — Team members available for this scheduling run.
-- `runtimeRules?: RuleEntry[]` — Ad-hoc rules injected at runtime (e.g., vacation, holiday closures).
+- `status: SolveStatus` — Outcome of the solve attempt.
+- `assignments: ShiftAssignment[]` — Shift assignments (empty when infeasible or no solution).
+- `validation: ScheduleValidation` — Validation diagnostics from compilation.
+- `cost?: CostBreakdown` — Cost breakdown (present when cost rules are used and a solution is found).
 
-### `ScheduleDefinition`
+### `SolveOptions`
 
-Result of `defineSchedule`.
+Options for `Schedule.solve` and `Schedule.compile`.
 
 **Properties:**
-- `createSchedulerConfig: (args: RuntimeArgs) => ModelBuilderConfig` — Produce a `ModelBuilderConfig` for the solver.
-- `roleIds: readonly string[]` — Declared role IDs.
-- `skillIds: readonly string[]` — Declared skill IDs.
-- `timeNames: readonly string[]` — Names of declared semantic times.
-- `shiftPatternIds: readonly string[]` — Shift pattern IDs.
-- `ruleNames: readonly string[]` — Internal rule identifiers in kebab-case (e.g., "max-hours-day", "time-off").
+- `dateRange: { start: string; end: string }` — The date range to schedule.
+- `pinned?: ShiftAssignment[]` — Fixed assignments from a prior solve (e.g., rolling schedule).
+These are injected as fixed variables in the solver.
+
+Not yet implemented. Providing pinned assignments logs a warning
+and proceeds without them.
 
 ### `ScheduleConfig`
 
-Configuration for `defineSchedule`.
+Configuration for `schedule`.
 
 Coverage entries for the same semantic time and target stack additively.
 An unscoped entry applies every day; adding a weekend-only entry on top
 doubles the count on those days. Use mutually exclusive `dayOfWeek` on
 both entries to avoid stacking. See `cover` for details.
+
+`roleIds`, `times`, `coverage`, and `shiftPatterns` are required.
+These four fields form the minimum solvable schedule.
 
 **Properties:**
 - `roleIds: R` — Declared role IDs.
@@ -47,24 +47,24 @@ both entries to avoid stacking. See `cover` for details.
 - `coverage: CoverageEntry<keyof T & string, R[number] | NonNullable<S>[number]>[]` — Staffing requirements per time period (entries stack additively).
 - `shiftPatterns: ShiftPattern[]` — Available shift patterns.
 - `rules?: RuleEntry[]` — Scheduling rules and constraints.
-- `dayOfWeek?: readonly DayOfWeek[]` — Days of the week the business operates (inclusion filter).
+- `ruleFactories?: Record<string, CreateCpsatRuleFunction>` — Custom rule factories. Keys are rule names, values are functions
+that take a config object and return a `CompilationRule`.
+Built-in rule names cannot be overridden.
+- `members?: SchedulingMember[]` — Team members (typically added via `.with()` at runtime).
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Days of the week the business operates (inclusion filter).
 - `weekStartsOn?: DayOfWeek` — Which day starts the week for weekly rules. Defaults to `"monday"`.
 
-### `defineSchedule`
+### `schedule`
 
-Define a complete schedule configuration.
+Create a schedule definition.
+
+Returns an immutable `Schedule` that can be composed via `.with()`
+and solved via `.solve()`.
 
 ```typescript
-import {
-  defineSchedule, t, time, cover, shift,
-  maxHoursPerWeek, minRestBetweenShifts, timeOff,
-  weekdays, weekend,
-} from "dabke";
-
-export default defineSchedule({
+const venue = schedule({
   roleIds: ["waiter", "runner", "manager"],
   skillIds: ["senior"],
-
   times: {
     lunch: time({ startTime: t(12), endTime: t(15) }),
     dinner: time(
@@ -72,38 +72,39 @@ export default defineSchedule({
       { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
     ),
   },
-
   coverage: [
     cover("lunch", "waiter", 2),
     cover("dinner", "waiter", 4, { dayOfWeek: weekdays }),
-    cover("dinner", "waiter", 6, { dayOfWeek: weekend }),
+    cover("dinner", "waiter", 5, { dayOfWeek: weekend }),
+    cover("dinner", "manager", 1),
   ],
-
   shiftPatterns: [
-    shift("morning", t(11, 30), t(15)),
+    shift("lunch_shift", t(11, 30), t(15)),
     shift("evening", t(17), t(22)),
   ],
-
   rules: [
+    maxHoursPerDay(10),
     maxHoursPerWeek(48),
-    minRestBetweenShifts(10),
-    timeOff({ appliesTo: "alice", dayOfWeek: weekend }),
+    minRestBetweenShifts(11),
   ],
 });
 ```
 
-**Parameters:**
-- `config: ScheduleConfig<R, S, T>` — Schedule configuration object with:
-- `roleIds` (required): declared role names
-- `skillIds` (optional): declared skill names
-- `times` (required): named semantic time periods (see `time`)
-- `coverage` (required): staffing requirements (see `cover`)
-- `shiftPatterns` (required): available shifts (see `shift`)
-- `rules` (optional): constraints and preferences (see rule functions)
-- `dayOfWeek` (optional): days the business operates (inclusion filter)
-- `weekStartsOn` (optional): defaults to `"monday"`
+### `partialSchedule`
 
-**Returns:** `ScheduleDefinition`
+Create a partial schedule for composition via `.with()`.
+
+Unlike `schedule`, all fields are optional. Use this for
+schedules that layer rules, coverage, or other config onto a
+complete base schedule.
+
+```typescript
+const companyPolicy = partialSchedule({
+  rules: [maxHoursPerWeek(40), minRestBetweenShifts(11)],
+});
+
+const ready = venue.with(companyPolicy, teamMembers);
+```
 
 ---
 
@@ -129,7 +130,7 @@ t(9)   // { hours: 9, minutes: 0 }
 Monday through Friday.
 
 ```typescript
-readonly DayOfWeek[]
+readonly [DayOfWeek, ...DayOfWeek[]]
 ```
 
 ### `weekend`
@@ -137,7 +138,7 @@ readonly DayOfWeek[]
 Saturday and Sunday.
 
 ```typescript
-readonly DayOfWeek[]
+readonly [DayOfWeek, ...DayOfWeek[]]
 ```
 
 ### `time`
@@ -200,7 +201,7 @@ scheduling period.
 
 **Properties:**
 - `skillIds?: [string, ...string[]]` — Additional skill ID filter (AND logic with the target role).
-- `dayOfWeek?: readonly DayOfWeek[]` — Restrict to specific days of the week.
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Restrict to specific days of the week.
 - `dates?: string[]` — Restrict to specific dates (YYYY-MM-DD).
 - `priority?: Priority` — Defaults to `"MANDATORY"`.
 
@@ -293,7 +294,7 @@ Not all rules support all scoping options. Entity-only rules
 
 **Properties:**
 - `appliesTo?: string | string[]` — Who this rule applies to (role name, skill name, or member ID).
-- `dayOfWeek?: readonly DayOfWeek[]` — Restrict to specific days of the week.
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Restrict to specific days of the week.
 - `dateRange?: { start: string; end: string }` — Restrict to a date range.
 - `dates?: string[]` — Restrict to specific dates (YYYY-MM-DD).
 - `recurringPeriods?: [RecurringPeriod, ...RecurringPeriod[]]` — Restrict to recurring calendar periods.
@@ -323,7 +324,7 @@ of a day.
 - `appliesTo?: string | string[]` — Who this rule applies to (role name, skill name, or member ID).
 - `from?: TimeOfDay` — Off from this time until end of day.
 - `until?: TimeOfDay` — Off from start of day until this time.
-- `dayOfWeek?: readonly DayOfWeek[]` — Restrict to specific days of the week.
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Restrict to specific days of the week.
 - `dateRange?: { start: string; end: string }` — Restrict to a date range.
 - `dates?: string[]` — Restrict to specific dates (YYYY-MM-DD).
 - `recurringPeriods?: [RecurringPeriod, ...RecurringPeriod[]]` — Restrict to recurring calendar periods.
@@ -335,6 +336,36 @@ Options for `assignTogether`.
 
 **Properties:**
 - `priority?: Priority` — Defaults to `"MANDATORY"`.
+
+### `RuleResolveContext`
+
+Context passed to a rule's resolve function during compilation.
+
+Contains the declared roles, skills, and member IDs so the resolver
+can translate user-facing fields (like `appliesTo`) into internal
+scoping fields.
+
+**Properties:**
+- `roles: ReadonlySet<string>`
+- `skills: ReadonlySet<string>`
+- `memberIds: ReadonlySet<string>`
+
+### `defineRule`
+
+Creates a rule entry for use in `ScheduleConfig.rules`.
+
+Built-in rules use the helpers (`maxHoursPerDay`, `timeOff`, etc.).
+Custom rules can use `defineRule` to create entries that plug into the
+same resolution and compilation pipeline.
+
+**Parameters:**
+- `name: string` — Rule name. Must match a key in the rule factory registry.
+- `fields: Record<string, unknown>` — Rule-specific configuration fields.
+- `resolve?: (ctx: RuleResolveContext) => Record<string, unknown> & { name: string }` — Optional custom resolver. When omitted, the default
+resolution applies: `appliesTo` is mapped to `roleIds`/`skillIds`/`memberIds`,
+`dates` is renamed to `specificDates`, and all other fields pass through.
+
+**Returns:** `RuleEntry`
 
 ### `maxHoursPerDay`
 
@@ -466,7 +497,7 @@ Cost rules are objective terms, not constraints. The `priority` field from
 
 **Properties:**
 - `appliesTo?: string | string[]` — Who this rule applies to (role name, skill name, or member ID).
-- `dayOfWeek?: DayOfWeek[]` — Restrict to specific days of the week.
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Restrict to specific days of the week.
 - `dateRange?: { start: string; end: string }` — Restrict to a date range.
 - `dates?: string[]` — Restrict to specific dates (YYYY-MM-DD).
 - `recurringPeriods?: [RecurringPeriod, ...RecurringPeriod[]]` — Restrict to recurring calendar periods.
@@ -635,7 +666,7 @@ dateRange: { start: '2025-02-03', end: '2025-02-09' },
 **Properties:**
 - `dateRange: { start: string; end: string }` — The overall scheduling window (start and end are inclusive).
 Dates should be in YYYY-MM-DD format.
-- `dayOfWeek?: DayOfWeek[]` — Include only these days of the week.
+- `dayOfWeek?: readonly DayOfWeek[]` — Include only these days of the week.
 If omitted, all days of the week are included.
 - `dates?: string[]` — Include only these specific dates (YYYY-MM-DD) within the range.
 If omitted, all dates in the range are included (subject to dayOfWeek filter).
@@ -709,7 +740,7 @@ Used in assignments and rule configurations.
 Most venues have the same shifts for everyone and don't need this.
 Use it when different roles have different schedules (e.g., kitchen staff starts
 earlier than floor staff).
-- `dayOfWeek?: DayOfWeek[]` — Restricts which days of the week this shift pattern can be used.
+- `dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]]` — Restricts which days of the week this shift pattern can be used.
 
 - If omitted: shift can be used on any day
 - If provided: shift can only be assigned on the specified days

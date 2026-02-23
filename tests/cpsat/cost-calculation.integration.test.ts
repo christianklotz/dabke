@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { getSolverClient } from "./helpers.js";
 import {
-  defineSchedule,
+  schedule,
   t,
   time,
   cover,
@@ -11,7 +11,6 @@ import {
   daySurcharge,
   timeSurcharge,
   weekend,
-  ModelBuilder,
   parseSolverResponse,
   calculateScheduleCost,
   COST_CATEGORY,
@@ -26,7 +25,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
   });
 
   it("full v2 API cost flow with multiple rules", async () => {
-    const restaurant = defineSchedule({
+    const restaurant = schedule({
       roleIds: ["waiter"],
       times: {
         lunch: time({ startTime: t(12), endTime: t(15) }),
@@ -41,25 +40,22 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     });
 
     // Feb 14 2026 = Saturday
-    const config = restaurant.createSchedulerConfig({
-      schedulingPeriod: { dateRange: { start: "2026-02-14", end: "2026-02-14" } },
-      members: [{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }],
-    });
+    const compiled = restaurant
+      .with([{ id: "alice", roleIds: ["waiter"], pay: { hourlyRate: 2000 } }])
+      .compile({ dateRange: { start: "2026-02-14", end: "2026-02-14" } });
 
-    const builder = new ModelBuilder(config);
-    const { request, canSolve } = builder.compile();
-    expect(canSolve).toBe(true);
+    expect(compiled.canSolve).toBe(true);
 
-    const response = await client.solve(request);
+    const response = await client.solve(compiled.request);
     expect(response.status).toBe("OPTIMAL");
 
     const result = parseSolverResponse(response);
     expect(result.assignments).toHaveLength(1);
 
     const cost = calculateScheduleCost(result.assignments, {
-      members: config.members,
-      shiftPatterns: config.shiftPatterns,
-      rules: builder.rules,
+      members: compiled.builder.members,
+      shiftPatterns: compiled.builder.shiftPatterns,
+      rules: compiled.builder.rules,
     });
 
     // 3 hours at 2000/hr = 6000 base
@@ -73,7 +69,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
   }, 30_000);
 
   it("solver prefers cheaper member with cost optimization", async () => {
-    const shop = defineSchedule({
+    const shop = schedule({
       roleIds: ["clerk"],
       times: {
         shift: time({ startTime: t(9), endTime: t(17) }),
@@ -83,17 +79,14 @@ describe("CP-SAT: end-to-end cost calculation", () => {
       rules: [minimizeCost()],
     });
 
-    const config = shop.createSchedulerConfig({
-      schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [
+    const compiled = shop
+      .with([
         { id: "expensive", roleIds: ["clerk"], pay: { hourlyRate: 5000 } },
         { id: "cheap", roleIds: ["clerk"], pay: { hourlyRate: 1500 } },
-      ],
-    });
+      ])
+      .compile({ dateRange: { start: "2026-02-09", end: "2026-02-09" } });
 
-    const builder = new ModelBuilder(config);
-    const { request } = builder.compile();
-    const response = await client.solve(request);
+    const response = await client.solve(compiled.request);
     expect(response.status).toBe("OPTIMAL");
 
     const result = parseSolverResponse(response);
@@ -102,9 +95,9 @@ describe("CP-SAT: end-to-end cost calculation", () => {
     expect(assignedMembers).not.toContain("expensive");
 
     const cost = calculateScheduleCost(result.assignments, {
-      members: config.members,
-      shiftPatterns: config.shiftPatterns,
-      rules: builder.rules,
+      members: compiled.builder.members,
+      shiftPatterns: compiled.builder.shiftPatterns,
+      rules: compiled.builder.rules,
     });
 
     // 8 hours * 1500 = 12000
@@ -112,7 +105,7 @@ describe("CP-SAT: end-to-end cost calculation", () => {
   }, 30_000);
 
   it("timeSurcharge affects cost correctly for night shift", async () => {
-    const bar = defineSchedule({
+    const bar = schedule({
       roleIds: ["bartender"],
       times: {
         night: time({ startTime: t(20), endTime: t(23) }),
@@ -122,21 +115,18 @@ describe("CP-SAT: end-to-end cost calculation", () => {
       rules: [minimizeCost(), timeSurcharge(500, { from: t(22), until: t(6) })],
     });
 
-    const config = bar.createSchedulerConfig({
-      schedulingPeriod: { dateRange: { start: "2026-02-09", end: "2026-02-09" } },
-      members: [{ id: "mike", roleIds: ["bartender"], pay: { hourlyRate: 2000 } }],
-    });
+    const compiled = bar
+      .with([{ id: "mike", roleIds: ["bartender"], pay: { hourlyRate: 2000 } }])
+      .compile({ dateRange: { start: "2026-02-09", end: "2026-02-09" } });
 
-    const builder = new ModelBuilder(config);
-    const { request } = builder.compile();
-    const response = await client.solve(request);
+    const response = await client.solve(compiled.request);
     expect(response.status).toBe("OPTIMAL");
 
     const result = parseSolverResponse(response);
     const cost = calculateScheduleCost(result.assignments, {
-      members: config.members,
-      shiftPatterns: config.shiftPatterns,
-      rules: builder.rules,
+      members: compiled.builder.members,
+      shiftPatterns: compiled.builder.shiftPatterns,
+      rules: compiled.builder.rules,
     });
 
     // Base: 3 * 2000 = 6000

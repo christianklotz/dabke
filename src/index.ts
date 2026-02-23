@@ -2,9 +2,9 @@
  * @privateRemarks
  * ## Core Concepts
  *
- * **Schedule Definition**: The primary API. Small, composable functions
+ * **Schedule**: The primary API. Small, composable functions
  * ({@link time}, {@link cover}, {@link shift}, rule functions) produce a
- * complete scheduling configuration via {@link defineSchedule}. Each concept
+ * complete scheduling configuration via {@link schedule}. Each concept
  * is a single function call with full type safety.
  *
  * **Times vs Shift Patterns**: These are two distinct concepts.
@@ -23,10 +23,9 @@
  * - Scoping: apply rules globally, per person, per role, per skill, or per time period
  * - Priority: `MANDATORY` (hard constraint) vs `LOW`/`MEDIUM`/`HIGH` (soft preferences)
  *
- * **Solving**: {@link ScheduleDefinition.createSchedulerConfig} merges the
- * static definition with runtime data (members, scheduling period).
- * {@link ModelBuilder} compiles the config into a solver request;
- * {@link HttpSolverClient} sends it to the CP-SAT solver.
+ * **Solving**: {@link Schedule.compile} compiles the config into a
+ * solver request; {@link Schedule.solve} sends it to the CP-SAT solver
+ * and returns a {@link SolveResult}.
  *
  * @packageDocumentation
  */
@@ -88,13 +87,21 @@ export { parseSolverResponse, resolveAssignments } from "./cpsat/response.js";
 export type { ShiftAssignment, ResolvedShiftAssignment, SolverResult } from "./cpsat/response.js";
 
 // ============================================================================
+// Cost calculation
+// ============================================================================
+
+export { calculateScheduleCost, COST_CATEGORY } from "./cpsat/cost.js";
+
+export type { CostBreakdown, MemberCostDetail, CostCalculationConfig } from "./cpsat/cost.js";
+
+// ============================================================================
 // Rules (registry types)
 // ============================================================================
 
 export type {
-  CpsatRuleName,
   CpsatRuleConfigEntry,
   CpsatRuleFactories,
+  CreateCpsatRuleFunction,
 } from "./cpsat/rules/rules.types.js";
 
 export type { RecurringPeriod } from "./cpsat/rules/scope.types.js";
@@ -142,11 +149,13 @@ export type {
 export { summarizeValidation } from "./cpsat/validation-reporter.js";
 
 // ============================================================================
-// Schedule Definition API
+// Schedule API
 // ============================================================================
 
 export {
-  defineSchedule,
+  schedule,
+  partialSchedule,
+  Schedule,
   t,
   time,
   cover,
@@ -163,6 +172,7 @@ export {
   preferLocation,
   timeOff,
   assignTogether,
+  defineRule,
   minimizeCost,
   dayMultiplier,
   daySurcharge,
@@ -181,12 +191,14 @@ export type {
   CoverageOptions,
   CoverageVariant,
   RuleEntry,
+  RuleResolveContext,
   RuleOptions,
   EntityOnlyRuleOptions,
   TimeOffOptions,
   AssignTogetherOptions,
   CostRuleOptions,
-  RuntimeArgs,
-  ScheduleDefinition,
   ScheduleConfig,
+  SolveResult,
+  SolveStatus,
+  SolveOptions,
 } from "./schedule.js";

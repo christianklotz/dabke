@@ -10,7 +10,7 @@ Define teams, shifts, coverage, and rules declaratively. dabke compiles them int
 
 ```typescript
 import {
-  defineSchedule,
+  schedule,
   t,
   time,
   cover,
@@ -23,8 +23,8 @@ import {
   weekend,
 } from "dabke";
 
-const schedule = defineSchedule({
-  roles: ["barista", "server"],
+const venue = schedule({
+  roleIds: ["barista", "server"],
 
   // Times: WHEN you need people (named periods for coverage + rules)
   times: {
@@ -75,31 +75,39 @@ docker pull christianklotz/dabke-solver
 docker run -p 8080:8080 christianklotz/dabke-solver
 ```
 
-Once you have a schedule definition, create a config with runtime data and solve:
+Once you have a schedule definition, add members and solve:
 
 ```typescript
-import { ModelBuilder, HttpSolverClient, parseSolverResponse, resolveAssignments } from "dabke";
+import { HttpSolverClient } from "dabke";
 
-const config = schedule.createSchedulerConfig({
-  schedulingPeriod: {
+const result = await venue
+  .with([
+    { id: "alice", roleIds: ["barista", "server"], pay: { hourlyRate: 1500 } },
+    { id: "bob", roleIds: ["barista"], pay: { hourlyRate: 1200 } },
+    { id: "carol", roleIds: ["barista", "server"], pay: { hourlyRate: 1400 } },
+    { id: "dave", roleIds: ["barista", "server"], pay: { hourlyRate: 1200 } },
+    { id: "eve", roleIds: ["barista", "server"], pay: { hourlyRate: 1300 } },
+  ])
+  .solve(new HttpSolverClient(fetch, "http://localhost:8080"), {
     dateRange: { start: "2026-02-09", end: "2026-02-15" },
-  },
-  members: [
-    { id: "alice", roles: ["barista", "server"], pay: { hourlyRate: 1500 } },
-    { id: "bob", roles: ["barista"], pay: { hourlyRate: 1200 } },
-    { id: "carol", roles: ["barista", "server"], pay: { hourlyRate: 1400 } },
-    { id: "dave", roles: ["barista", "server"], pay: { hourlyRate: 1200 } },
-    { id: "eve", roles: ["barista", "server"], pay: { hourlyRate: 1300 } },
-  ],
-});
+  });
 
-const builder = new ModelBuilder(config);
-const { request, canSolve } = builder.compile();
+console.log(result.status); // "optimal" | "feasible" | "infeasible" | "no_solution"
+console.log(result.assignments); // Shift assignments per member per day
+```
 
-const solver = new HttpSolverClient(fetch, "http://localhost:8080");
-const response = await solver.solve(request);
-const result = parseSolverResponse(response);
-const shifts = resolveAssignments(result.assignments, config.shiftPatterns);
+Or compile and solve manually for more control:
+
+```typescript
+const compiled = venue
+  .with([...members])
+  .compile({ dateRange: { start: "2026-02-09", end: "2026-02-15" } });
+
+if (compiled.canSolve) {
+  const solver = new HttpSolverClient(fetch, "http://localhost:8080");
+  const response = await solver.solve(compiled.request);
+  // ...
+}
 ```
 
 ---
@@ -122,7 +130,14 @@ maxHoursPerWeek(30, { appliesTo: "bob", priority: "MEDIUM" }),
 
 **Cost optimization.** Members declare `pay` as hourly or salaried. Cost rules (`minimizeCost`, `dayMultiplier`, `overtimeMultiplier`, `tieredOvertimeMultiplier`, etc.) tell the solver to minimize total labor cost, factoring in overtime, day premiums, and time-based surcharges.
 
-**Validation.** `ModelBuilder` reports coverage gaps and rule violations both pre-solve (via `compile()`) and post-solve (via `builder.reporter.analyzeSolution()`). Use `summarizeValidation()` for grouped reporting.
+**Composition with `.with()`.** Schedule definitions are immutable. Use `.with()` to merge other schedules or add members at runtime. Each `.with()` returns a new `Schedule` instance:
+
+```typescript
+const ready = venue.with([
+  { id: "alice", roleIds: ["barista"], pay: { hourlyRate: 1500 } },
+  { id: "bob", roleIds: ["barista"], pay: { hourlyRate: 1200 } },
+]);
+```
 
 ---
 

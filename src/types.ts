@@ -94,7 +94,7 @@ export interface SchedulingPeriod {
    * Include only these days of the week.
    * If omitted, all days of the week are included.
    */
-  dayOfWeek?: DayOfWeek[];
+  dayOfWeek?: readonly DayOfWeek[];
   /**
    * Include only these specific dates (YYYY-MM-DD) within the range.
    * If omitted, all dates in the range are included (subject to dayOfWeek filter).

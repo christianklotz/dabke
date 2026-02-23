@@ -8,12 +8,12 @@
  * @example
  * ```typescript
  * import {
- *   defineSchedule, t, time, cover, shift,
+ *   schedule, t, time, cover, shift,
  *   maxHoursPerDay, maxHoursPerWeek, minRestBetweenShifts,
  *   weekdays, weekend,
  * } from "dabke";
  *
- * export default defineSchedule({
+ * const venue = schedule({
  *   roleIds: ["cashier", "floor_lead", "stocker"],
  *   skillIds: ["keyholder"],
  *
@@ -44,6 +44,12 @@
  *     minRestBetweenShifts(10),
  *   ],
  * });
+ *
+ * const result = await venue
+ *   .with([
+ *     { id: "alice", roleIds: ["cashier"], skillIds: ["keyholder"] },
+ *   ])
+ *   .solve(client, { dateRange: { start: "2025-03-03", end: "2025-03-09" } });
  * ```
  *
  * @module
@@ -61,11 +67,23 @@ import type {
 export type { CoverageVariant } from "./cpsat/semantic-time.js";
 import { defineSemanticTimes } from "./cpsat/semantic-time.js";
 import { resolveDaysFromPeriod } from "./datetime.utils.js";
-import type { ModelBuilderConfig } from "./cpsat/model-builder.js";
+import type { ModelBuilderConfig, CompilationResult } from "./cpsat/model-builder.js";
+import { ModelBuilder } from "./cpsat/model-builder.js";
 import type { SchedulingMember, ShiftPattern, Priority } from "./cpsat/types.js";
-import type { CpsatRuleName, CpsatRuleConfigEntry } from "./cpsat/rules/rules.types.js";
+import type {
+  CpsatRuleName,
+  CpsatRuleConfigEntry,
+  CreateCpsatRuleFunction,
+} from "./cpsat/rules/rules.types.js";
+import { builtInCpsatRuleFactories } from "./cpsat/rules/registry.js";
 import type { RecurringPeriod } from "./cpsat/rules/scope.types.js";
 import type { OvertimeTier } from "./cpsat/rules/overtime-tiered-multiplier.js";
+import type { SolverClient, SolverResponse } from "./client.types.js";
+import { parseSolverResponse, resolveAssignments } from "./cpsat/response.js";
+import type { ShiftAssignment } from "./cpsat/response.js";
+import type { ScheduleValidation } from "./cpsat/validation.types.js";
+import { calculateScheduleCost } from "./cpsat/cost.js";
+import type { CostBreakdown } from "./cpsat/cost.js";
 
 // ============================================================================
 // Primitives
@@ -98,7 +116,7 @@ export function t(hours: number, minutes = 0): TimeOfDay {
  *
  * @category Time Periods
  */
-export const weekdays: readonly DayOfWeek[] = [
+export const weekdays: readonly [DayOfWeek, ...DayOfWeek[]] = [
   "monday",
   "tuesday",
   "wednesday",
@@ -111,7 +129,7 @@ export const weekdays: readonly DayOfWeek[] = [
  *
  * @category Time Periods
  */
-export const weekend: readonly DayOfWeek[] = ["saturday", "sunday"] as const;
+export const weekend: readonly [DayOfWeek, ...DayOfWeek[]] = ["saturday", "sunday"] as const;
 
 // ============================================================================
 // Semantic Times
@@ -188,7 +206,7 @@ export interface CoverageOptions {
   /** Additional skill ID filter (AND logic with the target role). */
   skillIds?: [string, ...string[]];
   /** Restrict to specific days of the week. */
-  dayOfWeek?: readonly DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict to specific dates (YYYY-MM-DD). */
   dates?: string[];
   /** Defaults to `"MANDATORY"`. */
@@ -200,7 +218,7 @@ export interface CoverageOptions {
  *
  * @remarks
  * Carries the semantic time name and target type information for
- * compile-time validation by {@link defineSchedule}. This is an opaque
+ * compile-time validation by {@link schedule}. This is an opaque
  * token; pass it directly into the `coverage` array.
  */
 export interface CoverageEntry<T extends string = string, R extends string = string> {
@@ -335,7 +353,7 @@ export function shift(
 ): ShiftPattern {
   const pattern: ShiftPattern = { id, startTime, endTime };
   if (opts?.roleIds) pattern.roleIds = opts.roleIds;
-  if (opts?.dayOfWeek) pattern.dayOfWeek = opts.dayOfWeek as DayOfWeek[];
+  if (opts?.dayOfWeek) pattern.dayOfWeek = opts.dayOfWeek;
   if (opts?.locationId) pattern.locationId = opts.locationId;
   return pattern;
 }
@@ -360,7 +378,7 @@ export interface RuleOptions {
   /** Who this rule applies to (role name, skill name, or member ID). */
   appliesTo?: string | string[];
   /** Restrict to specific days of the week. */
-  dayOfWeek?: readonly DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict to a date range. */
   dateRange?: { start: string; end: string };
   /** Restrict to specific dates (YYYY-MM-DD). */
@@ -406,7 +424,7 @@ export interface TimeOffOptions {
   /** Off from start of day until this time. */
   until?: TimeOfDay;
   /** Restrict to specific days of the week. */
-  dayOfWeek?: readonly DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict to a date range. */
   dateRange?: { start: string; end: string };
   /** Restrict to specific dates (YYYY-MM-DD). */
@@ -439,7 +457,7 @@ export interface CostRuleOptions {
   /** Who this rule applies to (role name, skill name, or member ID). */
   appliesTo?: string | string[];
   /** Restrict to specific days of the week. */
-  dayOfWeek?: DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict to a date range. */
   dateRange?: { start: string; end: string };
   /** Restrict to specific dates (YYYY-MM-DD). */
@@ -448,24 +466,73 @@ export interface CostRuleOptions {
   recurringPeriods?: [RecurringPeriod, ...RecurringPeriod[]];
 }
 
+/**
+ * Context passed to a rule's resolve function during compilation.
+ *
+ * Contains the declared roles, skills, and member IDs so the resolver
+ * can translate user-facing fields (like `appliesTo`) into internal
+ * scoping fields.
+ *
+ * @category Rules
+ */
+export interface RuleResolveContext {
+  readonly roles: ReadonlySet<string>;
+  readonly skills: ReadonlySet<string>;
+  readonly memberIds: ReadonlySet<string>;
+}
+
 // Internal rule entry type
 interface RuleEntryBase {
   readonly _type: "rule";
-  readonly _rule: CpsatRuleName;
+  readonly _rule: string;
+  /**
+   * Optional custom resolver. When present, `resolveRules()` calls this
+   * instead of the default translation path. Built-in rules that need
+   * special field mapping (e.g., `timeOff`, `assignTogether`) attach one;
+   * all other rules use the default resolver.
+   */
+  readonly _resolve?: (ctx: RuleResolveContext) => Record<string, unknown> & { name: string };
 }
 
 /**
  * An opaque rule entry returned by rule functions.
  *
  * @remarks
- * Pass these directly into the `rules` array of {@link ScheduleConfig} or
- * the `runtimeRules` array of {@link RuntimeArgs}. The internal fields are
- * resolved during {@link ScheduleDefinition.createSchedulerConfig}.
+ * Pass these directly into the `rules` array of {@link ScheduleConfig}.
+ * The internal fields are resolved during compilation.
  */
 export type RuleEntry = RuleEntryBase & Record<string, unknown>;
 
+/**
+ * Creates a rule entry for use in {@link ScheduleConfig.rules}.
+ *
+ * Built-in rules use the helpers (`maxHoursPerDay`, `timeOff`, etc.).
+ * Custom rules can use `defineRule` to create entries that plug into the
+ * same resolution and compilation pipeline.
+ *
+ * @param name - Rule name. Must match a key in the rule factory registry.
+ * @param fields - Rule-specific configuration fields.
+ * @param resolve - Optional custom resolver. When omitted, the default
+ *   resolution applies: `appliesTo` is mapped to `roleIds`/`skillIds`/`memberIds`,
+ *   `dates` is renamed to `specificDates`, and all other fields pass through.
+ *
+ * @category Rules
+ */
+export function defineRule(
+  name: string,
+  fields: Record<string, unknown>,
+  resolve?: (ctx: RuleResolveContext) => Record<string, unknown> & { name: string },
+): RuleEntry {
+  const { _type: _, _rule: __, ...safeFields } = fields;
+  const entry: RuleEntry = { _type: "rule", _rule: name, ...safeFields };
+  if (resolve) {
+    Object.defineProperty(entry, "_resolve", { value: resolve, enumerable: false });
+  }
+  return entry;
+}
+
 function makeRule(rule: CpsatRuleName, fields: Record<string, unknown>): RuleEntry {
-  return { _type: "rule", _rule: rule, ...fields };
+  return defineRule(rule, fields);
 }
 
 /**
@@ -829,7 +896,38 @@ export function tieredOvertimeMultiplier(
  * @category Rules
  */
 export function timeOff(opts: TimeOffOptions): RuleEntry {
-  return makeRule("time-off", { ...opts });
+  const { from, until, ...rest } = opts;
+  return defineRule("time-off", { from, until, ...rest }, (ctx) => {
+    if (!rest.dayOfWeek && !rest.dateRange && !rest.dates && !rest.recurringPeriods) {
+      throw new Error(
+        "timeOff() requires at least one time scope (dayOfWeek, dateRange, dates, or recurringPeriods).",
+      );
+    }
+
+    const { appliesTo, dates, ...passthrough } = rest;
+    const entityScope = resolveAppliesTo(appliesTo, ctx.roles, ctx.skills, ctx.memberIds);
+    const resolvedDates = dates ? { specificDates: dates } : {};
+
+    const partialDay: Record<string, unknown> = {};
+    if (from && until) {
+      partialDay.startTime = from;
+      partialDay.endTime = until;
+    } else if (from) {
+      partialDay.startTime = from;
+      partialDay.endTime = { hours: 23, minutes: 59 };
+    } else if (until) {
+      partialDay.startTime = { hours: 0, minutes: 0 };
+      partialDay.endTime = until;
+    }
+
+    return {
+      name: "time-off",
+      ...passthrough,
+      ...entityScope,
+      ...resolvedDates,
+      ...partialDay,
+    } as CpsatRuleConfigEntry;
+  });
 }
 
 /**
@@ -844,57 +942,76 @@ export function timeOff(opts: TimeOffOptions): RuleEntry {
  * @category Rules
  */
 export function assignTogether(
-  members: [string, string, ...string[]],
+  memberIds: [string, string, ...string[]],
   opts?: AssignTogetherOptions,
 ): RuleEntry {
-  return makeRule("assign-together", { members, ...opts });
+  return defineRule("assign-together", { members: memberIds, ...opts }, (ctx) => {
+    for (const member of memberIds) {
+      if (!ctx.memberIds.has(member)) {
+        throw new Error(
+          `assignTogether references unknown member "${member}". ` +
+            `Known member IDs: ${[...ctx.memberIds].join(", ")}`,
+        );
+      }
+    }
+    return {
+      name: "assign-together",
+      groupMemberIds: memberIds,
+      ...opts,
+    } as CpsatRuleConfigEntry;
+  });
 }
 
+/** A value that can be passed to {@link Schedule.with}. */
+type WithArg = Schedule | SchedulingMember[];
+
 // ============================================================================
-// Schedule Definition
+// SolveResult
 // ============================================================================
 
+/** Status of a solve attempt, using idiomatic lowercase TypeScript literals. */
+export type SolveStatus = "optimal" | "feasible" | "infeasible" | "no_solution";
+
 /**
- * Runtime arguments passed to {@link ScheduleDefinition.createSchedulerConfig}.
- *
- * @remarks
- * Separates data known at runtime (team roster, date range, ad-hoc rules)
- * from the static schedule definition. Runtime rules are merged after the
- * definition's own rules and undergo the same `appliesTo` resolution.
+ * Result of {@link Schedule.solve}.
  *
  * @category Schedule Definition
  */
-export interface RuntimeArgs {
-  /** The scheduling period (date range + optional filters). */
-  schedulingPeriod: SchedulingPeriod;
-  /** Team members available for this scheduling run. */
-  members: SchedulingMember[];
-  /** Ad-hoc rules injected at runtime (e.g., vacation, holiday closures). */
-  runtimeRules?: RuleEntry[];
+export interface SolveResult {
+  /** Outcome of the solve attempt. */
+  status: SolveStatus;
+  /** Shift assignments (empty when infeasible or no solution). */
+  assignments: ShiftAssignment[];
+  /** Validation diagnostics from compilation. */
+  validation: ScheduleValidation;
+  /** Cost breakdown (present when cost rules are used and a solution is found). */
+  cost?: CostBreakdown;
 }
 
 /**
- * Result of {@link defineSchedule}.
+ * Options for {@link Schedule.solve} and {@link Schedule.compile}.
  *
  * @category Schedule Definition
  */
-export interface ScheduleDefinition {
-  /** Produce a {@link ModelBuilderConfig} for the solver. */
-  createSchedulerConfig(args: RuntimeArgs): ModelBuilderConfig;
-  /** Declared role IDs. */
-  readonly roleIds: readonly string[];
-  /** Declared skill IDs. */
-  readonly skillIds: readonly string[];
-  /** Names of declared semantic times. */
-  readonly timeNames: readonly string[];
-  /** Shift pattern IDs. */
-  readonly shiftPatternIds: readonly string[];
-  /** Internal rule identifiers in kebab-case (e.g., "max-hours-day", "time-off"). */
-  readonly ruleNames: readonly string[];
+export interface SolveOptions {
+  /** The date range to schedule. */
+  dateRange: { start: string; end: string };
+  /**
+   * Fixed assignments from a prior solve (e.g., rolling schedule).
+   * These are injected as fixed variables in the solver.
+   *
+   * Not yet implemented. Providing pinned assignments logs a warning
+   * and proceeds without them.
+   */
+  pinned?: ShiftAssignment[];
 }
 
+// ============================================================================
+// Schedule Configuration
+// ============================================================================
+
 /**
- * Configuration for {@link defineSchedule}.
+ * Configuration for {@link schedule}.
  *
  * @remarks
  * Coverage entries for the same semantic time and target stack additively.
@@ -902,12 +1019,15 @@ export interface ScheduleDefinition {
  * doubles the count on those days. Use mutually exclusive `dayOfWeek` on
  * both entries to avoid stacking. See {@link cover} for details.
  *
+ * `roleIds`, `times`, `coverage`, and `shiftPatterns` are required.
+ * These four fields form the minimum solvable schedule.
+ *
  * @category Schedule Definition
  */
 export interface ScheduleConfig<
-  R extends readonly string[],
-  S extends readonly string[],
-  T extends Record<string, SemanticTimeEntry>,
+  R extends readonly string[] = readonly string[],
+  S extends readonly string[] = readonly string[],
+  T extends Record<string, SemanticTimeEntry> = Record<string, SemanticTimeEntry>,
 > {
   /** Declared role IDs. */
   roleIds: R;
@@ -921,37 +1041,185 @@ export interface ScheduleConfig<
   shiftPatterns: ShiftPattern[];
   /** Scheduling rules and constraints. */
   rules?: RuleEntry[];
+  /**
+   * Custom rule factories. Keys are rule names, values are functions
+   * that take a config object and return a {@link CompilationRule}.
+   * Built-in rule names cannot be overridden.
+   */
+  ruleFactories?: Record<string, CreateCpsatRuleFunction>;
+  /** Team members (typically added via `.with()` at runtime). */
+  members?: SchedulingMember[];
   /** Days of the week the business operates (inclusion filter). */
-  dayOfWeek?: readonly DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Which day starts the week for weekly rules. Defaults to `"monday"`. */
   weekStartsOn?: DayOfWeek;
 }
 
+// ============================================================================
+// Internal merged config
+// ============================================================================
+
+/** Internal representation of a fully merged schedule. */
+interface MergedScheduleConfig {
+  roleIds: string[];
+  skillIds: string[];
+  times: Record<string, SemanticTimeEntry>;
+  coverage: CoverageEntry[];
+  shiftPatterns: ShiftPattern[];
+  rules: RuleEntry[];
+  ruleFactories: Record<string, CreateCpsatRuleFunction>;
+  members: SchedulingMember[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
+  weekStartsOn?: DayOfWeek;
+}
+
+// ============================================================================
+// Schedule class
+// ============================================================================
+
 /**
- * Define a complete schedule configuration.
+ * An immutable schedule definition.
  *
- * @param config - Schedule configuration object with:
- *   - `roleIds` (required): declared role names
- *   - `skillIds` (optional): declared skill names
- *   - `times` (required): named semantic time periods (see {@link time})
- *   - `coverage` (required): staffing requirements (see {@link cover})
- *   - `shiftPatterns` (required): available shifts (see {@link shift})
- *   - `rules` (optional): constraints and preferences (see rule functions)
- *   - `dayOfWeek` (optional): days the business operates (inclusion filter)
- *   - `weekStartsOn` (optional): defaults to `"monday"`
+ * Created by {@link schedule}, composed via {@link Schedule.with},
+ * and solved via {@link Schedule.solve}.
+ *
+ * @category Schedule Definition
+ */
+export class Schedule {
+  readonly #config: Readonly<MergedScheduleConfig>;
+
+  /** @internal */
+  constructor(config: MergedScheduleConfig) {
+    this.#config = config;
+  }
+
+  /** @internal Returns a defensive copy of the config for merging. */
+  _getConfig(): MergedScheduleConfig {
+    return {
+      ...this.#config,
+      roleIds: [...this.#config.roleIds],
+      skillIds: [...this.#config.skillIds],
+      times: { ...this.#config.times },
+      coverage: [...this.#config.coverage],
+      shiftPatterns: [...this.#config.shiftPatterns],
+      rules: [...this.#config.rules],
+      ruleFactories: { ...this.#config.ruleFactories },
+      members: [...this.#config.members],
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Inspection
+  // --------------------------------------------------------------------------
+
+  /** Declared role IDs. */
+  get roleIds(): readonly string[] {
+    return this.#config.roleIds;
+  }
+
+  /** Declared skill IDs. */
+  get skillIds(): readonly string[] {
+    return this.#config.skillIds;
+  }
+
+  /** Names of declared semantic times. */
+  get timeNames(): readonly string[] {
+    return Object.keys(this.#config.times);
+  }
+
+  /** Shift pattern IDs. */
+  get shiftPatternIds(): readonly string[] {
+    return this.#config.shiftPatterns.map((sp) => sp.id);
+  }
+
+  /** Internal rule identifiers in kebab-case. */
+  get ruleNames(): readonly string[] {
+    return this.#config.rules.map((r) => r._rule);
+  }
+
+  // --------------------------------------------------------------------------
+  // Composition
+  // --------------------------------------------------------------------------
+
+  /**
+   * Merges schedules or members onto this schedule, returning a new
+   * immutable `Schedule`. The original is untouched.
+   *
+   * Accepts any mix of `Schedule` instances and `SchedulingMember[]` arrays.
+   *
+   * Merge semantics (when merging schedules):
+   * - Roles: union (additive)
+   * - Skills: union (additive)
+   * - Times: additive; error on name collision
+   * - Coverage: additive
+   * - Shift patterns: additive; error on ID collision
+   * - Rules: additive
+   * - Members: additive; error on duplicate ID
+   *
+   * Validation runs eagerly: role/skill disjointness, coverage targets
+   * referencing declared roles/skills, member role references, etc.
+   */
+  with(...args: WithArg[]): Schedule {
+    const merged = mergeConfig(this.#config, args);
+    return new Schedule(merged);
+  }
+
+  // --------------------------------------------------------------------------
+  // Solve / compile
+  // --------------------------------------------------------------------------
+
+  /**
+   * Compiles, validates, solves, and parses in one call.
+   *
+   * @param client - Solver client (e.g., `new HttpSolverClient(fetch, url)`)
+   * @param options - Date range and optional pinned assignments
+   */
+  async solve(client: SolverClient, options: SolveOptions): Promise<SolveResult> {
+    const compiled = this.compile(options);
+    if (!compiled.canSolve) {
+      return {
+        status: "infeasible",
+        assignments: [],
+        validation: compiled.validation,
+      };
+    }
+
+    const response = await client.solve(compiled.request);
+    return buildSolveResult(response, compiled, this.#config);
+  }
+
+  /**
+   * Diagnostic escape hatch. Compiles the schedule without solving.
+   *
+   * @param options - Date range and optional pinned assignments
+   */
+  compile(options: SolveOptions): CompilationResult & { builder: ModelBuilder } {
+    if (options.pinned && options.pinned.length > 0) {
+      throw new Error("Pinned assignments are not yet supported.");
+    }
+
+    const modelConfig = resolveToModelConfig(this.#config, options);
+    const builder = new ModelBuilder(modelConfig);
+    const result = builder.compile();
+    return { ...result, builder };
+  }
+}
+
+// ============================================================================
+// schedule() factory
+// ============================================================================
+
+/**
+ * Create a schedule definition.
+ *
+ * Returns an immutable {@link Schedule} that can be composed via `.with()`
+ * and solved via `.solve()`.
  *
  * @example
  * ```typescript
- * import {
- *   defineSchedule, t, time, cover, shift,
- *   maxHoursPerWeek, minRestBetweenShifts, timeOff,
- *   weekdays, weekend,
- * } from "dabke";
- *
- * export default defineSchedule({
+ * const venue = schedule({
  *   roleIds: ["waiter", "runner", "manager"],
  *   skillIds: ["senior"],
- *
  *   times: {
  *     lunch: time({ startTime: t(12), endTime: t(15) }),
  *     dinner: time(
@@ -959,35 +1227,101 @@ export interface ScheduleConfig<
  *       { startTime: t(18), endTime: t(22), dayOfWeek: weekend },
  *     ),
  *   },
- *
  *   coverage: [
  *     cover("lunch", "waiter", 2),
  *     cover("dinner", "waiter", 4, { dayOfWeek: weekdays }),
- *     cover("dinner", "waiter", 6, { dayOfWeek: weekend }),
+ *     cover("dinner", "waiter", 5, { dayOfWeek: weekend }),
+ *     cover("dinner", "manager", 1),
  *   ],
- *
  *   shiftPatterns: [
- *     shift("morning", t(11, 30), t(15)),
+ *     shift("lunch_shift", t(11, 30), t(15)),
  *     shift("evening", t(17), t(22)),
  *   ],
- *
  *   rules: [
+ *     maxHoursPerDay(10),
  *     maxHoursPerWeek(48),
- *     minRestBetweenShifts(10),
- *     timeOff({ appliesTo: "alice", dayOfWeek: weekend }),
+ *     minRestBetweenShifts(11),
  *   ],
  * });
  * ```
  *
  * @category Schedule Definition
  */
-export function defineSchedule<
+export function schedule<
   const R extends readonly string[],
   const S extends readonly string[],
   const T extends Record<string, SemanticTimeEntry>,
->(config: ScheduleConfig<R, S, T>): ScheduleDefinition {
+>(config: ScheduleConfig<R, S, T>): Schedule {
+  const merged = buildMergedConfig(config as unknown as ScheduleConfig);
+  validateConfig(merged);
+  return new Schedule(merged);
+}
+
+/**
+ * Create a partial schedule for composition via `.with()`.
+ *
+ * Unlike {@link schedule}, all fields are optional. Use this for
+ * schedules that layer rules, coverage, or other config onto a
+ * complete base schedule.
+ *
+ * @example
+ * ```typescript
+ * const companyPolicy = partialSchedule({
+ *   rules: [maxHoursPerWeek(40), minRestBetweenShifts(11)],
+ * });
+ *
+ * const ready = venue.with(companyPolicy, teamMembers);
+ * ```
+ *
+ * @category Schedule Definition
+ */
+export function partialSchedule(config: Partial<ScheduleConfig>): Schedule {
+  const merged = buildMergedConfig({
+    roleIds: [],
+    times: {},
+    coverage: [],
+    shiftPatterns: [],
+    ...config,
+  } as ScheduleConfig);
+  validateConfig(merged);
+  return new Schedule(merged);
+}
+
+// ============================================================================
+// Internal: Build merged config from user input
+// ============================================================================
+
+function buildMergedConfig(config: ScheduleConfig): MergedScheduleConfig {
+  return {
+    roleIds: [...config.roleIds],
+    skillIds: [...(config.skillIds ?? [])],
+    times: { ...config.times },
+    coverage: [...config.coverage],
+    shiftPatterns: [...config.shiftPatterns],
+    rules: [...(config.rules ?? [])],
+    ruleFactories: config.ruleFactories ? { ...config.ruleFactories } : {},
+    members: [...(config.members ?? [])],
+    dayOfWeek: config.dayOfWeek,
+    weekStartsOn: config.weekStartsOn,
+  };
+}
+
+// ============================================================================
+// Internal: Validate merged config
+// ============================================================================
+
+function validateConfig(config: MergedScheduleConfig): void {
   const roles = new Set<string>(config.roleIds);
-  const skills = new Set<string>(config.skillIds ?? []);
+  const skills = new Set<string>(config.skillIds);
+
+  // Validate custom rule factories don't override built-in names
+  for (const name of Object.keys(config.ruleFactories)) {
+    if (name in builtInCpsatRuleFactories) {
+      throw new Error(
+        `Custom rule factory "${name}" conflicts with a built-in rule. Choose a different name.`,
+      );
+    }
+  }
 
   // Validate role/skill disjointness
   for (const skill of skills) {
@@ -1014,39 +1348,238 @@ export function defineSchedule<
 
   // Validate coverage entries
   for (const entry of config.coverage) {
-    const targets = Array.isArray(entry.target) ? entry.target : [entry.target];
-    if (Array.isArray(entry.target)) {
-      // Array target: all must be roles (OR logic)
-      for (const target of targets) {
-        if (!roles.has(target)) {
-          throw new Error(
-            `Coverage for "${entry.timeName}" references "${target}" in a role OR group, ` +
-              `but it is not a declared role. Declared roles: ${[...roles].join(", ")}`,
-          );
-        }
-      }
-    } else {
-      // Single target: must be role or skill
-      if (!roles.has(entry.target) && !skills.has(entry.target)) {
+    validateCoverageEntry(entry, roles, skills);
+  }
+
+  // Validate member references
+  const memberIds = new Set<string>();
+  for (const member of config.members) {
+    if (memberIds.has(member.id)) {
+      throw new Error(`Duplicate member ID "${member.id}".`);
+    }
+    memberIds.add(member.id);
+
+    if (roles.has(member.id)) {
+      throw new Error(`Member ID "${member.id}" collides with a declared role name.`);
+    }
+    if (skills.has(member.id)) {
+      throw new Error(`Member ID "${member.id}" collides with a declared skill name.`);
+    }
+
+    for (const role of member.roleIds) {
+      if (!roles.has(role)) {
         throw new Error(
-          `Coverage for "${entry.timeName}" references unknown target "${entry.target}". ` +
-            `Declared roles: ${[...roles].join(", ")}. ` +
-            `Declared skills: ${[...skills].join(", ")}`,
+          `Member "${member.id}" references unknown role "${role}". ` +
+            `Declared roles: ${[...roles].join(", ")}`,
         );
       }
     }
-    // Validate skillIds option
-    if (entry.options.skillIds) {
-      for (const s of entry.options.skillIds) {
-        if (!skills.has(s)) {
+    if (member.skillIds) {
+      for (const skill of member.skillIds) {
+        if (!skills.has(skill)) {
           throw new Error(
-            `Coverage for "${entry.timeName}" uses skill filter "${s}" ` +
-              `which is not a declared skill. Declared skills: ${[...skills].join(", ")}`,
+            `Member "${member.id}" references unknown skill "${skill}". ` +
+              `Declared skills: ${[...skills].join(", ")}`,
           );
         }
       }
     }
   }
+}
+
+function validateCoverageEntry(
+  entry: CoverageEntry,
+  roles: Set<string>,
+  skills: Set<string>,
+): void {
+  const targets = Array.isArray(entry.target) ? entry.target : [entry.target];
+  if (Array.isArray(entry.target)) {
+    for (const target of targets) {
+      if (!roles.has(target)) {
+        throw new Error(
+          `Coverage for "${entry.timeName}" references "${target}" in a role OR group, ` +
+            `but it is not a declared role. Declared roles: ${[...roles].join(", ")}`,
+        );
+      }
+    }
+  } else {
+    if (!roles.has(entry.target) && !skills.has(entry.target)) {
+      throw new Error(
+        `Coverage for "${entry.timeName}" references unknown target "${entry.target}". ` +
+          `Declared roles: ${[...roles].join(", ")}. ` +
+          `Declared skills: ${[...skills].join(", ")}`,
+      );
+    }
+  }
+  if (entry.options.skillIds) {
+    for (const s of entry.options.skillIds) {
+      if (!skills.has(s)) {
+        throw new Error(
+          `Coverage for "${entry.timeName}" uses skill filter "${s}" ` +
+            `which is not a declared skill. Declared skills: ${[...skills].join(", ")}`,
+        );
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Internal: Merge logic
+// ============================================================================
+
+function mergeConfig(base: Readonly<MergedScheduleConfig>, args: WithArg[]): MergedScheduleConfig {
+  const result: MergedScheduleConfig = {
+    roleIds: [...base.roleIds],
+    skillIds: [...base.skillIds],
+    times: { ...base.times },
+    coverage: [...base.coverage],
+    shiftPatterns: [...base.shiftPatterns],
+    rules: [...base.rules],
+    ruleFactories: { ...base.ruleFactories },
+    members: [...base.members],
+    dayOfWeek: base.dayOfWeek,
+    weekStartsOn: base.weekStartsOn,
+  };
+
+  for (const arg of args) {
+    if (arg instanceof Schedule) {
+      mergeScheduleFragment(result, arg);
+    } else if (Array.isArray(arg)) {
+      mergeMembers(result, arg);
+    } else {
+      throw new Error(
+        `Unexpected argument passed to .with(): expected Schedule or SchedulingMember[], got ${typeof arg}`,
+      );
+    }
+  }
+
+  // Validate the merged result
+  validateConfig(result);
+  return result;
+}
+
+function mergeScheduleFragment(result: MergedScheduleConfig, s: Schedule): void {
+  const other = s._getConfig();
+
+  // dayOfWeek: error on conflict (semantics of union vs intersection are ambiguous)
+  if (other.dayOfWeek !== undefined) {
+    if (result.dayOfWeek !== undefined) {
+      const baseSet = new Set(result.dayOfWeek);
+      const same =
+        result.dayOfWeek.length === other.dayOfWeek.length &&
+        other.dayOfWeek.every((d) => baseSet.has(d));
+      if (!same) {
+        throw new Error(
+          "Cannot merge schedules with different dayOfWeek filters. " +
+            `Base has [${result.dayOfWeek.join(", ")}], ` +
+            `incoming has [${other.dayOfWeek.join(", ")}].`,
+        );
+      }
+    } else {
+      result.dayOfWeek = other.dayOfWeek;
+    }
+  }
+
+  // weekStartsOn: error on conflict (only one week boundary for weekly rules)
+  if (other.weekStartsOn !== undefined) {
+    if (result.weekStartsOn !== undefined && result.weekStartsOn !== other.weekStartsOn) {
+      throw new Error(
+        "Cannot merge schedules with different weekStartsOn values. " +
+          `Base has "${result.weekStartsOn}", incoming has "${other.weekStartsOn}".`,
+      );
+    }
+    result.weekStartsOn = other.weekStartsOn;
+  }
+
+  // Roles: union
+  for (const role of other.roleIds) {
+    if (!result.roleIds.includes(role)) {
+      result.roleIds.push(role);
+    }
+  }
+
+  // Skills: union
+  for (const skill of other.skillIds) {
+    if (!result.skillIds.includes(skill)) {
+      result.skillIds.push(skill);
+    }
+  }
+
+  // Times: additive, error on collision
+  for (const [name, entry] of Object.entries(other.times)) {
+    if (name in result.times) {
+      throw new Error(
+        `Time name "${name}" already exists. Cannot merge schedules with colliding time names.`,
+      );
+    }
+    result.times[name] = entry;
+  }
+
+  // Coverage: additive
+  result.coverage.push(...other.coverage);
+
+  // Shift patterns: additive, error on ID collision
+  const existingIds = new Set(result.shiftPatterns.map((sp) => sp.id));
+  for (const sp of other.shiftPatterns) {
+    if (existingIds.has(sp.id)) {
+      throw new Error(
+        `Shift pattern ID "${sp.id}" already exists. Cannot merge schedules with colliding shift pattern IDs.`,
+      );
+    }
+    result.shiftPatterns.push(sp);
+    existingIds.add(sp.id);
+  }
+
+  // Rules: additive
+  result.rules.push(...other.rules);
+
+  // Rule factories: merge, error on collision
+  for (const [name, factory] of Object.entries(other.ruleFactories)) {
+    if (name in result.ruleFactories && result.ruleFactories[name] !== factory) {
+      throw new Error(
+        `Rule factory "${name}" already registered. Cannot merge schedules with colliding rule factories.`,
+      );
+    }
+    result.ruleFactories[name] = factory;
+  }
+
+  // Members: additive, error on duplicate ID
+  const existingMemberIds = new Set(result.members.map((m) => m.id));
+  for (const member of other.members) {
+    if (existingMemberIds.has(member.id)) {
+      throw new Error(
+        `Duplicate member ID "${member.id}". Cannot merge schedules with colliding member IDs.`,
+      );
+    }
+    result.members.push(member);
+    existingMemberIds.add(member.id);
+  }
+}
+
+function mergeMembers(result: MergedScheduleConfig, incoming: SchedulingMember[]): void {
+  const existingIds = new Set(result.members.map((m) => m.id));
+  for (const member of incoming) {
+    if (existingIds.has(member.id)) {
+      throw new Error(
+        `Duplicate member ID "${member.id}". Cannot merge members with colliding IDs.`,
+      );
+    }
+    result.members.push(member);
+    existingIds.add(member.id);
+  }
+}
+
+// ============================================================================
+// Internal: Resolve to ModelBuilderConfig
+// ============================================================================
+
+function resolveToModelConfig(
+  config: Readonly<MergedScheduleConfig>,
+  options: SolveOptions,
+): ModelBuilderConfig {
+  const roles = new Set<string>(config.roleIds);
+  const skills = new Set<string>(config.skillIds);
+  const memberIds = new Set<string>(config.members.map((m) => m.id));
 
   // Build semantic time context
   const semanticTimes = defineSemanticTimes(config.times);
@@ -1054,104 +1587,115 @@ export function defineSchedule<
   // Convert coverage entries to semantic coverage requirements
   const coverageReqs = buildCoverageRequirements(config.coverage, roles, skills);
 
-  const shiftPatterns = config.shiftPatterns;
+  // Resolve scheduling period with dayOfWeek filter
+  const schedulingPeriod: SchedulingPeriod = {
+    dateRange: options.dateRange,
+  };
+  const resolvedPeriod = applyDaysFilter(schedulingPeriod, config.dayOfWeek);
+  const days = resolveDaysFromPeriod(resolvedPeriod);
+
+  // Resolve coverage
+  const resolvedCoverage = semanticTimes.resolve(coverageReqs, days);
+
+  // Resolve rules
+  const allRules = [...config.rules];
+
+  // Validate pay data when cost rules are present
+  const costRuleNames = new Set([
+    "minimize-cost",
+    "day-cost-multiplier",
+    "day-cost-surcharge",
+    "time-cost-surcharge",
+    "overtime-weekly-multiplier",
+    "overtime-weekly-surcharge",
+    "overtime-daily-multiplier",
+    "overtime-daily-surcharge",
+    "overtime-tiered-multiplier",
+  ]);
+  const hasCostRules = allRules.some((r) => costRuleNames.has(r._rule));
+  if (hasCostRules) {
+    const missingPay = config.members.filter((m) => !m.pay).map((m) => m.id);
+    if (missingPay.length > 0) {
+      throw new Error(
+        `Cost rules require pay data on all members. Missing pay: ${missingPay.join(", ")}`,
+      );
+    }
+  }
+
+  // Sort rules so minimize-cost compiles before modifier rules
+  const sortedRules = sortCostRulesFirst(allRules);
+  const ruleConfigs = resolveRules(sortedRules, roles, skills, memberIds);
 
   return {
-    roleIds: config.roleIds as readonly string[],
-    skillIds: (config.skillIds ?? []) as readonly string[],
-    timeNames: Object.keys(config.times) as readonly string[],
-    shiftPatternIds: config.shiftPatterns.map((sp) => sp.id) as readonly string[],
-    ruleNames: (config.rules ?? []).map((r: RuleEntry) => r._rule) as readonly string[],
-    createSchedulerConfig(args: RuntimeArgs): ModelBuilderConfig {
-      // Detect duplicate member IDs
-      const memberIds = new Set<string>();
-      for (const member of args.members) {
-        if (memberIds.has(member.id)) {
-          throw new Error(`Duplicate member ID "${member.id}".`);
-        }
-        memberIds.add(member.id);
-      }
-
-      // Validate member IDs don't collide with roles/skills
-      for (const member of args.members) {
-        if (roles.has(member.id)) {
-          throw new Error(`Member ID "${member.id}" collides with a declared role name.`);
-        }
-        if (skills.has(member.id)) {
-          throw new Error(`Member ID "${member.id}" collides with a declared skill name.`);
-        }
-      }
-
-      // Validate member roleIds/skillIds reference declared roles/skills
-      for (const member of args.members) {
-        for (const role of member.roleIds) {
-          if (!roles.has(role)) {
-            throw new Error(
-              `Member "${member.id}" references unknown role "${role}". ` +
-                `Declared roles: ${[...roles].join(", ")}`,
-            );
-          }
-        }
-        if (member.skillIds) {
-          for (const skill of member.skillIds) {
-            if (!skills.has(skill)) {
-              throw new Error(
-                `Member "${member.id}" references unknown skill "${skill}". ` +
-                  `Declared skills: ${[...skills].join(", ")}`,
-              );
-            }
-          }
-        }
-      }
-
-      // Resolve rules
-      const specRules = config.rules ?? [];
-      const runtimeRules = args.runtimeRules ?? [];
-      const allRules = [...specRules, ...runtimeRules];
-
-      // Validate pay data when cost rules are present
-      const costRuleNames = new Set([
-        "minimize-cost",
-        "day-cost-multiplier",
-        "day-cost-surcharge",
-        "time-cost-surcharge",
-        "overtime-weekly-multiplier",
-        "overtime-weekly-surcharge",
-        "overtime-daily-multiplier",
-        "overtime-daily-surcharge",
-        "overtime-tiered-multiplier",
-      ]);
-      const hasCostRules = allRules.some((r) => costRuleNames.has(r._rule));
-      if (hasCostRules) {
-        const missingPay = args.members.filter((m) => !m.pay).map((m) => m.id);
-        if (missingPay.length > 0) {
-          throw new Error(
-            `Cost rules require pay data on all members. Missing pay: ${missingPay.join(", ")}`,
-          );
-        }
-      }
-
-      // Sort rules so minimize-cost compiles before modifier rules
-      const sortedRules = sortCostRulesFirst(allRules);
-      const ruleConfigs = resolveRules(sortedRules, roles, skills, memberIds);
-
-      // Resolve scheduling period with dayOfWeek filter
-      const resolvedPeriod = applyDaysFilter(args.schedulingPeriod, config.dayOfWeek);
-      const days = resolveDaysFromPeriod(resolvedPeriod);
-
-      // Resolve coverage
-      const resolvedCoverage = semanticTimes.resolve(coverageReqs, days);
-
-      return {
-        members: args.members,
-        shiftPatterns,
-        schedulingPeriod: resolvedPeriod,
-        coverage: resolvedCoverage,
-        ruleConfigs,
-        weekStartsOn: config.weekStartsOn,
-      };
-    },
+    members: config.members,
+    shiftPatterns: config.shiftPatterns,
+    schedulingPeriod: resolvedPeriod,
+    coverage: resolvedCoverage,
+    ruleConfigs,
+    ruleFactories:
+      Object.keys(config.ruleFactories).length > 0
+        ? { ...builtInCpsatRuleFactories, ...config.ruleFactories }
+        : undefined,
+    weekStartsOn: config.weekStartsOn,
   };
+}
+
+// ============================================================================
+// Internal: Build SolveResult from solver response
+// ============================================================================
+
+function mapSolverStatus(solverStatus: SolverResponse["status"]): SolveStatus {
+  switch (solverStatus) {
+    case "OPTIMAL":
+      return "optimal";
+    case "FEASIBLE":
+      return "feasible";
+    case "INFEASIBLE":
+      return "infeasible";
+    case "TIMEOUT":
+    case "ERROR":
+      return "no_solution";
+    default:
+      return "no_solution";
+  }
+}
+
+function buildSolveResult(
+  response: SolverResponse,
+  compiled: CompilationResult & { builder: ModelBuilder },
+  config: Readonly<MergedScheduleConfig>,
+): SolveResult {
+  const status = mapSolverStatus(response.status);
+  const parsed = parseSolverResponse(response);
+
+  // Run post-solve validation when a solution exists
+  if (parsed.assignments.length > 0 && (status === "optimal" || status === "feasible")) {
+    const resolved = resolveAssignments(parsed.assignments, compiled.builder.shiftPatterns);
+    compiled.builder.reporter.analyzeSolution(response);
+    compiled.builder.validateSolution(resolved);
+  }
+
+  const validation = compiled.builder.reporter.getValidation();
+
+  const result: SolveResult = {
+    status,
+    assignments: parsed.assignments,
+    validation,
+  };
+
+  // Compute cost breakdown when cost rules are present and a solution was found
+  if (parsed.assignments.length > 0 && (status === "optimal" || status === "feasible")) {
+    const hasCostRules = config.rules.some((r) => r._rule === "minimize-cost");
+    if (hasCostRules) {
+      result.cost = calculateScheduleCost(parsed.assignments, {
+        members: config.members,
+        shiftPatterns: config.shiftPatterns,
+        rules: compiled.builder.rules,
+      });
+    }
+  }
+
+  return result;
 }
 
 // ============================================================================
@@ -1279,7 +1823,6 @@ function buildVariantCoverageRequirement<T extends string>(
 /**
  * Resolves an `appliesTo` value into entity scope fields.
  *
- * @remarks
  * Each target string is checked against roles, skills, then member IDs.
  * If all targets resolve to the same namespace, they are combined into one
  * scope field. If they span namespaces, an error is thrown; the caller
@@ -1287,9 +1830,9 @@ function buildVariantCoverageRequirement<T extends string>(
  */
 function resolveAppliesTo(
   appliesTo: string | string[] | undefined,
-  roles: Set<string>,
-  skills: Set<string>,
-  memberIds: Set<string>,
+  roles: ReadonlySet<string>,
+  skills: ReadonlySet<string>,
+  memberIds: ReadonlySet<string>,
 ): {
   memberIds?: [string, ...string[]];
   roleIds?: [string, ...string[]];
@@ -1322,7 +1865,6 @@ function resolveAppliesTo(
   ).length;
 
   if (namespacesUsed > 1) {
-    // Mixed namespaces not supported in a single rule config.
     throw new Error(
       `appliesTo targets span multiple namespaces (roles: [${resolvedRoles.join(", ")}], ` +
         `skills: [${resolvedSkills.join(", ")}], members: [${resolvedMembers.join(", ")}]). ` +
@@ -1348,80 +1890,29 @@ function resolveRules(
   skills: Set<string>,
   memberIds: Set<string>,
 ): CpsatRuleConfigEntry[] {
+  const ctx: RuleResolveContext = { roles, skills, memberIds };
+
   return rules.map((rule) => {
-    const { _type, _rule, appliesTo, dates, ...passthrough } = rule as RuleEntry & {
+    // Rules with custom resolvers handle their own translation
+    if (rule._resolve) {
+      return rule._resolve(ctx) as CpsatRuleConfigEntry;
+    }
+
+    // Default resolution: appliesTo → entity scope, dates → specificDates
+    const { _type, _rule, _resolve, appliesTo, dates, ...passthrough } = rule as RuleEntry & {
       appliesTo?: string | string[];
       dates?: string[];
     };
 
-    const entityScope =
-      _rule === "assign-together" ? {} : resolveAppliesTo(appliesTo, roles, skills, memberIds);
-
-    // Rename dates → specificDates (internal field name)
+    const entityScope = resolveAppliesTo(appliesTo, roles, skills, memberIds);
     const resolvedDates = dates ? { specificDates: dates } : {};
 
-    switch (_rule) {
-      case "time-off": {
-        const { from, until, ...timeOffRest } = passthrough as Record<string, unknown> & {
-          from?: TimeOfDay;
-          until?: TimeOfDay;
-        };
-
-        if (
-          !timeOffRest.dayOfWeek &&
-          !timeOffRest.dateRange &&
-          !dates &&
-          !timeOffRest.recurringPeriods
-        ) {
-          throw new Error(
-            "timeOff() requires at least one time scope (dayOfWeek, dateRange, dates, or recurringPeriods).",
-          );
-        }
-
-        const partialDay: Record<string, unknown> = {};
-        if (from && until) {
-          partialDay.startTime = from;
-          partialDay.endTime = until;
-        } else if (from) {
-          partialDay.startTime = from;
-          partialDay.endTime = { hours: 23, minutes: 59 };
-        } else if (until) {
-          partialDay.startTime = { hours: 0, minutes: 0 };
-          partialDay.endTime = until;
-        }
-
-        return {
-          name: _rule,
-          ...timeOffRest,
-          ...entityScope,
-          ...resolvedDates,
-          ...partialDay,
-        } as CpsatRuleConfigEntry;
-      }
-
-      case "assign-together": {
-        const { members, ...atRest } = passthrough as Record<string, unknown> & {
-          members: [string, string, ...string[]];
-        };
-        for (const member of members) {
-          if (!memberIds.has(member)) {
-            throw new Error(
-              `assignTogether references unknown member "${member}". ` +
-                `Known member IDs: ${[...memberIds].join(", ")}`,
-            );
-          }
-        }
-        return { name: _rule, groupMemberIds: members, ...atRest } as CpsatRuleConfigEntry;
-      }
-
-      default:
-        return {
-          name: _rule,
-          ...passthrough,
-          ...entityScope,
-          ...resolvedDates,
-        } as CpsatRuleConfigEntry;
-    }
+    return {
+      name: _rule,
+      ...passthrough,
+      ...entityScope,
+      ...resolvedDates,
+    } as CpsatRuleConfigEntry;
   }) as CpsatRuleConfigEntry[];
 }
 
@@ -1432,7 +1923,6 @@ function resolveRules(
 /**
  * Sorts rules so that `minimize-cost` compiles before cost modifier rules.
  *
- * @remarks
  * The `minimize-cost` rule must be compiled first because modifier rules
  * (multipliers, surcharges) reference cost variables it creates.
  * Non-cost rules retain their original relative order.
@@ -1451,7 +1941,7 @@ function sortCostRulesFirst(rules: RuleEntry[]): RuleEntry[] {
 
 function applyDaysFilter(
   schedulingPeriod: SchedulingPeriod,
-  dayOfWeek?: readonly DayOfWeek[],
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]],
 ): SchedulingPeriod {
   if (!dayOfWeek || dayOfWeek.length === 0) {
     return schedulingPeriod;
@@ -1459,10 +1949,10 @@ function applyDaysFilter(
 
   const existingDays = schedulingPeriod.dayOfWeek;
   if (!existingDays || existingDays.length === 0) {
-    return { ...schedulingPeriod, dayOfWeek: dayOfWeek as DayOfWeek[] };
+    return { ...schedulingPeriod, dayOfWeek: [...dayOfWeek] };
   }
 
   const existingSet = new Set(existingDays);
-  const intersected = dayOfWeek.filter((day) => existingSet.has(day)) as DayOfWeek[];
+  const intersected = dayOfWeek.filter((day) => existingSet.has(day));
   return { ...schedulingPeriod, dayOfWeek: intersected };
 }

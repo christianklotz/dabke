@@ -115,7 +115,7 @@ export interface ShiftPattern {
    * { id: "full_shift", startTime: t(9), endTime: t(18), dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"] }
    * ```
    */
-  dayOfWeek?: DayOfWeek[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
 
   /**
    * Physical location where this shift takes place.
