@@ -1,5 +1,7 @@
 /**
- * @privateRemarks
+ * Scheduling library powered by constraint programming (CP-SAT).
+ *
+ * @remarks
  * ## Core Concepts
  *
  * **Schedule**: The primary API. Small, composable functions
@@ -158,10 +160,13 @@ export {
   maxHoursPerWeek,
   minHoursPerDay,
   minHoursPerWeek,
+  maxDaysPerWeek,
+  minDaysPerWeek,
   maxShiftsPerDay,
   maxConsecutiveDays,
   minConsecutiveDays,
   minRestBetweenShifts,
+  mustAssign,
   preference,
   preferLocation,
   timeOff,
@@ -178,7 +183,7 @@ export {
   tieredOvertimeMultiplier,
   weekdays,
   weekend,
-} from "./schedule.js";
+} from "./schedule/index.js";
 
 export type {
   CoverageEntry,
@@ -195,4 +200,4 @@ export type {
   SolveResult,
   SolveStatus,
   SolveOptions,
-} from "./schedule.js";
+} from "./schedule/index.js";

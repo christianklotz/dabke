@@ -178,11 +178,14 @@ const ready = venue.with([
 
 ## LLM Integration
 
-dabke ships an `llms.txt` with complete API documentation for AI code generation:
+Generate per-section API reference docs from TSDoc:
 
-```typescript
-import { apiDocs } from "dabke/llms";
+```bash
+npm run generate:reference -- --outdir ./references
 ```
+
+This produces a `README.md` index, an `api.md` API surface listing,
+and one detail file per category (schedule, rules, coverage, etc.).
 
 ---
 

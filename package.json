@@ -1,6 +1,6 @@
 {
   "name": "dabke",
-  "version": "0.82.0",
+  "version": "0.83.0",
   "description": "Scheduling library powered by constraint programming (CP-SAT)",
   "keywords": [
     "constraint-programming",
@@ -26,7 +26,6 @@
     "CHANGELOG.md",
     "dist",
     "LICENSE",
-    "llms.txt",
     "README.md",
     "solver",
     "src"
@@ -39,10 +38,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./llms": {
-      "types": "./dist/llms.d.ts",
-      "default": "./dist/llms.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
@@ -59,14 +54,14 @@
     "test:unit:watch": "vitest --watch --project=unit",
     "test:integration": "[ -f .env ] && { set -a; source .env; set +a; } && vitest run --project=integration",
     "test:integration:watch": "[ -f .env ] && { set -a; source .env; set +a; } && vitest --watch --project=integration",
-    "generate:llmstxt": "tsx scripts/generate-llmstxt.ts && oxfmt --write llms.txt src/llms.ts"
+    "generate:reference": "tsx scripts/generate-reference.ts"
   },
   "dependencies": {
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "commander": "^14.0.2",
+    "@types/node": "^25.0.0",
+    "commander": "^14.0.3",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },

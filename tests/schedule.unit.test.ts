@@ -20,10 +20,13 @@ import {
   preferLocation,
   timeOff,
   assignTogether,
+  mustAssign,
+  maxDaysPerWeek,
+  minDaysPerWeek,
   weekdays,
   weekend,
-} from "../src/schedule.js";
-import type { RuleEntry } from "../src/schedule.js";
+} from "../src/schedule/index.js";
+import type { RuleEntry } from "../src/schedule/index.js";
 
 // ============================================================================
 // t() helper
@@ -274,6 +277,30 @@ describe("rule functions", () => {
     const rule = minRestBetweenShifts(10);
     expect(rule._rule).toBe("min-rest-between-shifts");
     expect(rule.hours).toBe(10);
+  });
+
+  it("mustAssign", () => {
+    const rule = mustAssign({ appliesTo: "alice" });
+    expect(rule._rule).toBe("must-assign");
+    expect(rule.appliesTo).toBe("alice");
+  });
+
+  it("mustAssign without options", () => {
+    const rule = mustAssign();
+    expect(rule._rule).toBe("must-assign");
+  });
+
+  it("maxDaysPerWeek", () => {
+    const rule = maxDaysPerWeek(5);
+    expect(rule._rule).toBe("max-days-week");
+    expect(rule.days).toBe(5);
+  });
+
+  it("minDaysPerWeek", () => {
+    const rule = minDaysPerWeek(3, { appliesTo: "full-time" });
+    expect(rule._rule).toBe("min-days-week");
+    expect(rule.days).toBe(3);
+    expect(rule.appliesTo).toBe("full-time");
   });
 
   it("preference", () => {
@@ -1245,5 +1272,56 @@ describe("variant coverage", () => {
     expect(waiterFri?.targetCount).toBe(2);
     expect(waiterSat?.targetCount).toBe(4);
     expect(managerFri?.targetCount).toBe(1);
+  });
+});
+
+// ============================================================================
+// Type-level: skillIds enforcement via NoInfer
+//
+// These tests have no runtime assertions. They verify that tsc catches
+// undeclared skills in coverage via @ts-expect-error. If the type
+// constraint breaks, tsc reports "Unused @ts-expect-error directive"
+// and the typecheck step fails.
+// ============================================================================
+
+describe("skillIds type enforcement", () => {
+  it("accepts coverage targeting only roles when skillIds is omitted", () => {
+    schedule({
+      roleIds: ["barista"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "barista", 1)],
+      shiftPatterns: [shift("day", t(9), t(17))],
+    });
+  });
+
+  it("accepts coverage targeting skills when skillIds is declared", () => {
+    schedule({
+      roleIds: ["barista"],
+      skillIds: ["keyholder"],
+      times: {
+        store: time({ startTime: t(9), endTime: t(17) }),
+        opening: time({ startTime: t(8, 30), endTime: t(9) }),
+      },
+      coverage: [cover("store", "barista", 2), cover("opening", "keyholder", 1)],
+      shiftPatterns: [shift("day", t(8, 30), t(17))],
+    });
+  });
+
+  it("rejects coverage targeting undeclared skill", () => {
+    expect(() =>
+      schedule({
+        roleIds: ["barista"],
+        times: {
+          store: time({ startTime: t(9), endTime: t(17) }),
+          opening: time({ startTime: t(8, 30), endTime: t(9) }),
+        },
+        coverage: [
+          cover("store", "barista", 2),
+          // @ts-expect-error — "keyholder" is not a declared role or skill
+          cover("opening", "keyholder", 1),
+        ],
+        shiftPatterns: [shift("day", t(8, 30), t(17))],
+      }),
+    ).toThrow(/unknown target "keyholder"/);
   });
 });

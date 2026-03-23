@@ -8,13 +8,16 @@ export interface CpsatRuleRegistry {
   "assignment-priority": import("./assignment-priority.js").AssignmentPriorityConfig;
   "location-preference": import("./location-preference.js").LocationPreferenceConfig;
   "max-consecutive-days": import("./max-consecutive-days.js").MaxConsecutiveDaysConfig;
+  "max-days-week": import("./max-days-week.js").MaxDaysWeekConfig;
   "max-hours-day": import("./max-hours-day.js").MaxHoursDayConfig;
   "max-hours-week": import("./max-hours-week.js").MaxHoursWeekConfig;
   "max-shifts-day": import("./max-shifts-day.js").MaxShiftsDayConfig;
   "min-consecutive-days": import("./min-consecutive-days.js").MinConsecutiveDaysConfig;
+  "min-days-week": import("./min-days-week.js").MinDaysWeekConfig;
   "min-hours-day": import("./min-hours-day.js").MinHoursDayConfig;
   "min-hours-week": import("./min-hours-week.js").MinHoursWeekConfig;
   "min-rest-between-shifts": import("./min-rest-between-shifts.js").MinRestBetweenShiftsConfig;
+  "must-assign": import("./must-assign.js").MustAssignConfig;
   "time-off": import("./time-off.js").TimeOffConfig;
   "minimize-cost": import("./minimize-cost.js").MinimizeCostConfig;
   "day-cost-multiplier": import("./day-cost-multiplier.js").DayCostMultiplierConfig;

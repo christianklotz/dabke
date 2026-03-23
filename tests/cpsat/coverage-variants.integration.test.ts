@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { schedule, t, time, cover, shift, weekdays, weekend } from "../../src/schedule.js";
+import { schedule, t, time, cover, shift, weekdays, weekend } from "../../src/schedule/index.js";
 import { getSolverClient, decodeAssignments } from "./helpers.js";
 
 /**

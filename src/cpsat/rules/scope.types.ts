@@ -90,7 +90,7 @@ type NonEmptyArray<T> = [T, ...T[]];
 /**
  * Recurring calendar period for time scoping.
  *
- * @category Rules
+ * @category Supporting Types
  */
 export interface RecurringPeriod {
   name: string;

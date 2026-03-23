@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.83.0 (2026-03-21)
+
+### Breaking Changes
+
+- Remove `./llms` export path and `llms.txt` from the package. The LLM reference
+  is now generated externally via `generate:reference`.
+
+### Features
+
+- Add `maxDaysPerWeek(days, opts?)` and `minDaysPerWeek(days, opts?)` rule functions
+  to constrain the number of distinct working days per member per scheduling week.
+- Add `mustAssign(opts?)` rule for staffing obligations. Guarantees targeted members
+  appear on the schedule each week; defaults to HIGH priority so the schedule still
+  generates when a member cannot be placed.
+
+### Improvements
+
+- Split `schedule.ts` into focused modules under `src/schedule/` (public API unchanged).
+- Add `NoInfer` on coverage entry types so role/skill references are checked against
+  declared roles and skills at compile time.
+- Update devDependencies (@types/node ^25.0.0, commander ^14.0.3).
+- Publish workflow now includes changelog text in GitHub releases.
+
 ## 0.82.0 (2026-02-23)
 
 ### Breaking Changes

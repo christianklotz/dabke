@@ -1,15 +1,20 @@
 #!/usr/bin/env tsx
 
 /**
- * Generates llms.txt and src/llms.ts from TSDoc in the source files.
+ * Generates API reference documentation from TSDoc in the source files.
+ *
+ * Two modes:
+ *
+ *   1. Default (no args): writes api.md, llms.txt, src/llms.ts to the
+ *      package root. Used for the published npm package.
+ *
+ *   2. --outdir <path>: writes per-section markdown files and a README.md
+ *      index to the given directory. Used by the tile build script to
+ *      populate the skill's references/ folder.
  *
  * Symbols opt in via `@category <Section Name>` in their TSDoc. The
  * generator discovers all categorized exports, groups them by category,
- * and renders them in the order defined by SECTION_ORDER. Symbols
- * without `@category` are excluded from llms.txt (they remain in
- * TypeDoc and IDE tooltips).
- *
- * The overview comes from `@packageDocumentation` in index.ts.
+ * and renders them in the order defined by SECTION_ORDER.
  *
  * TSDoc filtering:
  *   - `@category` controls inclusion and grouping
@@ -29,22 +34,31 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 
 // ============================================================================
-// Document structure.
-//
-// Section order for llms.txt. Only categories listed here are rendered;
-// any @category value not in this list is ignored with a warning.
-// All descriptive content comes from TSDoc in the source files.
+// Document structure
 // ============================================================================
 
-const SECTION_ORDER = [
-  "Schedule Definition",
-  "Time Periods",
-  "Coverage",
-  "Shift Patterns",
-  "Rules",
-  "Cost Optimization",
-  "Supporting Types",
+interface SectionDef {
+  heading: string;
+  slug: string;
+}
+
+const SECTIONS: SectionDef[] = [
+  { heading: "Schedule Definition", slug: "schedule" },
+  { heading: "Time Periods", slug: "time-periods" },
+  { heading: "Coverage", slug: "coverage" },
+  { heading: "Shift Patterns", slug: "shift-patterns" },
+  { heading: "Rules", slug: "rules" },
+  { heading: "Cost Optimization", slug: "cost" },
+  { heading: "Supporting Types", slug: "types" },
 ];
+
+const SECTION_ORDER = SECTIONS.map((s) => s.heading);
+
+function slugFor(heading: string): string {
+  return (
+    SECTIONS.find((s) => s.heading === heading)?.slug ?? heading.toLowerCase().replace(/\s+/g, "-")
+  );
+}
 
 // ============================================================================
 // TypeScript program setup
@@ -61,7 +75,6 @@ function createProgram(): ts.Program {
 // TSDoc extraction
 // ============================================================================
 
-/** Convert {@link Foo} and {@link Foo display text} to backticked name. */
 function stripLinks(s: string): string {
   return s.replace(/\{@link\s+([^}\s]+)(?:\s+[^}]*)?\}/g, "`$1`");
 }
@@ -72,13 +85,11 @@ function getJSDocNode(node: ts.Node): ts.JSDoc | undefined {
   return first && ts.isJSDoc(first) ? first : undefined;
 }
 
-/** Check if a node's JSDoc contains @internal. */
 function isInternal(node: ts.Node): boolean {
   const doc = getJSDocNode(node);
   return doc?.tags?.some((t) => t.tagName.text === "internal") ?? false;
 }
 
-/** Extract the @category value from a node's JSDoc. */
 function extractCategory(node: ts.Node): string | undefined {
   const doc = getJSDocNode(node);
   if (!doc?.tags) return undefined;
@@ -98,7 +109,6 @@ function extractJSDoc(node: ts.Node): string {
   let exampleRendered = false;
 
   for (const tag of doc.tags ?? []) {
-    // Skip tags that should not appear in public output
     if (tag.tagName.text === "privateRemarks") continue;
     if (tag.tagName.text === "internal") continue;
     if (tag.tagName.text === "packageDocumentation") continue;
@@ -118,7 +128,6 @@ function extractJSDoc(node: ts.Node): string {
   return stripLinks(result);
 }
 
-/** Extract the @returns description from a node's JSDoc. */
 function extractReturnsDoc(node: ts.Node): string {
   const doc = getJSDocNode(node);
   if (!doc?.tags) return "";
@@ -130,7 +139,6 @@ function extractReturnsDoc(node: ts.Node): string {
   return "";
 }
 
-/** Extract @param description for a specific parameter. */
 function extractParamDoc(node: ts.Node, paramName: string): string {
   const doc = getJSDocNode(node);
   if (!doc?.tags) return "";
@@ -146,9 +154,6 @@ function extractParamDoc(node: ts.Node, paramName: string): string {
   return "";
 }
 
-/**
- * Extract the @packageDocumentation block from a source file.
- */
 function extractPackageDoc(program: ts.Program, filePath: string): string {
   const sf = program.getSourceFile(filePath);
   if (!sf || sf.statements.length === 0) return "";
@@ -175,9 +180,7 @@ function extractPackageDoc(program: ts.Program, filePath: string): string {
 // Type formatting
 // ============================================================================
 
-/** Get the declared type text from a node's type annotation or method signature. */
 function sourceType(node: ts.Node): string | undefined {
-  // Method signatures: render as (params) => ReturnType
   if (ts.isMethodSignature(node)) {
     const params = node.parameters
       .map((p) => `${p.name.getText()}: ${p.type?.getText() ?? "unknown"}`)
@@ -212,11 +215,20 @@ interface DocEntry {
   name: string;
   kind: "interface" | "type" | "function" | "const";
   description: string;
+  summary: string;
   signature?: string;
   properties?: { name: string; type: string; description: string; optional: boolean }[];
   parameters?: { name: string; type: string; description: string; optional: boolean }[];
   returnType?: string;
   returnsDoc?: string;
+}
+
+function firstSentence(desc: string): string {
+  if (!desc) return "";
+  const match = desc.match(/^(.+?\.)\s/);
+  if (match) return match[1]!;
+  const firstLine = desc.split("\n")[0]?.trim() ?? "";
+  return firstLine.length > 120 ? firstLine.slice(0, 117) + "..." : firstLine;
 }
 
 function extractDocEntry(
@@ -226,27 +238,33 @@ function extractDocEntry(
   sf: ts.SourceFile,
 ): DocEntry | undefined {
   if (ts.isInterfaceDeclaration(node)) {
+    const description = extractJSDoc(node);
     return {
       name,
       kind: "interface",
-      description: extractJSDoc(node),
+      description,
+      summary: firstSentence(description),
       properties: extractProperties(checker, node),
     };
   }
   if (ts.isTypeAliasDeclaration(node)) {
+    const description = extractJSDoc(node);
     return {
       name,
       kind: "type",
-      description: extractJSDoc(node),
+      description,
+      summary: firstSentence(description),
       signature: typeToString(checker, node.type),
     };
   }
   if (ts.isFunctionDeclaration(node)) {
     const docNode = findDocumentedOverload(sf, name) ?? node;
+    const description = extractJSDoc(docNode);
     return {
       name,
       kind: "function",
-      description: extractJSDoc(docNode),
+      description,
+      summary: firstSentence(description),
       parameters: docNode.parameters.map((p) => ({
         name: p.name.getText(),
         type: sourceType(p) ?? typeToString(checker, p),
@@ -260,10 +278,12 @@ function extractDocEntry(
   if (ts.isVariableStatement(node)) {
     const decl = node.declarationList.declarations[0];
     if (decl) {
+      const description = extractJSDoc(node);
       return {
         name,
         kind: "const",
-        description: extractJSDoc(node),
+        description,
+        summary: firstSentence(description),
         signature: typeToString(checker, decl),
       };
     }
@@ -271,19 +291,10 @@ function extractDocEntry(
   return undefined;
 }
 
-/**
- * Strip leading "- " from @param descriptions.
- * TSDoc convention is `@param name - description`; the parser includes
- * the hyphen in the comment text.
- */
 function cleanParamDescription(desc: string): string {
   return desc.replace(/^- /, "");
 }
 
-/**
- * Find the first overload signature of a function that has JSDoc.
- * Returns undefined if no documented overload exists.
- */
 function findDocumentedOverload(
   sf: ts.SourceFile,
   name: string,
@@ -303,7 +314,6 @@ function findDocumentedOverload(
   return found;
 }
 
-/** Extract the exported name from a declaration node, if any. */
 function getExportedName(node: ts.Node): string | undefined {
   const hasExport =
     ts.canHaveModifiers(node) &&
@@ -325,10 +335,6 @@ function getExportedName(node: ts.Node): string | undefined {
   return undefined;
 }
 
-/**
- * Discover all exported symbols that have a @category tag.
- * Returns a map from category name to ordered list of DocEntry.
- */
 function discoverCategories(program: ts.Program, checker: ts.TypeChecker): Map<string, DocEntry[]> {
   const groups = new Map<string, DocEntry[]>();
   const seen = new Set<string>();
@@ -340,8 +346,6 @@ function discoverCategories(program: ts.Program, checker: ts.TypeChecker): Map<s
       const name = getExportedName(node);
       if (!name || seen.has(name)) return;
 
-      // For overloaded functions, check all overloads for @category.
-      // The category tag lives on the documented overload (no body).
       let categoryNode: ts.Node = node;
       if (ts.isFunctionDeclaration(node)) {
         const docOverload = findDocumentedOverload(sf, name);
@@ -368,17 +372,14 @@ function extractProperties(
   node: ts.InterfaceDeclaration,
 ): DocEntry["properties"] {
   if (node.members.length > 0) {
-    return (
-      node.members
-        // Filter out @internal members
-        .filter((m) => !isInternal(m))
-        .map((m) => ({
-          name: m.name?.getText() || "unknown",
-          type: sourceType(m) ?? typeToString(checker, m),
-          description: extractJSDoc(m),
-          optional: !!(m as ts.PropertySignature).questionToken,
-        }))
-    );
+    return node.members
+      .filter((m) => !isInternal(m))
+      .map((m) => ({
+        name: m.name?.getText() || "unknown",
+        type: sourceType(m) ?? typeToString(checker, m),
+        description: extractJSDoc(m),
+        optional: !!(m as ts.PropertySignature).questionToken,
+      }));
   }
   const type = checker.getTypeAtLocation(node);
   return checker.getPropertiesOfType(type).map((prop) => {
@@ -399,10 +400,10 @@ function extractProperties(
 }
 
 // ============================================================================
-// Markdown rendering
+// Rendering: full doc entry (used in per-section files and monolithic output)
 // ============================================================================
 
-function renderDoc(doc: DocEntry): string {
+function renderFullDoc(doc: DocEntry): string {
   let out = `### \`${doc.name}\`\n\n`;
   if (doc.description) out += `${doc.description}\n\n`;
 
@@ -439,8 +440,6 @@ function renderDoc(doc: DocEntry): string {
         out += `${ret}\n\n`;
       }
     } else if (!doc.description?.includes("```")) {
-      // Compact signature line, but only when no example code block
-      // is already present (examples demonstrate usage better).
       const params = doc.parameters
         .map((p) => {
           const opt = p.optional ? "?" : "";
@@ -456,59 +455,119 @@ function renderDoc(doc: DocEntry): string {
 }
 
 // ============================================================================
+// Rendering: --outdir mode (three-tier: README.md, api.md, per-section files)
+// ============================================================================
+
+/**
+ * README.md: conceptual overview from @packageDocumentation.
+ */
+function renderOutdirReadme(pkg: { name: string; description: string }, overview: string): string {
+  let content = `# ${pkg.name}\n\n> ${pkg.description}\n\n`;
+  if (overview) {
+    // Strip first line if it duplicates the package description
+    let cleaned = overview;
+    const firstLine = overview.split("\n")[0]?.replace(/\.$/, "").trim();
+    const desc = pkg.description?.replace(/\.$/, "").trim();
+    if (firstLine && desc && firstLine.toLowerCase() === desc.toLowerCase()) {
+      cleaned = overview.slice(overview.indexOf("\n") + 1).trimStart();
+    }
+    if (cleaned) content += `${cleaned}\n\n`;
+  }
+  content += `See [api.md](api.md) for the full API reference index.\n`;
+  return content;
+}
+
+/**
+ * api.md: compact API surface index with links to per-section files.
+ */
+function renderOutdirApiIndex(discovered: Map<string, DocEntry[]>): string {
+  let content = `# API Reference\n\n`;
+
+  for (const heading of SECTION_ORDER) {
+    const entries = discovered.get(heading);
+    if (!entries?.length) continue;
+
+    const slug = slugFor(heading);
+    content += `## [${heading}](${slug}.md)\n\n`;
+
+    for (const entry of sortEntriesFunctionsFirst(entries)) {
+      const nameFormatted = entry.kind === "function" ? `${entry.name}()` : entry.name;
+      content += `- \`${nameFormatted}\``;
+      if (entry.summary) content += ` — ${entry.summary}`;
+      content += "\n";
+    }
+    content += "\n";
+  }
+
+  return content;
+}
+
+/**
+ * Sort entries: functions and constants first, then interfaces and types.
+ * Within each group, preserve original declaration order.
+ */
+function sortEntriesFunctionsFirst(entries: DocEntry[]): DocEntry[] {
+  const kindOrder: Record<string, number> = { function: 0, const: 1, interface: 2, type: 3 };
+  return entries.toSorted((a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9));
+}
+
+/**
+ * Per-section detail file (e.g., rules.md, coverage.md).
+ */
+function renderSectionFile(heading: string, entries: DocEntry[]): string {
+  let content = `# ${heading}\n\n`;
+  for (const entry of sortEntriesFunctionsFirst(entries)) content += renderFullDoc(entry);
+  return content;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
 function main(): void {
+  const args = process.argv.slice(2);
+  const outdirIdx = args.indexOf("--outdir");
+  const outdir = outdirIdx !== -1 ? args[outdirIdx + 1] : undefined;
+
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, "package.json"), "utf-8"));
   const program = createProgram();
   const checker = program.getTypeChecker();
 
-  // -- Title & overview --
-  let content = `# ${pkg.name}\n\n> ${pkg.description}\n\n`;
-
-  let overview = extractPackageDoc(program, path.join(ROOT_DIR, "src", "index.ts"));
-  // The @packageDocumentation summary often duplicates package.json description.
-  // Strip the first line if it closely matches the blockquote already emitted.
-  if (overview) {
-    const firstLine = overview.split("\n")[0]?.replace(/\.$/, "").trim();
-    const desc = pkg.description?.replace(/\.$/, "").trim();
-    if (firstLine && desc && firstLine.toLowerCase() === desc.toLowerCase()) {
-      overview = overview.slice(overview.indexOf("\n") + 1).trimStart();
-    }
-    content += `${overview}\n\n`;
-  }
-
-  // -- Sections from @category tags --
+  const overview = extractPackageDoc(program, path.join(ROOT_DIR, "src", "index.ts"));
   const discovered = discoverCategories(program, checker);
 
-  // Warn about categories not in SECTION_ORDER
   for (const cat of discovered.keys()) {
     if (!SECTION_ORDER.includes(cat)) {
       console.warn(`Warning: @category "${cat}" is not in SECTION_ORDER — skipped`);
     }
   }
 
-  for (const heading of SECTION_ORDER) {
-    const entries = discovered.get(heading);
-    if (!entries?.length) continue;
+  if (outdir) {
+    // --outdir mode: write README.md + api.md + per-section .md files
+    fs.mkdirSync(outdir, { recursive: true });
 
-    content += `---\n\n## ${heading}\n\n`;
-    for (const entry of entries) content += renderDoc(entry);
+    const readme = renderOutdirReadme(pkg, overview);
+    fs.writeFileSync(path.join(outdir, "README.md"), readme, "utf-8");
+    console.log(`Generated ${path.join(outdir, "README.md")} (${readme.split("\n").length} lines)`);
+
+    const apiIndex = renderOutdirApiIndex(discovered);
+    fs.writeFileSync(path.join(outdir, "api.md"), apiIndex, "utf-8");
+    console.log(`Generated ${path.join(outdir, "api.md")} (${apiIndex.split("\n").length} lines)`);
+
+    for (const heading of SECTION_ORDER) {
+      const entries = discovered.get(heading);
+      if (!entries?.length) continue;
+
+      const slug = slugFor(heading);
+      const content = renderSectionFile(heading, entries);
+      const filePath = path.join(outdir, `${slug}.md`);
+      fs.writeFileSync(filePath, content, "utf-8");
+      console.log(`Generated ${filePath} (${content.split("\n").length} lines)`);
+    }
+  } else {
+    console.error("Usage: generate-reference.ts --outdir <path>");
+    process.exit(1);
   }
-
-  // -- Write outputs --
-  const llmsPath = path.join(ROOT_DIR, "llms.txt");
-  fs.writeFileSync(llmsPath, content, "utf-8");
-  console.log(`Generated ${llmsPath}`);
-
-  const tsPath = path.join(ROOT_DIR, "src/llms.ts");
-  fs.writeFileSync(
-    tsPath,
-    `// Auto-generated — do not edit manually\nexport const apiDocs = ${JSON.stringify(content)};\n`,
-    "utf-8",
-  );
-  console.log(`Generated ${tsPath}`);
 }
 
 main();
