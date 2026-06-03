@@ -135,6 +135,55 @@ describe("Role-based shift assignment (integration)", () => {
     expect(assignedIds).toEqual(["alice", "bob"]);
   }, 30_000);
 
+  it("reports the concrete role selected for multi-role shift patterns", async () => {
+    const builder = new ModelBuilder({
+      members: [
+        { id: "alice", roleIds: ["server", "bartender"] },
+        { id: "bob", roleIds: ["server", "bartender"] },
+      ],
+      shiftPatterns: [
+        {
+          id: "floor_shift",
+          roleIds: ["server", "bartender"],
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 17, minutes: 0 },
+        },
+      ],
+      schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
+      coverage: [
+        {
+          day: "2024-01-01",
+          roleIds: ["server"],
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 17, minutes: 0 },
+          targetCount: 1,
+          priority: "MANDATORY",
+        },
+        {
+          day: "2024-01-01",
+          roleIds: ["bartender"],
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 17, minutes: 0 },
+          targetCount: 1,
+          priority: "MANDATORY",
+        },
+      ],
+    });
+
+    const { request } = builder.compile();
+    const response = await client.solve(request);
+
+    expect(response.status).toBe("OPTIMAL");
+    const assignments = decodeAssignments(response.values);
+
+    expect(assignments).toHaveLength(2);
+    expect(assignments.map((assignment) => assignment.roleId).toSorted()).toEqual([
+      "bartender",
+      "server",
+    ]);
+    expect(new Set(assignments.map((assignment) => assignment.memberId)).size).toBe(2);
+  }, 30_000);
+
   it("returns infeasible when no members match required role", async () => {
     const builder = new ModelBuilder({
       members: [

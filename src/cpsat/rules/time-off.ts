@@ -1,26 +1,30 @@
 import * as z from "zod";
 import type { TimeOfDay } from "../../types.js";
-import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { RuleArtifact, RuleCompileContext } from "../rule-descriptor.js";
+import type { ValidationReporter } from "../validation-reporter.js";
 import type { ResolvedShiftAssignment } from "../response.js";
 import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
-import type { ValidationReporter } from "../validation-reporter.js";
 import {
   PrioritySchema,
   entityScope,
-  requiredTimeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
+  requiredTimeScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentVar } from "./variables.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
+import { canAssignMemberToPattern, isPatternAvailableOnDay } from "./pattern-eligibility.js";
 
 const timeOfDaySchema = z.object({
   hours: z.number().int().min(0).max(23),
   minutes: z.number().int().min(0).max(59),
 });
 
-const TimeOffSchema = z
+export const TimeOffSchema = z
   .object({
     priority: PrioritySchema,
     startTime: timeOfDaySchema.optional(),
@@ -40,173 +44,143 @@ const TimeOffSchema = z
   );
 
 /**
- * Configuration for {@link createTimeOffRule}.
- *
- * - `priority` (required): how strictly the solver enforces this rule
- * - `startTime` (optional): start of the time-off window within each day; must be paired with `endTime`
- * - `endTime` (optional): end of the time-off window within each day; must be paired with `startTime`
- *
- * Entity scoping (at most one):
- * - `memberIds`: restrict to specific members
- * - `roleIds`: restrict to members with matching roles
- * - `skillIds`: restrict to members with matching skills
- *
- * Time scoping (exactly one required):
- * - `dateRange`: contiguous date range
- * - `specificDates`: specific dates
- * - `dayOfWeek`: days of the week
- * - `recurringPeriods`: recurring calendar periods
+ * Configuration for {@link timeOffRuleDescriptor}.
  */
 export type TimeOffConfig = z.infer<typeof TimeOffSchema>;
 
 /**
- * Blocks or penalizes assignments during specified time periods.
+ * Low-level descriptor for the `time-off` rule.
  *
- * Supports entity scoping (people, roles, skills) and time scoping
- * (date ranges, specific dates, days of week, recurring periods).
- * Optionally supports partial-day time-off with startTime/endTime.
- *
- * @param config - See {@link TimeOffConfig}
- * @example Full day vacation
- * ```ts
- * createTimeOffRule({
- *   memberIds: ["alice"],
- *   dateRange: { start: "2024-02-01", end: "2024-02-05" },
- *   priority: "MANDATORY",
- * });
- * ```
- *
- * @example Every Wednesday afternoon off for students
- * ```ts
- * createTimeOffRule({
- *   roleIds: ["student"],
- *   dayOfWeek: ["wednesday"],
- *   startTime: { hours: 14, minutes: 0 },
- *   endTime: { hours: 23, minutes: 59 },
- *   priority: "MANDATORY",
- * });
- * ```
- *
- * @example Specific date, partial day
- * ```ts
- * createTimeOffRule({
- *   memberIds: ["bob"],
- *   specificDates: ["2024-03-15"],
- *   startTime: { hours: 16, minutes: 0 },
- *   endTime: { hours: 23, minutes: 59 },
- *   priority: "MANDATORY",
- * });
- * ```
+ * @category Rules
  */
-export function createTimeOffRule(config: TimeOffConfig): CompilationRule {
-  const parsed = TimeOffSchema.parse(config);
-  const { priority, startTime, endTime } = parsed;
+export const timeOffRuleDescriptor = defineRuleDescriptor({
+  name: "time-off",
+  schema: TimeOffSchema,
+  compile(config, ctx) {
+    const { priority, startTime, endTime } = config;
+    const fullDayStart: TimeOfDay = { hours: 0, minutes: 0 };
+    const fullDayEnd: TimeOfDay = { hours: 23, minutes: 59 };
+    const timeWindowStart = startTime ?? fullDayStart;
+    const timeWindowEnd = endTime ?? fullDayEnd;
 
-  const fullDayStart: TimeOfDay = { hours: 0, minutes: 0 };
-  const fullDayEnd: TimeOfDay = { hours: 23, minutes: 59 };
-  const timeWindowStart = startTime ?? fullDayStart;
-  const timeWindowEnd = endTime ?? fullDayEnd;
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+    const group = ruleGroup("time-off", "Time off", entityScopeValue, timeScopeValue);
+    const targetMembers = resolveMembersFromScope(entityScopeValue, [...ctx.members]);
+    const activeDays = resolveActiveDaysFromScope(timeScopeValue, [...ctx.days]);
+    const timeWindowKey = formatTimeWindowKey(timeWindowStart, timeWindowEnd);
 
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-  const group = ruleGroup("time-off", "Time off", entityScopeValue, timeScopeValue);
+    const constraintArtifacts: RuleArtifact[] = [];
+    for (const member of targetMembers) {
+      for (const day of activeDays) {
+        const overlappingVars = ctx.shiftPatterns
+          .filter(
+            (pattern) =>
+              canAssignMemberToPattern(member, pattern) &&
+              isPatternAvailableOnDay(pattern, day) &&
+              shiftOverlapsTimeWindow(pattern, timeWindowStart, timeWindowEnd),
+          )
+          .map((pattern) => assignmentVar(member.id, pattern.id, day.iso));
 
-  return {
-    compile(builder) {
-      const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
-      if (targetMembers.length === 0) return;
+        if (overlappingVars.length === 0) continue;
 
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
-      if (activeDays.length === 0) return;
+        const description = buildTimeOffDescription(
+          member.id,
+          day.iso,
+          timeWindowStart,
+          timeWindowEnd,
+        );
+        const context = { memberIds: [member.id], days: [day.iso] };
+        const constraintId = `time-off:${group.key}:${member.id}:${day.iso}:${timeWindowKey}`;
+        const terms = overlappingVars.map((varName) => ({ var: varName, coeff: 1 }));
 
-      for (const emp of targetMembers) {
-        for (const day of activeDays) {
-          // Report exclusion for coverage analysis (MANDATORY only)
-          if (priority === "MANDATORY") {
-            builder.reporter.excludeFromCoverage({
-              memberId: emp.id,
-              day,
-              startTime: timeWindowStart,
-              endTime: timeWindowEnd,
-            });
-          }
-
-          for (const pattern of builder.shiftPatterns) {
-            if (!builder.canAssign(emp, pattern)) continue;
-            if (!builder.patternAvailableOnDay(pattern, day)) continue;
-
-            if (startTime && endTime) {
-              if (!shiftOverlapsTimeWindow(pattern, startTime, endTime)) {
-                continue;
-              }
-            }
-
-            const assignVar = builder.assignment(emp.id, pattern.id, day);
-
-            if (priority === "MANDATORY") {
-              builder.addLinear([{ var: assignVar, coeff: 1 }], "==", 0);
-            } else {
-              builder.addSoftLinear(
-                [{ var: assignVar, coeff: 1 }],
-                "<=",
-                0,
-                priorityToPenalty(priority),
-              );
-            }
-          }
-        }
-      }
-    },
-
-    validate(
-      assignments: ResolvedShiftAssignment[],
-      reporter: ValidationReporter,
-      context: RuleValidationContext,
-    ) {
-      // MANDATORY time-off is a hard constraint - can't be violated
-      if (priority === "MANDATORY") return;
-
-      const targetMembers = resolveMembersFromScope(entityScopeValue, context.members);
-      if (targetMembers.length === 0) return;
-
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, context.days);
-      if (activeDays.length === 0) return;
-
-      for (const emp of targetMembers) {
-        for (const day of activeDays) {
-          const violated = assignments.some(
-            (a) =>
-              a.memberId === emp.id &&
-              a.day === day &&
-              assignmentOverlapsTimeWindow(a, timeWindowStart, timeWindowEnd),
+        if (priority === "MANDATORY") {
+          constraintArtifacts.push({
+            kind: "coverage-exclusion",
+            group,
+            memberId: member.id,
+            day: day.iso,
+            startTime: timeWindowStart,
+            endTime: timeWindowEnd,
+          });
+          constraintArtifacts.push(
+            hardConstraint({
+              group,
+              description,
+              context,
+              validation: reportValidation(constraintId),
+              terms,
+              comparator: "<=",
+              targetValue: 0,
+            }),
           );
-
-          if (violated) {
-            reporter.reportRuleViolation({
-              rule: "time-off",
-              message: `Time-off request for ${emp.id} on ${day} could not be honored`,
-              context: {
-                memberIds: [emp.id],
-                days: [day],
-              },
+        } else {
+          constraintArtifacts.push(
+            softConstraint({
               group,
-            });
-          } else {
-            reporter.reportRulePassed({
-              rule: "time-off",
-              message: `Time-off honored for ${emp.id} on ${day}`,
-              context: {
-                memberIds: [emp.id],
-                days: [day],
-              },
-              group,
-            });
-          }
+              description,
+              context,
+              validation: reportValidation(),
+              terms,
+              comparator: "<=",
+              targetValue: 0,
+              penalty: priorityToPenalty(priority),
+              constraintId,
+            }),
+          );
         }
       }
-    },
-  };
-}
+    }
+
+    const postSolveValidator =
+      priority === "MANDATORY"
+        ? []
+        : [
+            {
+              kind: "post-solve-feedback" as const,
+              run(
+                assignments: readonly ResolvedShiftAssignment[],
+                reporter: ValidationReporter,
+                validationContext: RuleCompileContext,
+              ) {
+                const validatorMembers = resolveMembersFromScope(entityScopeValue, [
+                  ...validationContext.members,
+                ]);
+                const validatorDays = resolveActiveDaysFromScope(timeScopeValue, [
+                  ...validationContext.days,
+                ]);
+
+                for (const member of validatorMembers) {
+                  for (const day of validatorDays) {
+                    const violated = assignments.some(
+                      (assignment) =>
+                        assignment.memberId === member.id &&
+                        assignment.day === day.iso &&
+                        assignmentOverlapsTimeWindow(assignment, timeWindowStart, timeWindowEnd),
+                    );
+
+                    if (violated) {
+                      continue;
+                    }
+
+                    reporter.reportRulePassed({
+                      rule: "time-off",
+                      message: `Time-off honored for ${member.id} on ${day.iso}`,
+                      context: { memberIds: [member.id], days: [day.iso] },
+                      group,
+                    });
+                  }
+                }
+              },
+            },
+          ];
+
+    return {
+      rule: "time-off",
+      artifacts: [...constraintArtifacts, ...postSolveValidator],
+    };
+  },
+});
 
 function shiftOverlapsTimeWindow(
   pattern: { startTime: TimeOfDay; endTime: TimeOfDay },
@@ -223,7 +197,7 @@ function shiftOverlapsTimeWindow(
 }
 
 function assignmentOverlapsTimeWindow(
-  assignment: ResolvedShiftAssignment,
+  assignment: { startTime: TimeOfDay; endTime: TimeOfDay },
   windowStart: TimeOfDay,
   windowEnd: TimeOfDay,
 ): boolean {
@@ -234,4 +208,21 @@ function assignmentOverlapsTimeWindow(
   const winEnd = normalizeEndMinutes(winStart, timeOfDayToMinutes(windowEnd));
 
   return Math.max(assignStart, winStart) < Math.min(assignEnd, winEnd);
+}
+
+function buildTimeOffDescription(
+  memberId: string,
+  dayIso: string,
+  windowStart: TimeOfDay,
+  windowEnd: TimeOfDay,
+): string {
+  return `Time off for ${memberId} on ${dayIso} (${formatTimeWindowKey(windowStart, windowEnd)})`;
+}
+
+function formatTimeWindowKey(windowStart: TimeOfDay, windowEnd: TimeOfDay): string {
+  return `${formatTimeOfDay(windowStart)}-${formatTimeOfDay(windowEnd)}`;
+}
+
+function formatTimeOfDay(time: TimeOfDay): string {
+  return `${time.hours.toString().padStart(2, "0")}:${time.minutes.toString().padStart(2, "0")}`;
 }

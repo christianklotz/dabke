@@ -1,5 +1,6 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { RuleArtifact } from "../rule-descriptor.js";
 import { priorityToPenalty } from "../utils.js";
 import {
   PrioritySchema,
@@ -8,8 +9,18 @@ import {
   resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentVarsForDay } from "./assignment-terms.js";
+import { assignedDayStartVariableName } from "./variables.js";
+import {
+  boolVariable,
+  hardConstraint,
+  reportValidation,
+  skipValidation,
+  softConstraint,
+} from "./artifacts.js";
+import { buildAssignedDayIndicator } from "./assigned-day.js";
 
-const MinConsecutiveDaysSchema = z
+export const MinConsecutiveDaysSchema = z
   .object({
     days: z.number().min(0),
     priority: PrioritySchema,
@@ -17,143 +28,166 @@ const MinConsecutiveDaysSchema = z
   .and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createMinConsecutiveDaysRule}.
- *
- * - `days` (required): minimum consecutive days required once a person starts working
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link minConsecutiveDaysRuleDescriptor}.
  */
 export type MinConsecutiveDaysConfig = z.infer<typeof MinConsecutiveDaysSchema>;
 
 /**
- * Requires that once a person starts working, they continue for a minimum
- * number of consecutive days.
+ * Low-level descriptor for the `min-consecutive-days` rule.
  *
- * @param config - See {@link MinConsecutiveDaysConfig}
- * @example
- * ```ts
- * createMinConsecutiveDaysRule({ days: 3, priority: "MANDATORY" });
- * ```
+ * @remarks
+ * Once an assignment streak starts, this rule requires it to continue for at
+ * least the configured number of assigned days.
+ *
+ * @category Rules
  */
-export function createMinConsecutiveDaysRule(config: MinConsecutiveDaysConfig): CompilationRule {
-  const parsed = MinConsecutiveDaysSchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { days, priority } = parsed;
-  const group = ruleGroup(`min-consecutive-days:${days}`, `Min ${days} consecutive days`, scope);
+export const minConsecutiveDaysRuleDescriptor = defineRuleDescriptor({
+  name: "min-consecutive-days",
+  schema: MinConsecutiveDaysSchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { days, priority } = config;
+    const group = ruleGroup(`min-consecutive-days:${days}`, `Min ${days} consecutive days`, scope);
+    if (days <= 1) {
+      return { rule: "min-consecutive-days", artifacts: [] };
+    }
 
-  return {
-    compile(b) {
-      if (days <= 1) return;
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
+    const artifacts = members.flatMap((member) => {
+      const supportArtifacts = ctx.days.flatMap(
+        (day) =>
+          buildAssignedDayIndicator({
+            memberId: member.id,
+            day,
+            assignmentVars: assignmentVarsForDay(member, day, ctx.shiftPatterns),
+            variableName: `assigned_${member.id}_${day.iso}`,
+          }).artifacts,
+      );
 
-      const members = resolveMembersFromScope(scope, b.members);
+      const startArtifacts = ctx.days.flatMap((day, index) => {
+        const assignedToday = `assigned_${member.id}_${day.iso}`;
+        const assignedYesterday =
+          index > 0 ? `assigned_${member.id}_${ctx.days[index - 1]!.iso}` : undefined;
+        const startVar = assignedDayStartVariableName(member.id, day.iso);
+        const artifactsForDay: RuleArtifact[] = [boolVariable(startVar)];
 
-      for (const emp of members) {
-        const worksByDay: string[] = [];
-
-        for (const day of b.days) {
-          const worksVar = b.boolVar(`works_${emp.id}_${day}`);
-          worksByDay.push(worksVar);
-
-          const dayAssignments = b.shiftPatterns
-            .filter((p) => b.canAssign(emp, p) && b.patternAvailableOnDay(p, day))
-            .map((p) => b.assignment(emp.id, p.id, day));
-
-          if (dayAssignments.length === 0) {
-            b.addLinear([{ var: worksVar, coeff: 1 }], "==", 0);
-          } else {
-            for (const assignVar of dayAssignments) {
-              b.addLinear(
-                [
-                  { var: worksVar, coeff: 1 },
-                  { var: assignVar, coeff: -1 },
-                ],
-                ">=",
-                0,
-              );
-            }
-            b.addLinear(
-              [{ var: worksVar, coeff: 1 }, ...dayAssignments.map((v) => ({ var: v, coeff: -1 }))],
-              "<=",
-              0,
-            );
-          }
-        }
-
-        for (let i = 0; i < b.days.length; i++) {
-          const dayLabel = b.days[i];
-          if (!dayLabel) continue;
-
-          const worksToday = worksByDay[i];
-          if (!worksToday) continue;
-          const worksYesterday = i > 0 ? worksByDay[i - 1] : undefined;
-          const startVar = b.boolVar(`work_start_${emp.id}_${dayLabel}`);
-
-          b.addLinear(
-            [
+        artifactsForDay.push(
+          hardConstraint({
+            description: `${startVar} implies an assignment on ${day.iso}`,
+            validation: skipValidation(
+              "scaffolding",
+              "This helper variable only marks the start of an assignment streak when the member has an assignment that day.",
+            ),
+            context: { memberIds: [member.id], days: [day.iso] },
+            terms: [
               { var: startVar, coeff: 1 },
-              { var: worksToday, coeff: -1 },
+              { var: assignedToday, coeff: -1 },
             ],
-            "<=",
-            0,
+            comparator: "<=",
+            targetValue: 0,
+          }),
+        );
+
+        if (assignedYesterday) {
+          artifactsForDay.push(
+            hardConstraint({
+              description: `${startVar} only when previous day is unassigned`,
+              validation: skipValidation(
+                "scaffolding",
+                "This helper variable must stay off when the previous day already belongs to the same assignment streak.",
+              ),
+              context: { memberIds: [member.id], days: [ctx.days[index - 1]!.iso, day.iso] },
+              terms: [
+                { var: startVar, coeff: 1 },
+                { var: assignedYesterday, coeff: 1 },
+              ],
+              comparator: "<=",
+              targetValue: 1,
+            }),
           );
-          if (worksYesterday) {
-            b.addLinear(
-              [
+          artifactsForDay.push(
+            hardConstraint({
+              description: `${startVar} activates on a new assignment streak`,
+              validation: skipValidation(
+                "scaffolding",
+                "This helper variable identifies new assignment streak boundaries for the consecutive-days window calculation.",
+              ),
+              context: { memberIds: [member.id], days: [ctx.days[index - 1]!.iso, day.iso] },
+              terms: [
                 { var: startVar, coeff: 1 },
-                { var: worksYesterday, coeff: 1 },
+                { var: assignedYesterday, coeff: 1 },
+                { var: assignedToday, coeff: -1 },
               ],
-              "<=",
-              1,
-            );
-            b.addLinear(
-              [
-                { var: startVar, coeff: 1 },
-                { var: worksYesterday, coeff: 1 },
-                { var: worksToday, coeff: -1 },
-              ],
-              ">=",
-              0,
-            );
-          } else {
-            b.addLinear(
-              [
-                { var: startVar, coeff: 1 },
-                { var: worksToday, coeff: -1 },
-              ],
-              ">=",
-              0,
-            );
-          }
-
-          const window = worksByDay.slice(i, i + days).filter(Boolean) as string[];
-          if (window.length === 0) continue;
-
-          const terms = [
-            ...window.map((v) => ({ var: v, coeff: 1 })),
-            { var: startVar, coeff: -days },
-          ];
-
-          const constraintId = `min-consecutive-days:${emp.id}:${dayLabel}`;
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, ">=", 0);
-          } else {
-            b.addSoftLinear(terms, ">=", 0, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "min-consecutive-days",
-              description: `${emp.id} min ${days} consecutive days from ${dayLabel}`,
-              targetValue: 0,
               comparator: ">=",
-              day: dayLabel,
-              context: { memberIds: [emp.id], days: b.days.slice(i, i + days) },
-              group,
-            });
-          }
+              targetValue: 0,
+            }),
+          );
+        } else {
+          artifactsForDay.push(
+            hardConstraint({
+              description: `${startVar} matches first-day assignment state`,
+              validation: skipValidation(
+                "scaffolding",
+                "On the first day of the horizon, the helper variable matches whether a new streak starts that day.",
+              ),
+              context: { memberIds: [member.id], days: [day.iso] },
+              terms: [
+                { var: startVar, coeff: 1 },
+                { var: assignedToday, coeff: -1 },
+              ],
+              comparator: ">=",
+              targetValue: 0,
+            }),
+          );
         }
-      }
-    },
-  };
-}
+
+        const windowDays = ctx.days.slice(index, index + days);
+        if (windowDays.length === 0) return artifactsForDay;
+
+        const description = `${member.id} min ${days} consecutive days from ${day.iso}`;
+        const context = { memberIds: [member.id], days: windowDays.map((entry) => entry.iso) };
+        const constraintId = `min-consecutive-days:${member.id}:${day.iso}`;
+        const terms = [
+          ...windowDays.map((windowDay) => ({
+            var: `assigned_${member.id}_${windowDay.iso}`,
+            coeff: 1,
+          })),
+          { var: startVar, coeff: -days },
+        ];
+
+        artifactsForDay.push(
+          priority === "MANDATORY"
+            ? hardConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(constraintId),
+                terms,
+                comparator: ">=",
+                targetValue: 0,
+              })
+            : softConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(),
+                terms,
+                comparator: ">=",
+                targetValue: 0,
+                penalty: priorityToPenalty(priority),
+                constraintId,
+              }),
+        );
+
+        return artifactsForDay;
+      });
+
+      return supportArtifacts.concat(startArtifacts);
+    });
+
+    return {
+      rule: "min-consecutive-days",
+      artifacts,
+    };
+  },
+});

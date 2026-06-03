@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
+import type { DateString } from "../../src/types.js";
 import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: assign-together rule", () => {
@@ -25,12 +26,12 @@ describe("CP-SAT: assign-together rule", () => {
       {
         name: "assignment-priority",
         memberIds: ["alice"],
-        preference: "high",
+        preference: "prefer",
       },
       {
         name: "assignment-priority",
         memberIds: ["bob"],
-        preference: "low",
+        preference: "avoid",
       },
     ];
 
@@ -68,7 +69,7 @@ describe("CP-SAT: assign-together rule", () => {
     // Rule 2: two and three should work together
     // Question: Does this mean all three (one, two, three) must work together?
 
-    const days = ["2024-02-01"];
+    const days: DateString[] = ["2024-02-01"];
     const roleId = "worker";
 
     const baseConfig = createBaseConfig({
@@ -132,7 +133,7 @@ describe("CP-SAT: assign-together rule", () => {
 
   it("overlapping groups with sufficient coverage allows all linked members", async () => {
     // Same as above but with targetCount: 3 to allow all three to work
-    const days = ["2024-02-01"];
+    const days: DateString[] = ["2024-02-01"];
     const roleId = "worker";
 
     const baseConfig = createBaseConfig({
@@ -179,7 +180,7 @@ describe("CP-SAT: assign-together rule", () => {
     // Rule 2: four and five together
     // These should be independent - solver can pick either group
 
-    const days = ["2024-02-01"];
+    const days: DateString[] = ["2024-02-01"];
     const roleId = "worker";
 
     const baseConfig = createBaseConfig({

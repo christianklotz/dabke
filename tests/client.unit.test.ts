@@ -20,9 +20,10 @@ describe("HttpSolverClient", () => {
       status: "OPTIMAL",
       values: { x: 1 },
       statistics: { solveTimeMs: 5 },
+      softConstraintViolations: [],
     };
 
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
       return new Response(JSON.stringify(responseBody), { status: 200 });
     });
 
@@ -38,8 +39,48 @@ describe("HttpSolverClient", () => {
     expect(result).toEqual(responseBody);
   });
 
+  it("rejects legacy softViolations responses", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(
+        JSON.stringify({
+          status: "OPTIMAL",
+          values: { x: 1 },
+          softViolations: [
+            {
+              constraintId: "legacy",
+              violationAmount: 1,
+              targetValue: 2,
+              actualValue: 1,
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    });
+
+    const client = new HttpSolverClient(fetchMock, "http://solver");
+
+    await expect(client.solve(baseRequest)).rejects.toThrow(/softConstraintViolations/);
+  });
+
+  it("rejects successful responses missing softConstraintViolations", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(
+        JSON.stringify({
+          status: "FEASIBLE",
+          values: { x: 1 },
+        }),
+        { status: 200 },
+      );
+    });
+
+    const client = new HttpSolverClient(fetchMock, "http://solver");
+
+    await expect(client.solve(baseRequest)).rejects.toThrow(/softConstraintViolations/);
+  });
+
   it("throws when solver returns non-OK response", async () => {
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
       return new Response("boom", { status: 500 });
     });
     const client = new HttpSolverClient(fetchMock, "http://solver");
@@ -48,7 +89,7 @@ describe("HttpSolverClient", () => {
   });
 
   it("fails health check on non-200 responses", async () => {
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
       return new Response("unhealthy", { status: 503 });
     });
     const client = new HttpSolverClient(fetchMock, "http://solver");

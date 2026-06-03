@@ -34,10 +34,13 @@
  */
 
 import * as z from "zod";
-import { DayOfWeekSchema, type DayOfWeek } from "../../types.js";
-import { toDayOfWeekUTC } from "../../datetime.utils.js";
-import type { SchedulingMember } from "../types.js";
-import { parseDayString } from "../utils.js";
+import {
+  DayOfWeekSchema,
+  type DateString,
+  type DayOfWeek,
+  type SchedulingDay,
+} from "../../types.js";
+import { PRIORITY_VALUES, SOFT_PRIORITY_VALUES, type SchedulingMember } from "../types.js";
 import { assertSafeKeySegments, type ValidationGroup } from "../validation.types.js";
 
 // ============================================================================
@@ -50,9 +53,12 @@ import { assertSafeKeySegments, type ValidationGroup } from "../validation.types
  * Rules that use priority should include this in their schema so the
  * default is co-located with the rule system, not injected externally.
  */
-export const PrioritySchema = z
-  .union([z.literal("LOW"), z.literal("MEDIUM"), z.literal("HIGH"), z.literal("MANDATORY")])
-  .default("MANDATORY");
+export const PrioritySchema = z.enum(PRIORITY_VALUES).default("MANDATORY");
+
+/**
+ * Zod schema for soft-only priorities.
+ */
+export const SoftPrioritySchema = z.enum(SOFT_PRIORITY_VALUES);
 
 // ============================================================================
 // Scope Keys
@@ -104,8 +110,8 @@ export interface RecurringPeriod {
  * The field shape when a time scope variant is active (selected).
  */
 type ActiveTimeFields = {
-  dateRange: { dateRange: { start: string; end: string } };
-  specificDates: { specificDates: NonEmptyArray<string> };
+  dateRange: { dateRange: { start: DateString; end: DateString } };
+  specificDates: { specificDates: NonEmptyArray<DateString> };
   dayOfWeek: { dayOfWeek: NonEmptyArray<DayOfWeek> };
   recurring: { recurringPeriods: NonEmptyArray<RecurringPeriod> };
 };
@@ -407,7 +413,7 @@ export type ParsedEntityScope =
 export type ParsedTimeScope =
   | { type: "none" }
   | { type: "dateRange"; start: string; end: string }
-  | { type: "specificDates"; dates: string[] }
+  | { type: "specificDates"; dates: DateString[] }
   | { type: "dayOfWeek"; days: DayOfWeek[] }
   | { type: "recurring"; periods: RecurringPeriod[] };
 
@@ -421,8 +427,8 @@ export interface EntityScopeInput {
 
 /** Input shape accepted by {@link parseTimeScope}. */
 export interface TimeScopeInput {
-  dateRange?: { start: string; end: string };
-  specificDates?: string[];
+  dateRange?: { start: DateString; end: DateString };
+  specificDates?: DateString[];
   dayOfWeek?: DayOfWeek[];
   recurringPeriods?: RecurringPeriod[];
   [key: string]: unknown;
@@ -488,28 +494,27 @@ export function resolveMembersFromScope(
 /**
  * Resolves which days a rule applies to based on time scope.
  */
-export function resolveActiveDaysFromScope(scope: ParsedTimeScope, allDays: string[]): string[] {
+export function resolveActiveDaysFromScope(
+  scope: ParsedTimeScope,
+  allDays: SchedulingDay[],
+): SchedulingDay[] {
   switch (scope.type) {
     case "none":
       return allDays;
     case "dateRange":
-      return allDays.filter((day) => day >= scope.start && day <= scope.end);
-    case "specificDates":
-      return allDays.filter((day) => scope.dates.includes(day));
+      return allDays.filter((day) => day.iso >= scope.start && day.iso <= scope.end);
+    case "specificDates": {
+      const dateSet = new Set(scope.dates);
+      return allDays.filter((day) => dateSet.has(day.iso));
+    }
     case "dayOfWeek": {
       const targetDays = new Set(scope.days);
-      return allDays.filter((day) => {
-        const date = parseDayString(day);
-        return targetDays.has(toDayOfWeekUTC(date));
-      });
+      return allDays.filter((day) => targetDays.has(day.dayOfWeek));
     }
     case "recurring":
-      return allDays.filter((day) => {
-        const date = parseDayString(day);
-        const month = date.getUTCMonth() + 1;
-        const dayOfMonth = date.getUTCDate();
-        return scope.periods.some((period) => isDateInRecurringPeriod(month, dayOfMonth, period));
-      });
+      return allDays.filter((day) =>
+        scope.periods.some((period) => isDateInRecurringPeriod(day.month, day.dayOfMonth, period)),
+      );
   }
 }
 

@@ -1,17 +1,16 @@
 import * as z from "zod";
-import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingMember } from "../types.js";
 import type { TimeOfDay } from "../../types.js";
-import type { ShiftAssignment } from "../response.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { CostArtifact } from "../rule-descriptor.js";
 import { COST_CATEGORY } from "../cost.js";
-import { timeOfDayToMinutes, normalizeEndMinutes, MINUTES_PER_DAY } from "../utils.js";
+import { MINUTES_PER_DAY, normalizeEndMinutes, timeOfDayToMinutes } from "../utils.js";
 import {
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
+  timeScope,
 } from "./scope.types.js";
 
 const TimeOfDaySchema = z.object({
@@ -19,7 +18,7 @@ const TimeOfDaySchema = z.object({
   minutes: z.number().int().min(0).max(59),
 });
 
-const TimeCostSurchargeSchema = z
+export const TimeCostSurchargeSchema = z
   .object({
     amountPerHour: z.number().min(0),
     window: z.object({
@@ -30,14 +29,112 @@ const TimeCostSurchargeSchema = z
   .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
-/** Configuration for {@link createTimeCostSurchargeRule}. */
+/** Configuration for {@link timeCostSurchargeRuleDescriptor}. */
 export type TimeCostSurchargeConfig = z.infer<typeof TimeCostSurchargeSchema>;
 
-/**
- * Computes the overlap in minutes between a shift and a time-of-day window.
- *
- * Handles overnight windows (e.g., 22:00-06:00) and overnight shifts.
- */
+export const timeCostSurchargeRuleDescriptor = defineRuleDescriptor({
+  name: "time-cost-surcharge",
+  schema: TimeCostSurchargeSchema,
+  compile(config) {
+    const { amountPerHour, window } = config;
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+
+    const validation = {
+      strategy: "skip" as const,
+      category: "no-meaningful-feedback" as const,
+      rationale:
+        amountPerHour <= 0
+          ? "A zero time surcharge does not change optimization or cost accounting."
+          : "Time cost surcharges only affect optimization when minimize-cost is active.",
+    };
+
+    const costArtifact: CostArtifact = {
+      kind: "cost",
+      validation,
+      compileObjective(builder) {
+        if (!builder.costContext?.active || amountPerHour <= 0) return;
+
+        const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
+        const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
+        if (targetMembers.length === 0 || activeDays.length === 0) return;
+
+        const { normalizationFactor } = builder.costContext;
+        for (const member of targetMembers) {
+          for (const pattern of builder.shiftPatterns) {
+            if (!builder.canAssign(member, pattern)) continue;
+            const overlapMinutes = computeOverlapMinutes(
+              pattern.startTime,
+              pattern.endTime,
+              window.from,
+              window.until,
+            );
+            if (overlapMinutes <= 0) continue;
+            const surcharge = (amountPerHour * overlapMinutes) / 60;
+            const normalizedPenalty = surcharge / normalizationFactor;
+
+            for (const day of activeDays) {
+              if (!builder.patternAvailableOnDay(pattern, day)) continue;
+              builder.addPenalty(
+                builder.assignment(member.id, pattern.id, day),
+                Math.max(1, normalizedPenalty),
+              );
+            }
+          }
+        }
+      },
+      calculateCost(assignments, costContext) {
+        if (amountPerHour <= 0) return { entries: [] };
+
+        const patternMap = new Map(
+          costContext.shiftPatterns.map((pattern) => [pattern.id, pattern]),
+        );
+        const activeDays = new Set(
+          resolveActiveDaysFromScope(timeScopeValue, [...costContext.days]).map((day) => day.iso),
+        );
+        const targetMemberIds = new Set(
+          resolveMembersFromScope(entityScopeValue, [...costContext.members]).map(
+            (member) => member.id,
+          ),
+        );
+
+        const entries = [] as Array<{
+          memberId: string;
+          day: string;
+          category: string;
+          amount: number;
+        }>;
+        for (const assignment of assignments) {
+          if (!activeDays.has(assignment.day) || !targetMemberIds.has(assignment.memberId))
+            continue;
+          const pattern = patternMap.get(assignment.shiftPatternId);
+          if (!pattern) continue;
+          const overlapMinutes = computeOverlapMinutes(
+            pattern.startTime,
+            pattern.endTime,
+            window.from,
+            window.until,
+          );
+          if (overlapMinutes <= 0) continue;
+          entries.push({
+            memberId: assignment.memberId,
+            day: assignment.day,
+            category: COST_CATEGORY.PREMIUM,
+            amount: (amountPerHour * overlapMinutes) / 60,
+          });
+        }
+
+        return { entries };
+      },
+    };
+
+    return {
+      rule: "time-cost-surcharge",
+      artifacts: [costArtifact],
+    };
+  },
+});
+
 function computeOverlapMinutes(
   shiftStart: TimeOfDay,
   shiftEnd: TimeOfDay,
@@ -49,122 +146,19 @@ function computeOverlapMinutes(
   const wFrom = timeOfDayToMinutes(windowFrom);
   const wUntil = timeOfDayToMinutes(windowUntil);
 
-  // Expand window: if overnight (e.g., 22:00-06:00), wUntil < wFrom
-  // Represent as two intervals or one extended interval
-  let totalOverlap = 0;
-
   if (wFrom < wUntil) {
-    // Normal window (e.g., 14:00-18:00)
-    totalOverlap = rangeOverlap(sStart, sEnd, wFrom, wUntil);
-  } else {
-    // Overnight window (e.g., 22:00-06:00)
-    // Split into [wFrom, MINUTES_PER_DAY) and [0, wUntil)
-    // But shift may also span overnight, so use extended ranges
-    totalOverlap += rangeOverlap(sStart, sEnd, wFrom, MINUTES_PER_DAY);
-    totalOverlap += rangeOverlap(sStart, sEnd, MINUTES_PER_DAY, MINUTES_PER_DAY + wUntil);
-    // Also check if shift overlaps [0, wUntil) in the same day
-    totalOverlap += rangeOverlap(sStart, sEnd, 0, wUntil);
+    return rangeOverlap(sStart, sEnd, wFrom, wUntil);
   }
 
-  return totalOverlap;
+  return (
+    rangeOverlap(sStart, sEnd, wFrom, MINUTES_PER_DAY) +
+    rangeOverlap(sStart, sEnd, MINUTES_PER_DAY, MINUTES_PER_DAY + wUntil) +
+    rangeOverlap(sStart, sEnd, 0, wUntil)
+  );
 }
 
 function rangeOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
   const start = Math.max(aStart, bStart);
   const end = Math.min(aEnd, bEnd);
   return Math.max(0, end - start);
-}
-
-/**
- * Creates a time-of-day surcharge rule (e.g., night differential).
- *
- * Adds a flat surcharge per hour for the portion of a shift that overlaps
- * a time-of-day window. Independent of the member's base rate.
- *
- * When `minimizeCost()` is not present, no solver terms are emitted,
- * but the `cost()` method still contributes to post-solve calculation.
- */
-export function createTimeCostSurchargeRule(config: TimeCostSurchargeConfig): CompilationRule {
-  const parsed = TimeCostSurchargeSchema.parse(config);
-  const { amountPerHour, window } = parsed;
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-
-  return {
-    compile(b) {
-      if (!b.costContext?.active) return;
-      if (amountPerHour <= 0) return;
-
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
-
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
-
-      const { normalizationFactor } = b.costContext;
-
-      for (const emp of targetMembers) {
-        for (const pattern of b.shiftPatterns) {
-          if (!b.canAssign(emp, pattern)) continue;
-
-          const overlapMinutes = computeOverlapMinutes(
-            pattern.startTime,
-            pattern.endTime,
-            window.from,
-            window.until,
-          );
-          if (overlapMinutes <= 0) continue;
-
-          const surcharge = (amountPerHour * overlapMinutes) / 60;
-          const normalizedPenalty = surcharge / normalizationFactor;
-
-          for (const day of activeDays) {
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            b.addPenalty(b.assignment(emp.id, pattern.id, day), Math.max(1, normalizedPenalty));
-          }
-        }
-      }
-    },
-
-    cost(
-      assignments: ShiftAssignment[],
-      members: ReadonlyArray<SchedulingMember>,
-      shiftPatterns: ReadonlyArray<ShiftPattern>,
-    ): CostContribution {
-      if (amountPerHour <= 0) return { entries: [] };
-
-      const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
-      const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
-      const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
-      const targetEmpIds = new Set(
-        resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
-      );
-
-      const entries: CostContribution["entries"] = [];
-
-      for (const a of assignments) {
-        if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.memberId)) continue;
-        const pattern = patternMap.get(a.shiftPatternId);
-        if (!pattern) continue;
-
-        const overlapMinutes = computeOverlapMinutes(
-          pattern.startTime,
-          pattern.endTime,
-          window.from,
-          window.until,
-        );
-        if (overlapMinutes <= 0) continue;
-
-        const amount = (amountPerHour * overlapMinutes) / 60;
-        entries.push({
-          memberId: a.memberId,
-          day: a.day,
-          category: COST_CATEGORY.PREMIUM,
-          amount,
-        });
-      }
-
-      return { entries };
-    },
-  };
 }

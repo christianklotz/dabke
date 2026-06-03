@@ -1,113 +1,133 @@
 import * as z from "zod";
-import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingMember } from "../types.js";
-import type { ShiftAssignment } from "../response.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { CostArtifact } from "../rule-descriptor.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
+  timeScope,
 } from "./scope.types.js";
-import { getHourlyRate, patternDurationMinutes } from "./cost-utils.js";
+import { getHourlyRate } from "./cost-utils.js";
+import { patternDurationMinutes } from "./pattern-time.js";
 
-const DayCostMultiplierSchema = z
+export const DayCostMultiplierSchema = z
   .object({
     factor: z.number().min(1),
   })
   .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
-/** Configuration for {@link createDayCostMultiplierRule}. */
+/** Configuration for {@link dayCostMultiplierRuleDescriptor}. */
 export type DayCostMultiplierConfig = z.infer<typeof DayCostMultiplierSchema>;
 
 /**
- * Creates a day-based rate multiplier rule.
+ * Low-level descriptor for the `day-cost-multiplier` rule.
  *
- * Multiplies the base rate for assignments on matching days. The extra cost
- * above 1x is added as a penalty term (the base 1x is handled by `minimizeCost()`).
+ * @remarks
+ * This artifact always contributes to post-solve cost calculation. It only adds
+ * solver objective terms when `minimize-cost` is active.
  *
- * When `minimizeCost()` is not present, no solver terms are emitted,
- * but the `cost()` method still contributes to post-solve calculation.
+ * @category Rules
  */
-export function createDayCostMultiplierRule(config: DayCostMultiplierConfig): CompilationRule {
-  const parsed = DayCostMultiplierSchema.parse(config);
-  const { factor } = parsed;
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
+export const dayCostMultiplierRuleDescriptor = defineRuleDescriptor({
+  name: "day-cost-multiplier",
+  schema: DayCostMultiplierSchema,
+  compile(config) {
+    const { factor } = config;
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
 
-  return {
-    compile(b) {
-      if (!b.costContext?.active) return;
-      if (factor <= 1) return;
+    const validation = {
+      strategy: "skip" as const,
+      category: "no-meaningful-feedback" as const,
+      rationale:
+        factor <= 1
+          ? "A 1x multiplier does not change optimization or cost accounting."
+          : "Day cost multipliers only affect optimization when minimize-cost is active.",
+    };
 
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+    const costArtifact: CostArtifact = {
+      kind: "cost",
+      validation,
+      compileObjective(builder) {
+        if (!builder.costContext?.active || factor <= 1) return;
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
+        const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
+        if (targetMembers.length === 0 || activeDays.length === 0) return;
 
-      const { normalizationFactor } = b.costContext;
-      const extraFactor = factor - 1;
+        const { normalizationFactor } = builder.costContext;
+        const extraFactor = factor - 1;
 
-      for (const emp of targetMembers) {
-        const rate = getHourlyRate(emp);
-        if (rate === undefined) continue;
-
-        for (const pattern of b.shiftPatterns) {
-          if (!b.canAssign(emp, pattern)) continue;
-          for (const day of activeDays) {
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            const duration = patternDurationMinutes(pattern);
-            const extraCost = (rate * extraFactor * duration) / 60;
-            const normalizedPenalty = extraCost / normalizationFactor;
-            b.addPenalty(b.assignment(emp.id, pattern.id, day), Math.max(1, normalizedPenalty));
+        for (const member of targetMembers) {
+          const rate = getHourlyRate(member);
+          if (rate === undefined) continue;
+          for (const pattern of builder.shiftPatterns) {
+            if (!builder.canAssign(member, pattern)) continue;
+            for (const day of activeDays) {
+              if (!builder.patternAvailableOnDay(pattern, day)) continue;
+              const duration = patternDurationMinutes(pattern);
+              const extraCost = (rate * extraFactor * duration) / 60;
+              const normalizedPenalty = extraCost / normalizationFactor;
+              builder.addPenalty(
+                builder.assignment(member.id, pattern.id, day),
+                Math.max(1, normalizedPenalty),
+              );
+            }
           }
         }
-      }
-    },
+      },
+      calculateCost(assignments, costContext) {
+        if (factor <= 1) return { entries: [] };
 
-    cost(
-      assignments: ShiftAssignment[],
-      members: ReadonlyArray<SchedulingMember>,
-      shiftPatterns: ReadonlyArray<ShiftPattern>,
-    ): CostContribution {
-      if (factor <= 1) return { entries: [] };
+        const memberMap = new Map(costContext.members.map((member) => [member.id, member]));
+        const patternMap = new Map(
+          costContext.shiftPatterns.map((pattern) => [pattern.id, pattern]),
+        );
+        const activeDays = new Set(
+          resolveActiveDaysFromScope(timeScopeValue, [...costContext.days]).map((day) => day.iso),
+        );
+        const targetMemberIds = new Set(
+          resolveMembersFromScope(entityScopeValue, [...costContext.members]).map(
+            (member) => member.id,
+          ),
+        );
+        const extraFactor = factor - 1;
 
-      const empMap = new Map(members.map((e) => [e.id, e]));
-      const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
+        const entries = [] as Array<{
+          memberId: string;
+          day: string;
+          category: string;
+          amount: number;
+        }>;
+        for (const assignment of assignments) {
+          if (!activeDays.has(assignment.day) || !targetMemberIds.has(assignment.memberId))
+            continue;
+          const member = memberMap.get(assignment.memberId);
+          if (!member) continue;
+          const rate = getHourlyRate(member);
+          if (rate === undefined) continue;
+          const pattern = patternMap.get(assignment.shiftPatternId);
+          if (!pattern) continue;
+          const duration = patternDurationMinutes(pattern);
+          entries.push({
+            memberId: assignment.memberId,
+            day: assignment.day,
+            category: COST_CATEGORY.PREMIUM,
+            amount: (rate * extraFactor * duration) / 60,
+          });
+        }
 
-      // Resolve which days this rule applies to from assignments
-      const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
-      const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
-      const targetEmpIds = new Set(
-        resolveMembersFromScope(entityScopeValue, [...empMap.values()]).map((e) => e.id),
-      );
+        return { entries };
+      },
+    };
 
-      const entries: CostContribution["entries"] = [];
-      const extraFactor = factor - 1;
-
-      for (const a of assignments) {
-        if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.memberId)) continue;
-        const emp = empMap.get(a.memberId);
-        if (!emp) continue;
-        const rate = getHourlyRate(emp);
-        if (rate === undefined) continue;
-        const pattern = patternMap.get(a.shiftPatternId);
-        if (!pattern) continue;
-        const duration = patternDurationMinutes(pattern);
-        const amount = (rate * extraFactor * duration) / 60;
-        entries.push({
-          memberId: a.memberId,
-          day: a.day,
-          category: COST_CATEGORY.PREMIUM,
-          amount,
-        });
-      }
-
-      return { entries };
-    },
-  };
-}
+    return {
+      rule: "day-cost-multiplier",
+      artifacts: [costArtifact],
+    };
+  },
+});

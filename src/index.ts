@@ -36,9 +36,9 @@
 // Time primitives
 // ============================================================================
 
-export type { TimeOfDay, DayOfWeek, SchedulingPeriod } from "./types.js";
+export type { DateString, TimeOfDay, DayOfWeek, SchedulingDay, SchedulingPeriod } from "./types.js";
 
-export { DayOfWeekSchema } from "./types.js";
+export { schedulingDay, DAY_OF_WEEK_INDEX, DayOfWeekSchema } from "./types.js";
 
 // ============================================================================
 // Solver client
@@ -51,13 +51,27 @@ export type {
   SolverRequest,
   SolverResponse,
   SolverStatus,
-  SoftConstraintViolation,
+  SolverMode,
+  SolverDiagnosticMode,
+  SolverObjectiveStage,
+  SolverStageResult,
+  SolverSoftConstraintViolation,
+  SolverHardConstraintConflict,
   FetcherLike,
 } from "./client.types.js";
 
 export { SOLVER_STATUS } from "./client.types.js";
 
-export { SolverRequestSchema, SolverResponseSchema, SolverStatusSchema } from "./client.schemas.js";
+export {
+  SolverModeSchema,
+  SolverDiagnosticModeSchema,
+  SolverObjectiveStageSchema,
+  SolverRequestSchema,
+  SolverResponseSchema,
+  SolverStageResultSchema,
+  SolverStatusSchema,
+  SolverHardConstraintConflictSchema,
+} from "./client.schemas.js";
 
 // ============================================================================
 // Model builder
@@ -65,14 +79,27 @@ export { SolverRequestSchema, SolverResponseSchema, SolverStatusSchema } from ".
 
 export { ModelBuilder } from "./cpsat/model-builder.js";
 
+export type { ModelBuilderConfig, CompilationResult } from "./cpsat/model-builder.js";
+export type { ModelSolveStrategy } from "./cpsat/types.js";
+
+export { compileRuleDescriptor, defineRuleDescriptor } from "./cpsat/rule-descriptor.js";
+
 export type {
-  ModelBuilderConfig,
-  CompilationResult,
-  CompilationRule,
-  RuleValidationContext,
+  CostValidationStrategy,
+  HardConstraintValidationStrategy,
+  ObjectiveValidationStrategy,
+  ReportHardConstraintValidationStrategy,
+  ReportSoftConstraintValidationStrategy,
+  RuleDescriptor,
+  RuleCompileContext,
+  RuleArtifact,
+  SkipValidationStrategy,
+  SoftConstraintValidationStrategy,
+  CompiledRule,
+  ValidationSkipCategory,
   CostEntry,
   CostContribution,
-} from "./cpsat/model-builder.js";
+} from "./cpsat/rule-descriptor.js";
 
 // ============================================================================
 // Solver response parsing
@@ -94,10 +121,19 @@ export type { CostBreakdown, MemberCostDetail, CostCalculationConfig } from "./c
 // Rules (registry types)
 // ============================================================================
 
+export {
+  assertValidCpsatRuleRegistry,
+  builtInCpsatRuleRegistry,
+  createCpsatRuleRegistry,
+} from "./cpsat/rules/registry.js";
+
 export type {
+  BuiltInCpsatRuleConfigRegistry,
+  BuiltInCpsatRuleRegistry,
+  CpsatRuleConfigByName,
   CpsatRuleConfigEntry,
-  CpsatRuleFactories,
-  CreateCpsatRuleFunction,
+  CpsatRuleConfigEntryFor,
+  CpsatRuleRegistry,
 } from "./cpsat/rules/rules.types.js";
 
 export type { RecurringPeriod } from "./cpsat/rules/scope.types.js";
@@ -150,6 +186,7 @@ export { summarizeValidation } from "./cpsat/validation-reporter.js";
 
 export {
   schedule,
+  scheduleWithRuleRegistry,
   partialSchedule,
   Schedule,
   t,
@@ -162,16 +199,24 @@ export {
   minHoursPerWeek,
   maxDaysPerWeek,
   minDaysPerWeek,
+  targetDaysPerWeek,
   maxShiftsPerDay,
+  maxConcurrentAssignments,
+  targetPeakConcurrentAssignments,
   maxConsecutiveDays,
   minConsecutiveDays,
   minRestBetweenShifts,
   mustAssign,
-  preference,
+  preferAssignment,
+  avoidAssignment,
+  preferRole,
   preferLocation,
   timeOff,
   assignTogether,
+  maxDaysOfWeekPerPeriod,
+  minDaysOfWeekPerPeriod,
   defineRule,
+  defineRuleFor,
   minimizeCost,
   dayMultiplier,
   daySurcharge,
@@ -192,12 +237,19 @@ export type {
   RuleEntry,
   RuleResolveContext,
   RuleOptions,
+  ScheduleRuleEntry,
   EntityOnlyRuleOptions,
+  TargetDaysPerWeekOptions,
   TimeOffOptions,
   AssignTogetherOptions,
+  MaxConcurrentAssignmentsOptions,
+  TargetPeakConcurrentAssignmentsOptions,
+  DaysOfWeekPerPeriodOptions,
   CostRuleOptions,
   ScheduleConfig,
+  ScheduleWithRuleRegistryConfig,
   SolveResult,
   SolveStatus,
+  SolveStrategy,
   SolveOptions,
 } from "./schedule/index.js";

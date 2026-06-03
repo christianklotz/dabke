@@ -3,8 +3,12 @@ import {
   ValidationReporterImpl,
   summarizeValidation,
 } from "../../src/cpsat/validation-reporter.js";
-import type { ValidationGroup } from "../../src/cpsat/validation.types.js";
+import type { ScheduleValidation, ValidationGroup } from "../../src/cpsat/validation.types.js";
 import type { SolverResponse } from "../../src/client.types.js";
+
+type CoverageErrorInput = Parameters<ValidationReporterImpl["reportCoverageError"]>[0];
+type RuleViolationInput = Parameters<ValidationReporterImpl["reportRuleViolation"]>[0];
+type CoverageBaseInput = Pick<CoverageErrorInput, "day" | "timeSlots" | "roleIds">;
 
 describe("ValidationReporterImpl", () => {
   describe("coverage exclusions", () => {
@@ -160,6 +164,32 @@ describe("ValidationReporterImpl", () => {
         context: { memberIds: ["alice"], days: ["2024-02-01"] },
       });
     });
+
+    it("preserves duplicate rule violations instead of overwriting them", () => {
+      const reporter = new ValidationReporterImpl();
+
+      reporter.reportRuleViolation({
+        rule: "min-rest-between-shifts",
+        message: "11h rest needed, got 8h",
+        context: { memberIds: ["alice"], days: ["2024-02-01"] },
+      });
+      reporter.reportRuleViolation({
+        rule: "min-rest-between-shifts",
+        message: "11h rest needed, got 6h",
+        context: { memberIds: ["alice"], days: ["2024-02-01"] },
+      });
+
+      const validation = reporter.getValidation();
+      expect(validation.violations).toHaveLength(2);
+      expect(validation.violations[0]?.id).toBe(
+        "violation:rule:min-rest-between-shifts:2024-02-01:alice",
+      );
+      expect(validation.violations[1]?.id).toBe(
+        "violation:rule:min-rest-between-shifts:2024-02-01:alice:2",
+      );
+      expect(validation.violations[0]?.message).toBe("11h rest needed, got 8h");
+      expect(validation.violations[1]?.message).toBe("11h rest needed, got 6h");
+    });
   });
 
   describe("passed", () => {
@@ -211,7 +241,7 @@ describe("ValidationReporterImpl", () => {
       const reporter1 = new ValidationReporterImpl();
       const reporter2 = new ValidationReporterImpl();
 
-      const errorData = {
+      const errorData: CoverageErrorInput = {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00", "14:00-18:00"],
         roleIds: ["barista"],
@@ -233,7 +263,7 @@ describe("ValidationReporterImpl", () => {
       const reporter1 = new ValidationReporterImpl();
       const reporter2 = new ValidationReporterImpl();
 
-      const violationData = {
+      const violationData: RuleViolationInput = {
         rule: "max-hours-week",
         message: "Weekly hours exceeded",
         context: { memberIds: ["bob", "alice"], days: ["2024-02-01", "2024-02-02"] },
@@ -305,7 +335,7 @@ describe("ValidationReporterImpl", () => {
     it("differentiates IDs by category (error vs violation vs passed)", () => {
       const reporter = new ValidationReporterImpl();
 
-      const commonData = {
+      const commonData: CoverageBaseInput = {
         day: "2024-02-01",
         timeSlots: ["09:00-13:00"],
         roleIds: ["barista"],
@@ -355,7 +385,7 @@ describe("ValidationReporterImpl", () => {
       const response: SolverResponse = {
         status: "OPTIMAL",
         values: {},
-        softViolations: [
+        softConstraintViolations: [
           {
             constraintId: "coverage:barista:2024-02-01:540",
             violationAmount: 1,
@@ -399,7 +429,7 @@ describe("ValidationReporterImpl", () => {
       const response: SolverResponse = {
         status: "OPTIMAL",
         values: {},
-        softViolations: [],
+        softConstraintViolations: [],
       };
 
       reporter.analyzeSolution(response);
@@ -436,6 +466,77 @@ describe("ValidationReporterImpl", () => {
       });
     });
 
+    it("reports grouped validation errors for tracked infeasible constraints", () => {
+      const reporter = new ValidationReporterImpl();
+      const coverageGroup: ValidationGroup = {
+        key: "coverage:late:waiter:1",
+        title: "1x waiter during late",
+      };
+      const ruleGroup: ValidationGroup = {
+        key: "rule:max-shifts-day:1:members:alice,bob",
+        title: "Max 1 shift per day",
+      };
+
+      reporter.trackConstraint({
+        id: "coverage:waiter:2024-02-01:1080",
+        type: "coverage",
+        source: "hard",
+        description: "1x waiter on 2024-02-01 at 18:00",
+        targetValue: 1,
+        comparator: ">=",
+        day: "2024-02-01",
+        timeSlot: "18:00",
+        roleIds: ["waiter"],
+        context: { days: ["2024-02-01"], memberIds: ["alice", "bob"] },
+        group: coverageGroup,
+      });
+      reporter.trackConstraint({
+        id: "max-shifts-day:alice:2024-02-01",
+        type: "rule",
+        source: "hard",
+        rule: "max-shifts-day",
+        description: "alice max 1 shift on 2024-02-01",
+        targetValue: 1,
+        comparator: "<=",
+        context: { days: ["2024-02-01"], memberIds: ["alice"] },
+        group: ruleGroup,
+      });
+
+      const response: SolverResponse = {
+        status: "INFEASIBLE",
+        solutionInfo: "Schedule is infeasible",
+        hardConstraintConflicts: [
+          { constraintId: "coverage:waiter:2024-02-01:1080" },
+          { constraintId: "max-shifts-day:alice:2024-02-01" },
+        ],
+      };
+
+      reporter.analyzeSolution(response);
+
+      const validation = reporter.getValidation();
+      expect(validation.errors).toHaveLength(3);
+      expect(validation.errors).toContainEqual(
+        expect.objectContaining({
+          type: "coverage",
+          group: coverageGroup,
+          message: "1x waiter during late is part of a sufficient infeasible constraint set.",
+        }),
+      );
+      expect(validation.errors).toContainEqual(
+        expect.objectContaining({
+          type: "rule",
+          group: ruleGroup,
+          message: "Max 1 shift per day is part of a sufficient infeasible constraint set.",
+        }),
+      );
+
+      const summaries = summarizeValidation(validation);
+      expect(summaries.map((summary) => summary.groupKey)).toEqual([
+        "coverage:late:waiter:1",
+        "rule:max-shifts-day:1:members:alice,bob",
+      ]);
+    });
+
     it("propagates group from tracked constraints to violations", () => {
       const reporter = new ValidationReporterImpl();
       const grp: ValidationGroup = {
@@ -459,7 +560,7 @@ describe("ValidationReporterImpl", () => {
       const response: SolverResponse = {
         status: "OPTIMAL",
         values: {},
-        softViolations: [
+        softConstraintViolations: [
           {
             constraintId: "coverage:barista:2024-02-01:540",
             violationAmount: 1,
@@ -499,7 +600,7 @@ describe("ValidationReporterImpl", () => {
       const response: SolverResponse = {
         status: "OPTIMAL",
         values: {},
-        softViolations: [],
+        softConstraintViolations: [],
       };
 
       reporter.analyzeSolution(response);
@@ -522,7 +623,7 @@ describe("summarizeValidation", () => {
   };
 
   it("groups passed items by group key", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [],
       violations: [],
       passed: [
@@ -572,7 +673,7 @@ describe("summarizeValidation", () => {
   });
 
   it("creates separate groups for different groups", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [],
       violations: [],
       passed: [
@@ -610,7 +711,7 @@ describe("summarizeValidation", () => {
   });
 
   it("sets status to partial when there are violations but also passed", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [],
       violations: [
         {
@@ -648,7 +749,7 @@ describe("summarizeValidation", () => {
   });
 
   it("sets status to failed when there are errors", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [
         {
           id: "error:coverage:2024-02-01:09:00:barista:_",
@@ -672,7 +773,7 @@ describe("summarizeValidation", () => {
   });
 
   it("uses group title for summary title", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [],
       violations: [],
       passed: [
@@ -694,7 +795,7 @@ describe("summarizeValidation", () => {
   });
 
   it("creates separate entries for ungrouped items", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [],
       violations: [],
       passed: [
@@ -724,7 +825,7 @@ describe("summarizeValidation", () => {
   });
 
   it("ignores solver errors in grouping", () => {
-    const validation = {
+    const validation: ScheduleValidation = {
       errors: [
         {
           id: "error:solver:1",

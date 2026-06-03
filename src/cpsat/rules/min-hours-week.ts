@@ -1,7 +1,7 @@
 import * as z from "zod";
 import { DayOfWeekSchema } from "../../types.js";
-import type { CompilationRule } from "../model-builder.js";
-import type { Term } from "../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { RuleArtifact } from "../rule-descriptor.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
 import {
   PrioritySchema,
@@ -10,6 +10,9 @@ import {
   resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentTermsForDays } from "./assignment-terms.js";
+import { maxAssignableMinutesForDay, patternDurationMinutes } from "./pattern-time.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
 
 const MinHoursWeekBase = z.object({
   hours: z.number().min(0),
@@ -17,79 +20,101 @@ const MinHoursWeekBase = z.object({
   weekStartsOn: DayOfWeekSchema.optional(),
 });
 
-const MinHoursWeekSchema = MinHoursWeekBase.and(entityScope(["members", "roles", "skills"]));
+export const MinHoursWeekSchema = MinHoursWeekBase.and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createMinHoursWeekRule}.
- *
- * - `hours` (required): minimum hours required per scheduling week
- * - `priority` (required): how strictly the solver enforces this rule
- * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link minHoursWeekRuleDescriptor}.
  */
 export type MinHoursWeekConfig = z.infer<typeof MinHoursWeekSchema>;
 
 /**
- * Enforces a minimum total number of hours per scheduling week.
+ * Low-level descriptor for the `min-hours-week` rule.
  *
- * @param config - See {@link MinHoursWeekConfig}
- * @example
- * ```ts
- * createMinHoursWeekRule({ hours: 30, priority: "HIGH" });
- * ```
+ * @category Rules
  */
-export function createMinHoursWeekRule(config: MinHoursWeekConfig): CompilationRule {
-  const parsed = MinHoursWeekSchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { hours, priority, weekStartsOn } = parsed;
-  const minMinutes = hours * 60;
-  const group = ruleGroup(`min-hours-week:${hours}`, `Min ${hours}h per week`, scope);
+export const minHoursWeekRuleDescriptor = defineRuleDescriptor({
+  name: "min-hours-week",
+  schema: MinHoursWeekSchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { hours, priority, weekStartsOn } = config;
+    const minMinutes = hours * 60;
+    const group = ruleGroup(`min-hours-week:${hours}`, `Min ${hours}h per week`, scope);
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
+    const weeks = splitIntoWeeks([...ctx.days], weekStartsOn ?? ctx.weekStartsOn);
 
-  return {
-    compile(b) {
-      if (hours <= 0) return;
+    const artifacts: RuleArtifact[] = [];
+    for (const member of members) {
+      for (const weekDays of weeks) {
+        const weekStart = weekDays[0];
+        if (!weekStart) continue;
 
-      const members = resolveMembersFromScope(scope, b.members);
-      const weeks = splitIntoWeeks(b.days, weekStartsOn ?? b.weekStartsOn);
+        const terms = assignmentTermsForDays(
+          member,
+          weekDays,
+          ctx.shiftPatterns,
+          patternDurationMinutes,
+        );
+        if (terms.length === 0) continue;
 
-      for (const emp of members) {
-        for (const weekDays of weeks) {
-          const terms: Term[] = [];
-          for (const day of weekDays) {
-            for (const pattern of b.shiftPatterns) {
-              if (!b.canAssign(emp, pattern)) continue;
-              if (!b.patternAvailableOnDay(pattern, day)) continue;
-              terms.push({
-                var: b.assignment(emp.id, pattern.id, day),
-                coeff: b.patternDuration(pattern.id),
-              });
-            }
-          }
+        const description = `${member.id} min ${hours}h in week starting ${weekStart.iso}`;
+        const context = { memberIds: [member.id], days: weekDays.map((day) => day.iso) };
+        const constraintId = `min-hours-week:${member.id}:${weekStart.iso}`;
 
-          if (terms.length === 0) continue;
-
-          const weekLabel = weekDays[0]!;
-          const constraintId = `min-hours-week:${emp.id}:${weekLabel}`;
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, ">=", minMinutes);
-          } else {
-            b.addSoftLinear(terms, ">=", minMinutes, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "min-hours-week",
-              description: `${emp.id} min ${hours}h in week starting ${weekLabel}`,
-              targetValue: minMinutes,
-              comparator: ">=",
-              day: weekLabel,
-              context: { memberIds: [emp.id], days: weekDays },
+        if (priority === "MANDATORY") {
+          artifacts.push(
+            hardConstraint({
               group,
-            });
-          }
+              description,
+              context,
+              validation: reportValidation(constraintId),
+              terms,
+              comparator: ">=",
+              targetValue: minMinutes,
+            }),
+            {
+              kind: "pre-solve-feedback",
+              run(preSolveContext, reporter) {
+                const maxMinutes = weekDays.reduce(
+                  (total, day) =>
+                    total + maxAssignableMinutesForDay(member, day, preSolveContext.shiftPatterns),
+                  0,
+                );
+                if (maxMinutes >= minMinutes) return;
+                reporter.reportRuleError({
+                  rule: "min-hours-week",
+                  message: `${member.id} cannot reach ${hours}h in week starting ${weekStart.iso}; maximum possible is ${Math.round((maxMinutes / 60) * 10) / 10}h.`,
+                  context,
+                  suggestions: [
+                    `Reduce the weekly minimum for ${member.id}`,
+                    `Add longer or additional shifts in the week starting ${weekStart.iso}`,
+                  ],
+                  group,
+                });
+              },
+            },
+          );
+        } else {
+          artifacts.push(
+            softConstraint({
+              group,
+              description,
+              context,
+              validation: reportValidation(),
+              terms,
+              comparator: ">=",
+              targetValue: minMinutes,
+              penalty: priorityToPenalty(priority),
+              constraintId,
+            }),
+          );
         }
       }
-    },
-  };
-}
+    }
+
+    return {
+      rule: "min-hours-week",
+      artifacts,
+    };
+  },
+});

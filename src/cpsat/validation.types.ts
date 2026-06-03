@@ -1,10 +1,10 @@
-import type { TimeOfDay } from "../types.js";
+import type { DateString, TimeOfDay } from "../types.js";
 
 /**
  * Context shared across validation results for grouping/display.
  */
 export interface ValidationContext {
-  days?: string[];
+  days?: DateString[];
   timeSlots?: string[];
   memberIds?: string[];
 }
@@ -60,7 +60,7 @@ export function assertSafeKeySegments(values: readonly string[], label: string):
 export interface CoverageError {
   readonly id: string;
   readonly type: "coverage";
-  readonly day: string;
+  readonly day: DateString;
   readonly timeSlots: readonly string[];
   readonly roleIds?: string[];
   readonly skillIds?: readonly string[];
@@ -88,13 +88,13 @@ export interface SolverError {
 export type ScheduleError = CoverageError | RuleError | SolverError;
 
 // =============================================================================
-// Violations - soft constraints not met, but schedule generated
+// Violations - non-fatal unmet requirements or preferences
 // =============================================================================
 
 export interface CoverageViolation {
   readonly id: string;
   readonly type: "coverage";
-  readonly day: string;
+  readonly day: DateString;
   readonly timeSlots: readonly string[];
   readonly roleIds?: string[];
   readonly skillIds?: readonly string[];
@@ -125,7 +125,7 @@ export type ScheduleViolation = CoverageViolation | RuleViolation;
 export interface CoveragePassed {
   readonly id: string;
   readonly type: "coverage";
-  readonly day: string;
+  readonly day: DateString;
   readonly timeSlots: readonly string[];
   readonly roleIds?: string[];
   readonly skillIds?: readonly string[];
@@ -148,7 +148,17 @@ export type SchedulePassed = CoveragePassed | RulePassed;
 // Complete validation result
 // =============================================================================
 
-/** @category Validation */
+/**
+ * Public validation feedback collected across pre-solve, solver-stage, and
+ * post-solve analysis.
+ *
+ * @remarks
+ * This is not a direct mirror of the raw solver response. Solver transport
+ * fields such as `softConstraintViolations` are translated into these
+ * phase-agnostic `errors`, `violations`, and `passed` items.
+ *
+ * @category Validation
+ */
 export interface ScheduleValidation {
   readonly errors: readonly ScheduleError[];
   readonly violations: readonly ScheduleViolation[];
@@ -171,7 +181,7 @@ export interface ValidationSummary {
   readonly type: "coverage" | "rule";
   /** Human-readable title for this group (e.g., "3x nurse during day_ward"). */
   readonly title: string;
-  readonly days: readonly string[];
+  readonly days: readonly DateString[];
   readonly status: "passed" | "partial" | "failed";
   readonly passedCount: number;
   readonly violatedCount: number;
@@ -185,12 +195,13 @@ export interface ValidationSummary {
 export interface TrackedConstraint {
   readonly id: string;
   readonly type: "coverage" | "rule";
+  readonly source?: "hard" | "soft";
   readonly rule?: string;
   /** Per-constraint description used to generate violation messages. */
   readonly description: string;
   readonly targetValue: number;
-  readonly comparator: "<=" | ">=";
-  readonly day?: string;
+  readonly comparator: "<=" | ">=" | "==";
+  readonly day?: DateString;
   readonly timeSlot?: string;
   readonly roleIds?: string[];
   readonly skillIds?: readonly string[];
@@ -204,7 +215,7 @@ export interface TrackedConstraint {
  */
 export interface CoverageExclusion {
   memberId: string;
-  day: string;
+  day: DateString;
   startTime?: TimeOfDay;
   endTime?: TimeOfDay;
 }

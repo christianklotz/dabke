@@ -25,12 +25,12 @@ describe("CP-SAT: max-hours-week rule", () => {
       {
         name: "assignment-priority",
         memberIds: ["alice"],
-        preference: "high",
+        preference: "prefer",
       },
       {
         name: "assignment-priority",
         memberIds: ["bob"],
-        preference: "low",
+        preference: "avoid",
       },
     ];
 

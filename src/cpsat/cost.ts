@@ -1,6 +1,7 @@
+import type { DayOfWeek, SchedulingDay } from "../types.js";
 import type { ShiftAssignment } from "./response.js";
 import type { SchedulingMember, ShiftPattern } from "./types.js";
-import type { CompilationRule, CostEntry } from "./model-builder.js";
+import type { CompiledRule, CostEntry } from "./rule-descriptor.js";
 import { timeOfDayToMinutes, normalizeEndMinutes } from "./utils.js";
 
 /**
@@ -54,7 +55,9 @@ export interface CostBreakdown {
 export interface CostCalculationConfig {
   members: ReadonlyArray<SchedulingMember>;
   shiftPatterns: ReadonlyArray<ShiftPattern>;
-  rules: ReadonlyArray<CompilationRule>;
+  rules: ReadonlyArray<CompiledRule>;
+  days: ReadonlyArray<SchedulingDay>;
+  weekStartsOn: DayOfWeek;
 }
 
 /**
@@ -71,14 +74,21 @@ export function calculateScheduleCost(
   assignments: ShiftAssignment[],
   config: CostCalculationConfig,
 ): CostBreakdown {
-  const { members, shiftPatterns, rules } = config;
+  const { members, shiftPatterns, rules, days } = config;
 
-  // Collect all cost entries from rules
+  // Collect all cost entries from cost artifacts
   const allEntries: CostEntry[] = [];
   for (const rule of rules) {
-    if (!rule.cost) continue;
-    const contribution = rule.cost(assignments, members, shiftPatterns);
-    allEntries.push(...contribution.entries);
+    for (const artifact of rule.artifacts) {
+      if (artifact.kind !== "cost" || !artifact.calculateCost) continue;
+      const contribution = artifact.calculateCost(assignments, {
+        members,
+        shiftPatterns,
+        days,
+        weekStartsOn: config.weekStartsOn,
+      });
+      allEntries.push(...contribution.entries);
+    }
   }
 
   // Compute total hours per member from assignments

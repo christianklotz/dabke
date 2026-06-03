@@ -3,7 +3,7 @@ import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import { parseSolverResponse, resolveAssignments } from "../../src/cpsat/response.js";
 import { getSolverClient } from "./helpers.js";
 
-describe("Validation diagnostics (integration)", () => {
+describe("Validation feedback (integration)", () => {
   let client: ReturnType<typeof getSolverClient>;
 
   beforeAll(() => {
@@ -35,12 +35,12 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
+      const compilation = builder.compile();
 
-      expect(diagnostics.canSolve).toBe(false);
-      expect(diagnostics.validation.errors.length).toBeGreaterThan(0);
-      expect(diagnostics.validation.errors[0]?.type).toBe("coverage");
-      expect(diagnostics.validation.errors[0]?.message).toContain("no eligible team members");
+      expect(compilation.canSolve).toBe(false);
+      expect(compilation.validation.errors.length).toBeGreaterThan(0);
+      expect(compilation.validation.errors[0]?.type).toBe("coverage");
+      expect(compilation.validation.errors[0]?.message).toContain("no eligible team members");
     });
 
     it("reports coverage error when mandatory time-off blocks all members", () => {
@@ -76,10 +76,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
+      const compilation = builder.compile();
 
-      expect(diagnostics.canSolve).toBe(false);
-      const error = diagnostics.validation.errors.find(
+      expect(compilation.canSolve).toBe(false);
+      const error = compilation.validation.errors.find(
         (e) => e.type === "coverage" && e.message.includes("mandatory time off"),
       );
       expect(error).toBeDefined();
@@ -111,10 +111,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
-      expect(diagnostics.canSolve).toBe(true);
+      const compilation = builder.compile();
+      expect(compilation.canSolve).toBe(true);
 
-      const response = await client.solve(diagnostics.request);
+      const response = await client.solve(compilation.request);
       expect(response.status).toBe("OPTIMAL");
 
       builder.reporter.analyzeSolution(response);
@@ -155,10 +155,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
-      expect(diagnostics.canSolve).toBe(true);
+      const compilation = builder.compile();
+      expect(compilation.canSolve).toBe(true);
 
-      const response = await client.solve(diagnostics.request);
+      const response = await client.solve(compilation.request);
       expect(response.status).toBe("OPTIMAL");
 
       builder.reporter.analyzeSolution(response);
@@ -209,10 +209,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
-      expect(diagnostics.canSolve).toBe(true);
+      const compilation = builder.compile();
+      expect(compilation.canSolve).toBe(true);
 
-      const response = await client.solve(diagnostics.request);
+      const response = await client.solve(compilation.request);
       expect(response.status).toBe("OPTIMAL");
 
       const result = parseSolverResponse(response);
@@ -230,6 +230,9 @@ describe("Validation diagnostics (integration)", () => {
       const timeOffViolation = validation.violations.find(
         (v) => v.type === "rule" && v.rule === "time-off",
       );
+      expect(
+        validation.violations.filter((v) => v.type === "rule" && v.rule === "time-off"),
+      ).toHaveLength(1);
       expect(timeOffViolation).toBeDefined();
       expect(timeOffViolation?.type).toBe("rule");
       if (timeOffViolation?.type === "rule") {
@@ -273,10 +276,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
-      expect(diagnostics.canSolve).toBe(true);
+      const compilation = builder.compile();
+      expect(compilation.canSolve).toBe(true);
 
-      const response = await client.solve(diagnostics.request);
+      const response = await client.solve(compilation.request);
       expect(response.status).toBe("OPTIMAL");
 
       const result = parseSolverResponse(response);
@@ -341,10 +344,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
-      expect(diagnostics.canSolve).toBe(true);
+      const compilation = builder.compile();
+      expect(compilation.canSolve).toBe(true);
 
-      const response = await client.solve(diagnostics.request);
+      const response = await client.solve(compilation.request);
       expect(response.status).toBe("OPTIMAL");
 
       const result = parseSolverResponse(response);
@@ -417,10 +420,10 @@ describe("Validation diagnostics (integration)", () => {
         ],
       });
 
-      const diagnostics = builder.compile();
-      expect(diagnostics.canSolve).toBe(true);
+      const compilation = builder.compile();
+      expect(compilation.canSolve).toBe(true);
 
-      const response = await client.solve(diagnostics.request);
+      const response = await client.solve(compilation.request);
       expect(response.status).toBe("OPTIMAL");
 
       const result = parseSolverResponse(response);

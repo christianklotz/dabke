@@ -84,7 +84,7 @@ describe("Skill-based scheduling (integration)", () => {
         name: "assignment-priority",
 
         skillIds: ["keyholder"],
-        preference: "high",
+        preference: "prefer",
       },
     ];
 
@@ -242,7 +242,7 @@ describe("Skill-based scheduling (integration)", () => {
         name: "assignment-priority",
 
         skillIds: ["senior"],
-        preference: "high",
+        preference: "prefer",
       },
     ];
 

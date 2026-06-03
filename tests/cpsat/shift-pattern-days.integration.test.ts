@@ -98,7 +98,7 @@ describe("ShiftPattern dayOfWeek restriction (integration)", () => {
   }, 30_000);
 
   it("realistic cafe scenario with different Saturday hours", async () => {
-    // Based on cafeRealisticRota eval scenario
+    // Based on a realistic rota scenario
     const builder = new ModelBuilder({
       members: [
         { id: "martina", roleIds: ["staff"] },

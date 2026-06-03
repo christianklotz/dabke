@@ -1,6 +1,4 @@
-import type { DayOfWeek, TimeOfDay } from "../types.js";
-import { toDayOfWeekUTC } from "../datetime.utils.js";
-import { parseDayString } from "./utils.js";
+import type { DateString, DayOfWeek, SchedulingDay, TimeOfDay } from "../types.js";
 import type { CoverageRequirement, Priority } from "./types.js";
 import { assertSafeKeySegment, type ValidationGroup } from "./validation.types.js";
 
@@ -40,7 +38,7 @@ export interface SemanticTimeVariant extends SemanticTimeDef {
   /** Restrict this entry to specific days of the week. */
   dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict this entry to specific dates (YYYY-MM-DD). */
-  dates?: string[];
+  dates?: DateString[];
 }
 
 /**
@@ -59,7 +57,7 @@ interface SemanticCoverageRequirementBase<S extends string> {
   /** Scope this requirement to specific days of the week */
   dayOfWeek?: [DayOfWeek, ...DayOfWeek[]];
   /** Scope this requirement to specific dates (YYYY-MM-DD) */
-  dates?: string[];
+  dates?: DateString[];
   /**
    * Override the auto-generated group for validation reporting.
    * If not provided, a group is auto-generated from the semantic time name,
@@ -141,7 +139,7 @@ export type SemanticCoverageRequirement<S extends string> =
  * Base fields shared by concrete coverage requirement variants.
  */
 interface ConcreteCoverageRequirementBase {
-  day: string;
+  day: DateString;
   startTime: TimeOfDay;
   endTime: TimeOfDay;
   targetCount: number;
@@ -199,6 +197,7 @@ export type ConcreteCoverageRequirement =
 /**
  * A day-specific count within a variant {@link cover} call.
  *
+ * @remarks
  * Each variant specifies a count and optional day/date scope. During
  * resolution, the most specific matching variant wins for each day
  * (`dates` > `dayOfWeek` > default), mirroring {@link SemanticTimeVariant}.
@@ -221,7 +220,7 @@ export interface CoverageVariant {
   /** Restrict this variant to specific days of the week. */
   dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict this variant to specific dates (YYYY-MM-DD). */
-  dates?: string[];
+  dates?: DateString[];
   /** Defaults to `"MANDATORY"`. */
   priority?: Priority;
 }
@@ -337,7 +336,7 @@ export interface SemanticTimeContext<S extends string> {
    * Resolve all coverage requirements to concrete CoverageRequirement[]
    * for the given days in the scheduling horizon.
    */
-  resolve(reqs: MixedCoverageRequirement<S>[], days: string[]): CoverageRequirement[];
+  resolve(reqs: MixedCoverageRequirement<S>[], days: SchedulingDay[]): CoverageRequirement[];
 }
 
 /**
@@ -394,7 +393,7 @@ export function defineSemanticTimes<const T extends Record<string, SemanticTimeE
       return reqs;
     },
 
-    resolve(reqs: MixedCoverageRequirement<S>[], days: string[]): CoverageRequirement[] {
+    resolve(reqs: MixedCoverageRequirement<S>[], days: SchedulingDay[]): CoverageRequirement[] {
       return resolveSemanticCoverage(defs, reqs, days);
     },
   };
@@ -405,7 +404,7 @@ export function defineSemanticTimes<const T extends Record<string, SemanticTimeE
  * Handles the discriminated union by checking which variant to construct.
  */
 function buildCoverageRequirement(
-  day: string,
+  day: DateString,
   startTime: TimeOfDay,
   endTime: TimeOfDay,
   roleIds: [string, ...string[]] | undefined,
@@ -417,14 +416,11 @@ function buildCoverageRequirement(
   const base = { day, startTime, endTime, targetCount, priority, group };
 
   if (roleIds && roleIds.length > 0) {
-    // Role-based (with optional skills)
     return skillIds && skillIds.length > 0 ? { ...base, roleIds, skillIds } : { ...base, roleIds };
   } else if (skillIds && skillIds.length > 0) {
-    // Skill-only
     return { ...base, skillIds };
   }
 
-  // This shouldn't happen if input types are correct, but handle gracefully
   throw new Error(
     `Coverage requirement for day "${day}" must have at least one of roleIds or skillIds`,
   );
@@ -437,15 +433,15 @@ function buildCoverageRequirement(
 function resolveSemanticCoverage<S extends string>(
   defs: Record<S, SemanticTimeEntry>,
   reqs: MixedCoverageRequirement<S>[],
-  days: string[],
+  days: SchedulingDay[],
 ): CoverageRequirement[] {
   const result: CoverageRequirement[] = [];
-  const daySet = new Set(days);
+  const dayIsoSet = new Set(days.map((d) => d.iso));
 
   for (const req of reqs) {
     if (isConcreteCoverage(req)) {
       // Concrete requirement - pass through if day is in horizon
-      if (daySet.has(req.day)) {
+      if (dayIsoSet.has(req.day)) {
         const defaultGroup = concreteCoverageGroup(req);
         result.push(
           buildCoverageRequirement(
@@ -478,7 +474,7 @@ function resolveSemanticCoverage<S extends string>(
 
         result.push(
           buildCoverageRequirement(
-            day,
+            day.iso,
             resolved.startTime,
             resolved.endTime,
             req.roleIds,
@@ -504,7 +500,7 @@ function resolveSemanticCoverage<S extends string>(
         if (resolved) {
           result.push(
             buildCoverageRequirement(
-              day,
+              day.iso,
               resolved.startTime,
               resolved.endTime,
               req.roleIds,
@@ -568,21 +564,18 @@ function variantCoverageGroup<S extends string>(
  */
 function resolveVariantForDay(
   variants: readonly CoverageVariant[],
-  day: string,
+  day: SchedulingDay,
 ): CoverageVariant | null {
-  const date = parseDayString(day);
-  const dayOfWeek = toDayOfWeekUTC(date);
-
   let dateMatch: CoverageVariant | null = null;
   let dowMatch: CoverageVariant | null = null;
   let defaultMatch: CoverageVariant | null = null;
 
   for (const variant of variants) {
-    if (variant.dates && variant.dates.includes(day)) {
+    if (variant.dates && variant.dates.includes(day.iso)) {
       dateMatch = variant;
       break;
     }
-    if (variant.dayOfWeek && variant.dayOfWeek.includes(dayOfWeek)) {
+    if (variant.dayOfWeek && variant.dayOfWeek.includes(day.dayOfWeek)) {
       dowMatch = variant;
     }
     if (!variant.dates && !variant.dayOfWeek) {
@@ -607,8 +600,9 @@ function concreteCoverageGroup(req: ConcreteCoverageRequirement): ValidationGrou
  * Formats days of week for display in group keys.
  */
 function formatDaysScope(days: DayOfWeek[]): string {
-  if (days.length === 0) return "";
-  if (days.length === 1) return days[0]!;
+  const first = days[0];
+  if (!first) return "";
+  if (days.length === 1) return first;
 
   // Check for common patterns
   const weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
@@ -640,20 +634,18 @@ function formatTime(time: TimeOfDay): string {
  * Filter days based on optional day-of-week and specific date constraints.
  */
 function filterDays(
-  allDays: string[],
+  allDays: SchedulingDay[],
   dayOfWeek?: DayOfWeek[],
   specificDates?: string[],
-): string[] {
+): SchedulingDay[] {
   let result = allDays;
 
   if (specificDates && specificDates.length > 0) {
-    // If specific dates are provided, use only those (intersection with allDays)
     const dateSet = new Set(specificDates);
-    result = result.filter((d) => dateSet.has(d));
+    result = result.filter((d) => dateSet.has(d.iso));
   } else if (dayOfWeek && dayOfWeek.length > 0) {
-    // Filter by day of week
     const daySet = new Set(dayOfWeek);
-    result = result.filter((d) => daySet.has(toDayOfWeekUTC(parseDayString(d))));
+    result = result.filter((d) => daySet.has(d.dayOfWeek));
   }
 
   return result;
@@ -663,26 +655,21 @@ function filterDays(
  * Resolve the time definition for a specific day.
  * Returns the most specific match: date-specific > day-of-week > default.
  */
-function resolveTimeForDay(entry: SemanticTimeEntry, day: string): SemanticTimeDef | null {
-  // Simple definition - applies to all days
+function resolveTimeForDay(entry: SemanticTimeEntry, day: SchedulingDay): SemanticTimeDef | null {
   if (!Array.isArray(entry)) {
     return entry;
   }
 
-  const date = parseDayString(day);
-  const dayOfWeek = toDayOfWeekUTC(date);
-
-  // Find best match: date-specific first, then day-of-week, then default
   let dateMatch: SemanticTimeVariant | null = null;
   let dowMatch: SemanticTimeVariant | null = null;
   let defaultMatch: SemanticTimeVariant | null = null;
 
   for (const variant of entry) {
-    if (variant.dates && variant.dates.includes(day)) {
+    if (variant.dates && variant.dates.includes(day.iso)) {
       dateMatch = variant;
-      break; // Date-specific is most specific
+      break;
     }
-    if (variant.dayOfWeek && variant.dayOfWeek.includes(dayOfWeek)) {
+    if (variant.dayOfWeek && variant.dayOfWeek.includes(day.dayOfWeek)) {
       dowMatch = variant;
     }
     if (!variant.dates && !variant.dayOfWeek) {
@@ -690,6 +677,5 @@ function resolveTimeForDay(entry: SemanticTimeEntry, day: string): SemanticTimeD
     }
   }
 
-  const match = dateMatch ?? dowMatch ?? defaultMatch;
-  return match ?? null;
+  return dateMatch ?? dowMatch ?? defaultMatch ?? null;
 }

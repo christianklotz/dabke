@@ -1,5 +1,5 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
 import { priorityToPenalty } from "../utils.js";
 import {
   PrioritySchema,
@@ -8,8 +8,11 @@ import {
   resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentVarsForDay } from "./assignment-terms.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
+import { buildAssignedDayIndicator } from "./assigned-day.js";
 
-const MaxConsecutiveDaysSchema = z
+export const MaxConsecutiveDaysSchema = z
   .object({
     days: z.number().min(0),
     priority: PrioritySchema,
@@ -17,103 +20,83 @@ const MaxConsecutiveDaysSchema = z
   .and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createMaxConsecutiveDaysRule}.
- *
- * - `days` (required): maximum consecutive days allowed
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link maxConsecutiveDaysRuleDescriptor}.
  */
 export type MaxConsecutiveDaysConfig = z.infer<typeof MaxConsecutiveDaysSchema>;
 
 /**
- * Limits how many consecutive days a person can be assigned.
+ * Low-level descriptor for the `max-consecutive-days` rule.
  *
- * @param config - See {@link MaxConsecutiveDaysConfig}
- * @example
- * ```ts
- * createMaxConsecutiveDaysRule({ days: 5, priority: "MANDATORY" });
- * ```
+ * @remarks
+ * This rule limits the length of each assignment streak by counting assigned
+ * days in every sliding window of `days + 1` days.
+ *
+ * @category Rules
  */
-export function createMaxConsecutiveDaysRule(config: MaxConsecutiveDaysConfig): CompilationRule {
-  const parsed = MaxConsecutiveDaysSchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { days, priority } = parsed;
-  const windowSize = days + 1;
-  const group = ruleGroup(`max-consecutive-days:${days}`, `Max ${days} consecutive days`, scope);
+export const maxConsecutiveDaysRuleDescriptor = defineRuleDescriptor({
+  name: "max-consecutive-days",
+  schema: MaxConsecutiveDaysSchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { days, priority } = config;
+    const windowSize = days + 1;
+    const group = ruleGroup(`max-consecutive-days:${days}`, `Max ${days} consecutive days`, scope);
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
 
-  return {
-    compile(b) {
-      const members = resolveMembersFromScope(scope, b.members);
+    const artifacts = members.flatMap((member) => {
+      const supportArtifacts = ctx.days.flatMap(
+        (day) =>
+          buildAssignedDayIndicator({
+            memberId: member.id,
+            day,
+            assignmentVars: assignmentVarsForDay(member, day, ctx.shiftPatterns),
+            variableName: `assigned_${member.id}_${day.iso}`,
+          }).artifacts,
+      );
 
-      for (const emp of members) {
-        for (let i = 0; i <= b.days.length - windowSize; i++) {
-          const windowDays = b.days.slice(i, i + windowSize);
-
-          const worksDayVars: string[] = [];
-          for (const day of windowDays) {
-            const worksVar = b.boolVar(`works_${emp.id}_${day}`);
-            worksDayVars.push(worksVar);
-
-            const dayAssignments = b.shiftPatterns
-              .filter((p) => b.canAssign(emp, p) && b.patternAvailableOnDay(p, day))
-              .map((p) => b.assignment(emp.id, p.id, day));
-
-            if (dayAssignments.length === 0) {
-              b.addLinear([{ var: worksVar, coeff: 1 }], "==", 0);
-            } else {
-              for (const assignVar of dayAssignments) {
-                b.addLinear(
-                  [
-                    { var: worksVar, coeff: 1 },
-                    { var: assignVar, coeff: -1 },
-                  ],
-                  ">=",
-                  0,
-                );
-              }
-              b.addLinear(
-                [
-                  { var: worksVar, coeff: 1 },
-                  ...dayAssignments.map((v) => ({ var: v, coeff: -1 })),
-                ],
-                "<=",
-                0,
-              );
-            }
-          }
-
+      const windowArtifacts = Array.from(
+        { length: Math.max(0, ctx.days.length - windowSize + 1) },
+        (_, index) => {
+          const windowDays = ctx.days.slice(index, index + windowSize);
           const windowStart = windowDays[0]!;
-          const constraintId = `max-consecutive-days:${emp.id}:${windowStart}`;
+          const terms = windowDays.map((day) => ({
+            var: `assigned_${member.id}_${day.iso}`,
+            coeff: 1,
+          }));
+          const description = `${member.id} max ${days} consecutive days from ${windowStart.iso}`;
+          const context = { memberIds: [member.id], days: windowDays.map((day) => day.iso) };
+          const constraintId = `max-consecutive-days:${member.id}:${windowStart.iso}`;
 
-          if (priority === "MANDATORY") {
-            b.addLinear(
-              worksDayVars.map((v) => ({ var: v, coeff: 1 })),
-              "<=",
-              days,
-            );
-          } else {
-            b.addSoftLinear(
-              worksDayVars.map((v) => ({ var: v, coeff: 1 })),
-              "<=",
-              days,
-              priorityToPenalty(priority),
-              constraintId,
-            );
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "max-consecutive-days",
-              description: `${emp.id} max ${days} consecutive days from ${windowStart}`,
-              targetValue: days,
-              comparator: "<=",
-              day: windowStart,
-              context: { memberIds: [emp.id], days: windowDays },
-              group,
-            });
-          }
-        }
-      }
-    },
-  };
-}
+          return priority === "MANDATORY"
+            ? hardConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(constraintId),
+                terms,
+                comparator: "<=",
+                targetValue: days,
+              })
+            : softConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(),
+                terms,
+                comparator: "<=",
+                targetValue: days,
+                penalty: priorityToPenalty(priority),
+                constraintId,
+              });
+        },
+      );
+
+      return supportArtifacts.concat(windowArtifacts);
+    });
+
+    return {
+      rule: "max-consecutive-days",
+      artifacts,
+    };
+  },
+});

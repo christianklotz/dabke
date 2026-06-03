@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
+import type { BaseScenarioConfig } from "./helpers.js";
 import { getSolverClient, decodeAssignments, solveWithRules } from "./helpers.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
+import type { DateString } from "../../src/types.js";
 
 /**
  * Integration tests for fair distribution of shifts.
@@ -21,7 +23,7 @@ describe("Fair distribution (integration)", () => {
       // Scenario: Retail shop open 9-5pm every day, need 1 person (8:30am-5:30pm)
       // Two members: Anne and John
       // Fair distribution: each should work roughly half the days (3-4 days each)
-      const days = [
+      const days: DateString[] = [
         "2024-02-05", // Monday
         "2024-02-06", // Tuesday
         "2024-02-07", // Wednesday
@@ -88,7 +90,7 @@ describe("Fair distribution (integration)", () => {
     it("should distribute shifts fairly with three members over 7 days", async () => {
       // Similar scenario but with 3 members
       // Fair distribution: ~2-3 days each
-      const days = [
+      const days: DateString[] = [
         "2024-02-05",
         "2024-02-06",
         "2024-02-07",
@@ -155,6 +157,8 @@ describe("Fair distribution (integration)", () => {
     it("member-assignment-priority can override fairness when needed", async () => {
       // Scenario: Prefer permanent staff (Anne) over temp staff (John)
       // Fairness should still apply but preference should win
+      const days: DateString[] = ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"];
+
       const baseConfig = {
         members: [
           { id: "anne", roleIds: ["staff"] },
@@ -169,7 +173,7 @@ describe("Fair distribution (integration)", () => {
           },
         ],
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-08" } },
-        coverage: ["2024-02-05", "2024-02-06", "2024-02-07", "2024-02-08"].map((day) => ({
+        coverage: days.map((day) => ({
           day,
           roleIds: ["staff"] as [string, ...string[]],
           startTime: { hours: 9, minutes: 0 },
@@ -177,19 +181,19 @@ describe("Fair distribution (integration)", () => {
           targetCount: 1,
           priority: "MANDATORY" as const,
         })),
-      };
+      } satisfies BaseScenarioConfig;
 
       // With strong preference for Anne, she should get more shifts
       const rules: CpsatRuleConfigEntry[] = [
         {
           name: "assignment-priority",
           memberIds: ["anne"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["john"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 
@@ -208,7 +212,7 @@ describe("Fair distribution (integration)", () => {
     }, 30_000);
 
     it("fairness can be disabled via config", async () => {
-      const days = ["2024-02-05", "2024-02-06", "2024-02-07"];
+      const days: DateString[] = ["2024-02-05", "2024-02-06", "2024-02-07"];
 
       const builder = new ModelBuilder({
         members: [

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
+import type { CoverageRequirement } from "../../src/cpsat/types.js";
 import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: location-preference rule", () => {
@@ -26,7 +27,7 @@ describe("CP-SAT: location-preference rule", () => {
         endTime: { hours: 18, minutes: 0 },
       },
     ];
-    const coverage = [
+    const coverage: CoverageRequirement[] = [
       {
         day: "2024-02-01",
         roleIds: ["waiter"] as [string],

@@ -1,15 +1,21 @@
 import assert from "node:assert";
+import * as z from "zod";
 import { describe, expect, it, vi } from "vitest";
-import type { CompilationRule } from "../../src/cpsat/model-builder.js";
-import type { CpsatRuleConfigEntry, CpsatRuleFactories } from "../../src/cpsat/rules.js";
+import type { CompiledRule } from "../../src/cpsat/rule-descriptor.js";
+import type {
+  AnyCpsatRuleConfigEntry,
+  CpsatRuleConfigEntry,
+  CpsatRuleRegistry,
+} from "../../src/cpsat/rules.js";
 import {
   buildCpsatRules,
-  createMaxHoursDayRule,
+  builtInCpsatRuleRegistry,
+  maxHoursDayRuleDescriptor,
   resolveRuleScopes,
 } from "../../src/cpsat/rules.js";
 
 /** Extracts a resolved config field for test assertions. */
-function configField(entry: CpsatRuleConfigEntry, field: string): unknown {
+function configField(entry: AnyCpsatRuleConfigEntry, field: string): unknown {
   return (entry as Record<string, unknown>)[field];
 }
 
@@ -108,13 +114,51 @@ describe("CP-SAT rule scoping resolver", () => {
     expect(configField(rule, "priority")).toBe("HIGH");
   });
 
-  it("builds compilation rules via factories using resolved scopes", () => {
-    const factory = vi.fn(
-      (_config: { tag: string; scope?: { memberIds?: string[] } }) =>
-        ({ compile: vi.fn() }) satisfies CompilationRule,
+  it("builds compilation rules via rule registry using resolved scopes", () => {
+    const compileSpy = vi.spyOn(builtInCpsatRuleRegistry["min-hours-day"], "compile");
+
+    const entries: CpsatRuleConfigEntry[] = [
+      {
+        name: "min-hours-day",
+        hours: 5,
+        priority: "MANDATORY",
+      },
+    ];
+
+    const rules = buildCpsatRules(entries, members, {
+      members,
+      shiftPatterns: [],
+      days: [],
+      weekStartsOn: "monday",
+    });
+    expect(rules).toHaveLength(1);
+    expect(compileSpy).toHaveBeenCalledTimes(1);
+    expect(compileSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hours: 5,
+        priority: "MANDATORY",
+        memberIds: ["alice", "bob"],
+      }),
+      expect.any(Object),
     );
-    const factories: CpsatRuleFactories = {
-      "min-hours-day": factory as any,
+
+    compileSpy.mockRestore();
+  });
+
+  it("fails fast when a descriptor registry key does not match descriptor.name", () => {
+    const compile = vi.fn<CpsatRuleRegistry[string]["compile"]>(
+      () => ({ rule: "wrong-name", artifacts: [] }) satisfies CompiledRule,
+    );
+    const ruleRegistry: CpsatRuleRegistry = {
+      "min-hours-day": {
+        name: "wrong-name",
+        schema: z.object({
+          hours: z.number(),
+          priority: z.string(),
+          memberIds: z.array(z.string()),
+        }),
+        compile,
+      },
     };
 
     const entries: CpsatRuleConfigEntry[] = [
@@ -125,14 +169,22 @@ describe("CP-SAT rule scoping resolver", () => {
       },
     ];
 
-    const rules = buildCpsatRules(entries, members, factories);
-    expect(rules).toHaveLength(1);
-    expect(factory).toHaveBeenCalledTimes(1);
-    expect(factory.mock.calls[0]?.[0]).toMatchObject({
-      hours: 5,
-      priority: "MANDATORY",
-      memberIds: ["alice", "bob"],
-    });
+    expect(() =>
+      buildCpsatRules(
+        entries,
+        members,
+        {
+          members,
+          shiftPatterns: [],
+          days: [],
+          weekStartsOn: "monday",
+        },
+        ruleRegistry,
+      ),
+    ).toThrow(
+      'Registered CP-SAT rule descriptor key "min-hours-day" must match descriptor.name "wrong-name".',
+    );
+    expect(compile).not.toHaveBeenCalled();
   });
 
   it("expands role-scoped rules to member IDs", () => {
@@ -363,6 +415,93 @@ describe("CP-SAT rule scoping resolver", () => {
     expect(configField(second, "memberIds")).toBeUndefined();
   });
 
+  it("preserves custom rule roleIds and skillIds", () => {
+    const membersWithSkills = [
+      { id: "alice", roleIds: ["role"], skillIds: ["first-aid"] },
+      { id: "bob", roleIds: ["role"], skillIds: [] },
+    ];
+
+    const entries: AnyCpsatRuleConfigEntry[] = [
+      {
+        name: "debug",
+        flag: true,
+        roleIds: ["role"],
+      },
+      {
+        name: "debug",
+        flag: false,
+        skillIds: ["first-aid"],
+      },
+    ];
+
+    const resolved = resolveRuleScopes(entries, membersWithSkills);
+
+    expect(resolved).toEqual(entries);
+  });
+
+  it("passes custom rule roleIds and skillIds through to descriptor compilation", () => {
+    const factory = vi.fn<CpsatRuleRegistry[string]["compile"]>(
+      () => ({ rule: "debug", artifacts: [] }) satisfies CompiledRule,
+    );
+    const ruleRegistry: CpsatRuleRegistry = {
+      debug: {
+        name: "debug",
+        schema: z.object({
+          flag: z.boolean(),
+          roleIds: z.array(z.string()).optional(),
+          skillIds: z.array(z.string()).optional(),
+          memberIds: z.array(z.string()).optional(),
+        }),
+        compile: factory,
+      },
+    };
+
+    const entries: AnyCpsatRuleConfigEntry[] = [
+      {
+        name: "debug",
+        flag: true,
+        roleIds: ["role"],
+      },
+      {
+        name: "debug",
+        flag: false,
+        skillIds: ["first-aid"],
+      },
+    ];
+
+    buildCpsatRules(
+      entries,
+      [
+        { id: "alice", roleIds: ["role"], skillIds: ["first-aid"] },
+        { id: "bob", roleIds: ["role"], skillIds: [] },
+      ],
+      {
+        members: [],
+        shiftPatterns: [],
+        days: [],
+        weekStartsOn: "monday",
+      },
+      ruleRegistry,
+    );
+
+    expect(factory).toHaveBeenNthCalledWith(
+      1,
+      {
+        flag: true,
+        roleIds: ["role"],
+      },
+      expect.any(Object),
+    );
+    expect(factory).toHaveBeenNthCalledWith(
+      2,
+      {
+        flag: false,
+        skillIds: ["first-aid"],
+      },
+      expect.any(Object),
+    );
+  });
+
   it("mixes non-scoped and scoped rules correctly", () => {
     const entries: CpsatRuleConfigEntry[] = [
       {
@@ -413,8 +552,7 @@ describe("CP-SAT rule scoping resolver", () => {
 describe("CP-SAT rule validation", () => {
   it("rejects conflicting scope definitions", () => {
     expect(() =>
-      // @ts-expect-error: deliberately passing both memberIds and roleIds to test runtime validation
-      createMaxHoursDayRule({
+      maxHoursDayRuleDescriptor.schema.parse({
         hours: 8,
         priority: "MANDATORY",
         memberIds: ["alice"],

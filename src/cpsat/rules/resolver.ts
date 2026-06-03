@@ -5,19 +5,24 @@ import {
   type ParsedEntityScope,
   type ParsedTimeScope,
 } from "./scope.types.js";
-import { builtInCpsatRuleFactories } from "./registry.js";
+import {
+  assertNoBuiltInCpsatRuleOverrides,
+  assertValidCpsatRuleRegistry,
+  builtInCpsatRuleRegistry,
+} from "./registry.js";
 import type {
+  AnyCpsatRuleConfigEntry,
+  BuiltInCpsatRuleRegistry,
   CpsatRuleConfigEntry,
-  CpsatRuleFactories,
-  CpsatRuleName,
+  CpsatRuleConfigEntryFor,
   CpsatRuleRegistry,
 } from "./rules.types.js";
-import type { CompilationRule } from "../model-builder.js";
+import type { CompiledRule, RuleCompileContext } from "../rule-descriptor.js";
+import { compileRuleDescriptor } from "../rule-descriptor.js";
 
 type InternalEntry = {
   index: number;
-  name: CpsatRuleName;
-  config: CpsatRuleRegistry[CpsatRuleName];
+  entry: AnyCpsatRuleConfigEntry;
   entityScope: ParsedEntityScope;
   timeScope: ParsedTimeScope;
 };
@@ -25,9 +30,9 @@ type InternalEntry = {
 /**
  * Extract the config portion from a flat rule entry (everything except `name`).
  */
-function entryConfig(entry: CpsatRuleConfigEntry): CpsatRuleRegistry[CpsatRuleName] {
+function entryConfig(entry: AnyCpsatRuleConfigEntry): Record<string, unknown> {
   const { name: _name, ...config } = entry;
-  return config as CpsatRuleRegistry[CpsatRuleName];
+  return config;
 }
 
 /**
@@ -97,7 +102,9 @@ function timeScopeKey(time: ParsedTimeScope): string {
 }
 
 /**
- * Rules that don't use standard scoping and should pass through unchanged.
+ * Built-in rules that don't use standard scoping and should pass through unchanged.
+ * Custom rules also pass through unchanged so they can receive their declared
+ * scope fields directly.
  */
 const NON_SCOPED_RULES = new Set<string>(["assign-together"]);
 
@@ -105,22 +112,22 @@ const NON_SCOPED_RULES = new Set<string>(["assign-together"]);
  * Resolves overlapping scopes so that more specific scopes override broader ones.
  *
  * Resolution rules:
- * 1. Rules in NON_SCOPED_RULES pass through unchanged (they handle their own logic)
- * 2. Rules with different time scopes coexist (different time windows don't compete)
+ * 1. Custom rules and built-in rules in NON_SCOPED_RULES pass through unchanged
+ * 2. Built-in rules with different time scopes coexist (different time windows don't compete)
  * 3. Within the same time scope, rules are sorted by specificity (person > role > skill > global)
  *    and then by insertion order (later wins for same specificity, i.e., last insert overrides)
  * 4. More specific rules claim their IDs first; less specific rules get the remainder
  * 5. All scope types (person, role, skill, global) are expanded to explicit IDs
  */
 export function resolveRuleScopes(
-  entries: CpsatRuleConfigEntry[],
+  entries: readonly AnyCpsatRuleConfigEntry[],
   members: SchedulingMember[],
-): CpsatRuleConfigEntry[] {
-  const resolved: CpsatRuleConfigEntry[] = [];
-  const scopedEntries: Array<{ entry: CpsatRuleConfigEntry; index: number }> = [];
+): AnyCpsatRuleConfigEntry[] {
+  const resolved: AnyCpsatRuleConfigEntry[] = [];
+  const scopedEntries: Array<{ entry: AnyCpsatRuleConfigEntry; index: number }> = [];
 
   entries.forEach((entry, index) => {
-    if (NON_SCOPED_RULES.has(entry.name)) {
+    if (NON_SCOPED_RULES.has(entry.name) || !(entry.name in builtInCpsatRuleRegistry)) {
       resolved.push(entry);
     } else {
       scopedEntries.push({ entry, index });
@@ -141,8 +148,7 @@ export function resolveRuleScopes(
     const list = grouped.get(groupKey) ?? [];
     list.push({
       index,
-      name: entry.name,
-      config,
+      entry,
       entityScope: entity,
       timeScope: time,
     });
@@ -159,8 +165,8 @@ export function resolveRuleScopes(
 
     const assignedMembers = new Set<string>();
 
-    for (const entry of sorted) {
-      const targetIds = getMemberIdsForScope(entry.entityScope, members);
+    for (const item of sorted) {
+      const targetIds = getMemberIdsForScope(item.entityScope, members);
       const remaining = subtractIds(targetIds, assignedMembers);
       if (remaining.length === 0) continue;
 
@@ -171,12 +177,12 @@ export function resolveRuleScopes(
         roleIds: _roleIds,
         skillIds: _skillIds,
         ...configWithoutEntityScope
-      } = entry.config as Record<string, unknown>;
+      } = entryConfig(item.entry);
       resolved.push({
-        name: entry.name,
+        name: item.entry.name,
         ...configWithoutEntityScope,
         memberIds: remaining,
-      } as CpsatRuleConfigEntry);
+      });
     }
   }
 
@@ -184,22 +190,44 @@ export function resolveRuleScopes(
 }
 
 /**
- * Builds CompilationRule instances from named configs, applying scoping resolution.
+ * Builds compiled rules from named configs, applying scoping resolution.
  */
 export function buildCpsatRules(
-  entries: CpsatRuleConfigEntry[],
+  entries: readonly CpsatRuleConfigEntry[],
   members: SchedulingMember[],
-  factories: CpsatRuleFactories = builtInCpsatRuleFactories,
-): CompilationRule[] {
+  compileContext: RuleCompileContext,
+  ruleRegistry?: BuiltInCpsatRuleRegistry,
+): CompiledRule[];
+export function buildCpsatRules<Registry extends CpsatRuleRegistry>(
+  entries: readonly CpsatRuleConfigEntryFor<Registry>[],
+  members: SchedulingMember[],
+  compileContext: RuleCompileContext,
+  ruleRegistry: Registry,
+): CompiledRule[];
+export function buildCpsatRules(
+  entries: readonly AnyCpsatRuleConfigEntry[],
+  members: SchedulingMember[],
+  compileContext: RuleCompileContext,
+  ruleRegistry: CpsatRuleRegistry,
+): CompiledRule[];
+export function buildCpsatRules(
+  entries: readonly AnyCpsatRuleConfigEntry[],
+  members: SchedulingMember[],
+  compileContext: RuleCompileContext,
+  ruleRegistry: CpsatRuleRegistry = builtInCpsatRuleRegistry,
+): CompiledRule[] {
   if (entries.length === 0) return [];
+
+  assertValidCpsatRuleRegistry(ruleRegistry);
+  assertNoBuiltInCpsatRuleOverrides(ruleRegistry);
 
   const resolved = resolveRuleScopes(entries, members);
 
   return resolved.map((entry) => {
-    const factory = factories[entry.name];
-    if (!factory) {
+    const descriptor = ruleRegistry[entry.name];
+    if (!descriptor) {
       throw new Error(`Unknown CP-SAT rule "${entry.name}"`);
     }
-    return factory(entryConfig(entry));
+    return compileRuleDescriptor(descriptor, entryConfig(entry), compileContext);
   });
 }

@@ -1,10 +1,33 @@
 /**
- * Coverage definitions: staffing requirements per semantic time period.
+ * Coverage definitions: lower-bound staffing requirements per semantic time period.
+ *
+ * Coverage answers "what floor should apply throughout this scoped time, with
+ * the chosen priority?". It attaches sustained lower bounds to semantic times,
+ * whether those periods are
+ * explicit in the requirements or inferred to separate distinct business
+ * requirements. Coverage does not express caps, targets, fairness, or other
+ * assignment-shaping logic. Use rules for those concerns.
+ *
+ * @example
+ * ```typescript
+ * coverage: [
+ *   cover("lunch", "waiter", 2, { dayOfWeek: weekdays }),
+ *   cover("lunch", "waiter", 3, { dayOfWeek: weekend }),
+ *   cover("dinner", ["manager", "supervisor"], 1),
+ *   cover("opening", "keyholder", 1),
+ *
+ *   // Variant form: different counts by day
+ *   cover("peak_hours", "agent",
+ *     { count: 4 },
+ *     { count: 2, dates: ["2025-12-24"] },
+ *   ),
+ * ]
+ * ```
  *
  * @module
  */
 
-import type { DayOfWeek } from "../types.js";
+import type { DateString, DayOfWeek } from "../types.js";
 import type { CoverageVariant } from "../cpsat/semantic-time.js";
 import type { Priority } from "../cpsat/types.js";
 
@@ -16,7 +39,15 @@ export type { CoverageVariant } from "../cpsat/semantic-time.js";
  * @remarks
  * Day/date scoping controls which days this coverage entry applies to.
  * An entry without `dayOfWeek` or `dates` applies every day in the
- * scheduling period.
+ * scheduling period. Scope answers where the floor applies; it does not change
+ * the meaning of coverage itself. `priority` controls how hard the coverage floor is.
+ * Use it to distinguish language like "must keep 5 staffed on Saturdays"
+ * from "ideally keep 5 staffed on Mondays too" without changing the
+ * underlying coverage shape. `skillIds` is a hard filter, not a preference.
+ * Use it only when the required minimum truly needs those skills throughout
+ * the window. If a role or skill mix is preferred rather than required, model
+ * that with rules such as {@link preferAssignment} instead of skill-filtered
+ * coverage.
  *
  * @category Coverage
  */
@@ -26,7 +57,7 @@ export interface CoverageOptions {
   /** Restrict to specific days of the week. */
   dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   /** Restrict to specific dates (YYYY-MM-DD). */
-  dates?: string[];
+  dates?: DateString[];
   /** Defaults to `"MANDATORY"`. */
   priority?: Priority;
 }
@@ -53,35 +84,33 @@ export interface CoverageEntry<T extends string = string, R extends string = str
  * Defines a staffing requirement for a semantic time period.
  *
  * @remarks
- * Entries for the same time and role **stack additively**.
- * For weekday vs weekend staffing, use mutually exclusive `dayOfWeek`
- * on both entries.
+ * Coverage always defines a lower bound that applies throughout the scoped
+ * semantic time, with strength controlled by `priority`. If the requirements
+ * also state an upper bound or productive
+ * cap, model that separately in `rules`, for example with
+ * {@link maxConcurrentAssignments}.
+ *
+ * Scope answers where the floor applies. Priority answers how strictly the
+ * solver should preserve that floor when trade-offs are necessary.
+ *
+ * Attach coverage to the narrowest semantic time that actually carries that
+ * minimum. Avoid layering a broad parent coverage window on top of narrower
+ * windows unless the same lower bound truly applies throughout the full span.
+ * If the requirements talk about hitting full occupancy at the busy point,
+ * prefer {@link targetPeakConcurrentAssignments} over turning that into a
+ * whole-window minimum. Do not infer a synthetic "peak" semantic time just to attach
+ * `cover(..., 5)` unless the requirements really define a sustained window
+ * that needs that minimum throughout.
+ *
+ * Overlapping entries for the same time and role produce independent
+ * constraints; the solver enforces the **max** count, not the sum.
+ * An unscoped entry acts as a floor that scoped entries cannot reduce.
+ * Use mutually exclusive scopes when different days need different coverage.
  *
  * @param timeName - Name of a declared semantic time
  * @param target - Role name (string), array of role names (OR logic), or skill name
  * @param count - Number of people needed
  * @param opts - Options: `skillIds` (AND filter), `dayOfWeek`, `dates`, `priority`
- *
- * @example
- * ```typescript
- * coverage: [
- *   // 2 waiters during lunch
- *   cover("lunch", "waiter", 2),
- *
- *   // 1 manager OR supervisor during dinner
- *   cover("dinner", ["manager", "supervisor"], 1),
- *
- *   // 1 person with keyholder skill at opening
- *   cover("opening", "keyholder", 1),
- *
- *   // 1 senior waiter (role + skill AND)
- *   cover("lunch", "waiter", 1, { skillIds: ["senior"] }),
- *
- *   // Different counts by day (mutually exclusive dayOfWeek!)
- *   cover("lunch", "waiter", 2, { dayOfWeek: weekdays }),
- *   cover("lunch", "waiter", 3, { dayOfWeek: weekend }),
- * ]
- * ```
  *
  * @category Coverage
  */

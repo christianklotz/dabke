@@ -289,6 +289,47 @@ describe("Coverage requirements (integration)", () => {
       expect(["alice", "charlie"]).toContain(assignments[0]?.memberId);
     }, 30_000);
 
+    it("assigns role-less members matching skill-only coverage on unrestricted shifts", async () => {
+      const builder = new ModelBuilder({
+        members: [
+          { id: "alice", roleIds: [], skillIds: ["keyholder"] },
+          { id: "bob", roleIds: [], skillIds: [] },
+        ],
+        shiftPatterns: [
+          {
+            id: "opening",
+            startTime: { hours: 7, minutes: 0 },
+            endTime: { hours: 15, minutes: 0 },
+          },
+        ],
+        schedulingPeriod: { dateRange: { start: "2024-01-01", end: "2024-01-01" } },
+        coverage: [
+          {
+            day: "2024-01-01",
+            skillIds: ["keyholder"],
+            startTime: { hours: 7, minutes: 0 },
+            endTime: { hours: 15, minutes: 0 },
+            targetCount: 1,
+            priority: "MANDATORY",
+          },
+        ],
+      });
+
+      const { request } = builder.compile();
+      const response = await client.solve(request);
+
+      expect(response.status).toBe("OPTIMAL");
+      const assignments = decodeAssignments(response.values);
+
+      expect(assignments).toEqual([
+        {
+          memberId: "alice",
+          shiftPatternId: "opening",
+          day: "2024-01-01",
+        },
+      ]);
+    }, 30_000);
+
     it("assigns members matching role AND skills combination", async () => {
       const builder = new ModelBuilder({
         members: [

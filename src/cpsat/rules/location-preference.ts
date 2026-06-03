@@ -1,15 +1,16 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
-import type { Priority } from "../types.js";
-import { OBJECTIVE_WEIGHTS } from "../utils.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import { PREFERENCE_WEIGHTS } from "../utils.js";
 import {
   PrioritySchema,
   entityScope,
   parseEntityScope,
   resolveMembersFromScope,
 } from "./scope.types.js";
+import { assignmentVar } from "./variables.js";
+import { canAssignMemberToPattern, isPatternAvailableOnDay } from "./pattern-eligibility.js";
 
-const LocationPreferenceSchema = z
+export const LocationPreferenceSchema = z
   .object({
     locationId: z.string(),
     priority: PrioritySchema,
@@ -17,59 +18,53 @@ const LocationPreferenceSchema = z
   .and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createLocationPreferenceRule}.
- *
- * - `locationId` (required): the location ID to prefer for matching shift patterns
- * - `priority` (required): how strongly to prefer this location
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link locationPreferenceRuleDescriptor}.
  */
 export type LocationPreferenceConfig = z.infer<typeof LocationPreferenceSchema>;
 
-const PRIORITY_WEIGHTS: Record<Priority, number> = {
-  LOW: OBJECTIVE_WEIGHTS.FAIRNESS,
-  MEDIUM: OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE,
-  HIGH: OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE * 2.5,
-  MANDATORY: OBJECTIVE_WEIGHTS.ASSIGNMENT_PREFERENCE * 5,
-};
-
 /**
- * Prefers assigning a person to shift patterns matching a specific location.
+ * Low-level descriptor for location preference rules.
  *
- * @param config - See {@link LocationPreferenceConfig}
- * @example
- * ```ts
- * createLocationPreferenceRule({
- *   locationId: "terrace",
- *   priority: "HIGH",
- *   memberIds: ["alice"],
- * });
- * ```
+ * @category Rules
  */
-export function createLocationPreferenceRule(config: LocationPreferenceConfig): CompilationRule {
-  const parsed = LocationPreferenceSchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { locationId } = parsed;
-  const weight = PRIORITY_WEIGHTS[parsed.priority] ?? 0;
+export const locationPreferenceRuleDescriptor = defineRuleDescriptor({
+  name: "location-preference",
+  schema: LocationPreferenceSchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { locationId } = config;
+    const weight = PREFERENCE_WEIGHTS[config.priority as keyof typeof PREFERENCE_WEIGHTS] ?? 0;
+    if (weight === 0) {
+      return { rule: "location-preference", artifacts: [] };
+    }
 
-  return {
-    compile(b) {
-      if (weight === 0) return;
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
+    const terms = members.flatMap((member) =>
+      ctx.shiftPatterns.flatMap((pattern) => {
+        if (!canAssignMemberToPattern(member, pattern)) return [];
+        if (pattern.locationId === locationId) return [];
+        return ctx.days
+          .filter((day) => isPatternAvailableOnDay(pattern, day))
+          .map((day) => ({ var: assignmentVar(member.id, pattern.id, day.iso), coeff: weight }));
+      }),
+    );
 
-      const members = resolveMembersFromScope(scope, b.members);
-
-      for (const emp of members) {
-        for (const pattern of b.shiftPatterns) {
-          if (!b.canAssign(emp, pattern)) continue;
-          const isPreferred = pattern.locationId === locationId;
-          if (isPreferred) continue;
-
-          for (const day of b.days) {
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            b.addPenalty(b.assignment(emp.id, pattern.id, day), weight);
-          }
-        }
-      }
-    },
-  };
-}
+    return {
+      rule: "location-preference",
+      artifacts: [
+        {
+          kind: "objective",
+          terms,
+          validation: {
+            strategy: "skip",
+            category: "no-meaningful-feedback",
+            rationale:
+              terms.length === 0
+                ? `Location preference for "${locationId}" produced no objective terms.`
+                : "Preference rules influence the objective but do not emit validation feedback.",
+          },
+        },
+      ],
+    };
+  },
+});

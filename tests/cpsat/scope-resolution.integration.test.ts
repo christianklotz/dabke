@@ -35,12 +35,12 @@ describe("CP-SAT: scope resolution", () => {
         {
           name: "assignment-priority",
           memberIds: ["alice"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["bob"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 
@@ -95,12 +95,12 @@ describe("CP-SAT: scope resolution", () => {
         {
           name: "assignment-priority",
           memberIds: ["alice"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["bob"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 
@@ -163,17 +163,17 @@ describe("CP-SAT: scope resolution", () => {
         {
           name: "assignment-priority",
           memberIds: ["alice"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["charlie"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["bob"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 
@@ -222,12 +222,12 @@ describe("CP-SAT: scope resolution", () => {
         {
           name: "assignment-priority",
           memberIds: ["alice"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["bob"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 
@@ -283,12 +283,12 @@ describe("CP-SAT: scope resolution", () => {
         {
           name: "assignment-priority",
           memberIds: ["alice"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["bob"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 

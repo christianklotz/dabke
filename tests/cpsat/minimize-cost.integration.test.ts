@@ -89,6 +89,8 @@ describe("CP-SAT: minimize-cost rule", () => {
       members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
+      days: builder.days,
+      weekStartsOn: builder.weekStartsOn,
     });
 
     // Solver should prefer bob (cheaper). 1 day, 8 hours, 1500/hr = 12000

@@ -1,19 +1,20 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
-import type { Term } from "../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
 import { priorityToPenalty } from "../utils.js";
 import {
   PrioritySchema,
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
   ruleGroup,
+  timeScope,
 } from "./scope.types.js";
+import { assignmentTermsForDay } from "./assignment-terms.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
 
-const MaxShiftsDaySchema = z
+export const MaxShiftsDaySchema = z
   .object({
     shifts: z.number().int().min(1),
     priority: PrioritySchema,
@@ -22,94 +23,73 @@ const MaxShiftsDaySchema = z
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /**
- * Configuration for {@link createMaxShiftsDayRule}.
- *
- * - `shifts` (required): maximum number of shifts per day (at least 1)
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
- * Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
+ * Configuration for {@link maxShiftsDayRuleDescriptor}.
  */
 export type MaxShiftsDayConfig = z.infer<typeof MaxShiftsDaySchema>;
 
 /**
- * Limits how many shifts a person can work in a single day.
+ * Low-level descriptor for the `max-shifts-day` rule.
  *
- * Controls the maximum number of distinct shift assignments per day,
- * regardless of shift duration. For limiting total hours worked, use `max-hours-day`.
+ * @remarks
+ * This rule limits distinct assignments per day, regardless of their duration.
+ * Use {@link maxHoursDayRuleDescriptor} to limit assigned time instead.
  *
- * @param config - See {@link MaxShiftsDayConfig}
- * @example Limit to one shift per day
- * ```ts
- * createMaxShiftsDayRule({
- *   shifts: 1,
- *   priority: "MANDATORY",
- * });
- * ```
- *
- * @example Students can work 2 shifts on weekends only
- * ```ts
- * createMaxShiftsDayRule({
- *   roleIds: ["student"],
- *   shifts: 2,
- *   dayOfWeek: ["saturday", "sunday"],
- *   priority: "MANDATORY",
- * });
- * ```
+ * @category Rules
  */
-export function createMaxShiftsDayRule(config: MaxShiftsDayConfig): CompilationRule {
-  const parsed = MaxShiftsDaySchema.parse(config);
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-  const { shifts, priority } = parsed;
-  const group = ruleGroup(
-    `max-shifts-day:${shifts}`,
-    `Max ${shifts} shift${shifts === 1 ? "" : "s"} per day`,
-    entityScopeValue,
-    timeScopeValue,
-  );
+export const maxShiftsDayRuleDescriptor = defineRuleDescriptor({
+  name: "max-shifts-day",
+  schema: MaxShiftsDaySchema,
+  compile(config, ctx) {
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+    const { shifts, priority } = config;
+    const group = ruleGroup(
+      `max-shifts-day:${shifts}`,
+      `Max ${shifts} shift${shifts === 1 ? "" : "s"} per day`,
+      entityScopeValue,
+      timeScopeValue,
+    );
+    const targetMembers = resolveMembersFromScope(entityScopeValue, [...ctx.members]);
+    const activeDays = resolveActiveDaysFromScope(timeScopeValue, [...ctx.days]);
 
-  return {
-    compile(b) {
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+    const artifacts = targetMembers.flatMap((member) =>
+      activeDays.flatMap((day) => {
+        const terms = assignmentTermsForDay(member, day, ctx.shiftPatterns, () => 1);
+        if (terms.length === 0) return [];
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const description = `${member.id} max ${shifts} shift${shifts === 1 ? "" : "s"} on ${day.iso}`;
+        const context = { memberIds: [member.id], days: [day.iso] };
+        const constraintId = `max-shifts-day:${member.id}:${day.iso}`;
 
-      for (const emp of targetMembers) {
-        for (const day of activeDays) {
-          const terms: Term[] = [];
-          for (const pattern of b.shiftPatterns) {
-            if (!b.canAssign(emp, pattern)) continue;
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            terms.push({
-              var: b.assignment(emp.id, pattern.id, day),
-              coeff: 1,
-            });
-          }
+        return [
+          priority === "MANDATORY"
+            ? hardConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(constraintId),
+                terms,
+                comparator: "<=",
+                targetValue: shifts,
+              })
+            : softConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(),
+                terms,
+                comparator: "<=",
+                targetValue: shifts,
+                penalty: priorityToPenalty(priority),
+                constraintId,
+              }),
+        ];
+      }),
+    );
 
-          if (terms.length === 0) continue;
-
-          const constraintId = `max-shifts-day:${emp.id}:${day}`;
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, "<=", shifts);
-          } else {
-            b.addSoftLinear(terms, "<=", shifts, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "max-shifts-day",
-              description: `${emp.id} max ${shifts} shift${shifts === 1 ? "" : "s"} on ${day}`,
-              targetValue: shifts,
-              comparator: "<=",
-              day,
-              context: { memberIds: [emp.id], days: [day] },
-              group,
-            });
-          }
-        }
-      }
-    },
-  };
-}
+    return {
+      rule: "max-shifts-day",
+      artifacts,
+    };
+  },
+});

@@ -1,4 +1,4 @@
-import type { TimeOfDay, DayOfWeek } from "../types.js";
+import type { DateString, TimeOfDay, DayOfWeek } from "../types.js";
 import type { SolverRequest, SolverTerm } from "../client.types.js";
 import type { ValidationGroup } from "./validation.types.js";
 
@@ -15,11 +15,12 @@ export interface HourlyPay {
 /**
  * Annual salary with contracted weekly hours.
  *
+ * @remarks
  * The solver treats salaried members as having a fixed weekly cost
  * (`annual / 52`) that is incurred once they work any shift in a week.
  * Additional shifts within the same week have zero marginal cost.
  *
- * Note: overtime multiplier rules apply only to hourly members.
+ * Overtime multiplier rules apply only to hourly members.
  * Overtime surcharge rules apply to all members regardless of pay type.
  *
  * @category Supporting Types
@@ -34,12 +35,37 @@ export interface SalariedPay {
 /**
  * How strictly the solver enforces a rule.
  *
+ * @remarks
+ * Priority is part of the schedule design, not a cosmetic option. Use it to
+ * preserve the distinction between hard requirements and softer preferences
+ * from the requirements. In practice, words like "must", "at least", "needs", and
+ * "cannot" usually map to `"MANDATORY"`, while words like "ideally",
+ * "prefer", "mainly", and "where possible" usually map to a soft priority.
+ * The same coverage shape or rule scope can be modeled with different
+ * priorities when the business language is subtler than a pure hard limit.
+ *
  * - `"LOW"`, `"MEDIUM"`, `"HIGH"`: soft constraints with increasing penalty for violations
  * - `"MANDATORY"`: hard constraint; the solver will not produce a solution that violates it
  *
  * @category Supporting Types
  */
-export type Priority = "LOW" | "MEDIUM" | "HIGH" | "MANDATORY";
+export const PRIORITY_VALUES = ["LOW", "MEDIUM", "HIGH", "MANDATORY"] as const;
+
+/**
+ * The soft-only priority values.
+ *
+ * @category Supporting Types
+ */
+export const SOFT_PRIORITY_VALUES = ["LOW", "MEDIUM", "HIGH"] as const;
+
+export type Priority = (typeof PRIORITY_VALUES)[number];
+
+/**
+ * Soft-only priority values.
+ *
+ * @category Supporting Types
+ */
+export type SoftPriority = (typeof SOFT_PRIORITY_VALUES)[number];
 
 /**
  * A team member available for scheduling.
@@ -131,7 +157,7 @@ export interface ShiftPattern {
 }
 
 export interface TimeInterval {
-  day: string;
+  day: DateString;
   startTime: TimeOfDay;
   endTime: TimeOfDay;
 }
@@ -215,12 +241,35 @@ interface SkillBasedCoverageRequirement extends CoverageRequirementBase {
  */
 export type CoverageRequirement = RoleBasedCoverageRequirement | SkillBasedCoverageRequirement;
 
+/**
+ * Compile-time solve profile used by model builders.
+ *
+ * @category Model Builder
+ */
+export type ModelSolveStrategy =
+  | {
+      /** Build the normal optimized solver request. */
+      readonly type: "optimize";
+    }
+  | {
+      /** Build a hard-feasibility request that ignores objectives and soft constraints. */
+      readonly type: "feasibility-only";
+    };
+
 /** Optional settings for the model builder. */
 export interface ModelBuilderOptions {
   /** Which day starts the week for weekly rules. Defaults to "monday". */
   weekStartsOn?: DayOfWeek;
   /** Solver-level options (time limit, solution limit). */
   solverOptions?: SolverRequest["options"];
+  /** Compile-time solve profile. Defaults to optimized solving. */
+  strategy?: ModelSolveStrategy;
+  /**
+   * Internal objective stage order for staged solver requests.
+   *
+   * @internal
+   */
+  objectiveStageOrder?: readonly string[];
   /**
    * Bucket size used when translating coverage requirements into time-indexed constraints.
    * Smaller buckets are more accurate but increase the number of constraints.

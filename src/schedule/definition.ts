@@ -4,7 +4,7 @@
  * @module
  */
 
-import type { DayOfWeek, SchedulingPeriod } from "../types.js";
+import type { DateString, DayOfWeek, SchedulingPeriod } from "../types.js";
 import type { SemanticTimeEntry } from "../cpsat/semantic-time.js";
 import type { MixedCoverageRequirement, CoverageVariant } from "../cpsat/semantic-time.js";
 import { defineSemanticTimes } from "../cpsat/semantic-time.js";
@@ -12,9 +12,18 @@ import { resolveDaysFromPeriod } from "../datetime.utils.js";
 import type { ModelBuilderConfig, CompilationResult } from "../cpsat/model-builder.js";
 import { ModelBuilder } from "../cpsat/model-builder.js";
 import type { SchedulingMember, ShiftPattern, Priority } from "../cpsat/types.js";
-import type { CpsatRuleConfigEntry, CreateCpsatRuleFunction } from "../cpsat/rules/rules.types.js";
-import { builtInCpsatRuleFactories } from "../cpsat/rules/registry.js";
-import type { SolverClient, SolverResponse } from "../client.types.js";
+import type {
+  AnyCpsatRuleConfigEntry,
+  BuiltInCpsatRuleRegistry,
+  CpsatRuleConfigEntryFor,
+  CpsatRuleRegistry,
+} from "../cpsat/rules/rules.types.js";
+import {
+  assertNoBuiltInCpsatRuleOverrides,
+  assertValidCpsatRuleRegistry,
+  builtInCpsatRuleRegistry,
+} from "../cpsat/rules/registry.js";
+import type { SolverClient, SolverRequest, SolverResponse } from "../client.types.js";
 import { parseSolverResponse, resolveAssignments } from "../cpsat/response.js";
 import type { ShiftAssignment } from "../cpsat/response.js";
 import type { ScheduleValidation } from "../cpsat/validation.types.js";
@@ -22,11 +31,239 @@ import { calculateScheduleCost } from "../cpsat/cost.js";
 import type { CostBreakdown } from "../cpsat/cost.js";
 
 import type { CoverageEntry } from "./coverage.js";
-import type { RuleEntry, RuleResolveContext } from "./rules.js";
+import type { RuleEntry, RuleResolveContext, ScheduleRuleEntry } from "./rules.js";
 import { resolveAppliesTo } from "./rules.js";
 
 /** A value that can be passed to {@link Schedule.with}. */
-type WithArg = Schedule | SchedulingMember[];
+type WithArg = Schedule<CpsatRuleRegistry> | SchedulingMember[];
+
+type EmptyRuleRegistry = Record<never, never>;
+type BuiltInRuleRegistry = BuiltInCpsatRuleRegistry;
+type CustomRuleRegistry<TRuleRegistry extends BuiltInRuleRegistry> = CpsatRuleRegistry & {
+  [K in Extract<Exclude<keyof TRuleRegistry, keyof BuiltInRuleRegistry>, string>]: TRuleRegistry[K];
+};
+
+type RegistryFromWithArg<T> = T extends Schedule<infer Registry> ? Registry : EmptyRuleRegistry;
+
+type RuleEntryFields<T> = T extends RuleEntry<any, infer Fields> ? Fields : never;
+
+type BuiltInScheduleRuleAuthoringFields<Name extends keyof BuiltInRuleRegistry> =
+  Name extends "max-hours-day"
+    ? RuleEntryFields<ReturnType<typeof import("./rules.js").maxHoursPerDay>>
+    : Name extends "max-hours-week"
+      ? RuleEntryFields<ReturnType<typeof import("./rules.js").maxHoursPerWeek>>
+      : Name extends "min-hours-day"
+        ? RuleEntryFields<ReturnType<typeof import("./rules.js").minHoursPerDay>>
+        : Name extends "min-hours-week"
+          ? RuleEntryFields<ReturnType<typeof import("./rules.js").minHoursPerWeek>>
+          : Name extends "max-days-week"
+            ? RuleEntryFields<ReturnType<typeof import("./rules.js").maxDaysPerWeek>>
+            : Name extends "min-days-week"
+              ? RuleEntryFields<ReturnType<typeof import("./rules.js").minDaysPerWeek>>
+              : Name extends "target-days-week"
+                ? RuleEntryFields<ReturnType<typeof import("./rules.js").targetDaysPerWeek>>
+                : Name extends "max-shifts-day"
+                  ? RuleEntryFields<ReturnType<typeof import("./rules.js").maxShiftsPerDay>>
+                  : Name extends "max-concurrent-assignments"
+                    ? RuleEntryFields<
+                        ReturnType<typeof import("./rules.js").maxConcurrentAssignments>
+                      >
+                    : Name extends "target-peak-concurrent-assignments"
+                      ? RuleEntryFields<
+                          ReturnType<typeof import("./rules.js").targetPeakConcurrentAssignments>
+                        >
+                      : Name extends "max-consecutive-days"
+                        ? RuleEntryFields<
+                            ReturnType<typeof import("./rules.js").maxConsecutiveDays>
+                          >
+                        : Name extends "min-consecutive-days"
+                          ? RuleEntryFields<
+                              ReturnType<typeof import("./rules.js").minConsecutiveDays>
+                            >
+                          : Name extends "min-rest-between-shifts"
+                            ? RuleEntryFields<
+                                ReturnType<typeof import("./rules.js").minRestBetweenShifts>
+                              >
+                            : Name extends "must-assign"
+                              ? RuleEntryFields<ReturnType<typeof import("./rules.js").mustAssign>>
+                              : Name extends "assignment-priority"
+                                ? RuleEntryFields<
+                                    ReturnType<typeof import("./rules.js").preferAssignment>
+                                  >
+                                : Name extends "role-preference"
+                                  ? RuleEntryFields<
+                                      ReturnType<typeof import("./rules.js").preferRole>
+                                    >
+                                  : Name extends "location-preference"
+                                    ? RuleEntryFields<
+                                        ReturnType<typeof import("./rules.js").preferLocation>
+                                      >
+                                    : Name extends "time-off"
+                                      ? RuleEntryFields<
+                                          ReturnType<typeof import("./rules.js").timeOff>
+                                        >
+                                      : Name extends "assign-together"
+                                        ? RuleEntryFields<
+                                            ReturnType<typeof import("./rules.js").assignTogether>
+                                          >
+                                        : Name extends "max-days-of-week-per-period"
+                                          ? RuleEntryFields<
+                                              ReturnType<
+                                                typeof import("./rules.js").maxDaysOfWeekPerPeriod
+                                              >
+                                            >
+                                          : Name extends "min-days-of-week-per-period"
+                                            ? RuleEntryFields<
+                                                ReturnType<
+                                                  typeof import("./rules.js").minDaysOfWeekPerPeriod
+                                                >
+                                              >
+                                            : Name extends "minimize-cost"
+                                              ? RuleEntryFields<
+                                                  ReturnType<
+                                                    typeof import("./cost.js").minimizeCost
+                                                  >
+                                                >
+                                              : Name extends "day-cost-multiplier"
+                                                ? RuleEntryFields<
+                                                    ReturnType<
+                                                      typeof import("./cost.js").dayMultiplier
+                                                    >
+                                                  >
+                                                : Name extends "day-cost-surcharge"
+                                                  ? RuleEntryFields<
+                                                      ReturnType<
+                                                        typeof import("./cost.js").daySurcharge
+                                                      >
+                                                    >
+                                                  : Name extends "time-cost-surcharge"
+                                                    ? RuleEntryFields<
+                                                        ReturnType<
+                                                          typeof import("./cost.js").timeSurcharge
+                                                        >
+                                                      >
+                                                    : Name extends "overtime-weekly-multiplier"
+                                                      ? RuleEntryFields<
+                                                          ReturnType<
+                                                            typeof import("./cost.js").overtimeMultiplier
+                                                          >
+                                                        >
+                                                      : Name extends "overtime-weekly-surcharge"
+                                                        ? RuleEntryFields<
+                                                            ReturnType<
+                                                              typeof import("./cost.js").overtimeSurcharge
+                                                            >
+                                                          >
+                                                        : Name extends "overtime-daily-multiplier"
+                                                          ? RuleEntryFields<
+                                                              ReturnType<
+                                                                typeof import("./cost.js").dailyOvertimeMultiplier
+                                                              >
+                                                            >
+                                                          : Name extends "overtime-daily-surcharge"
+                                                            ? RuleEntryFields<
+                                                                ReturnType<
+                                                                  typeof import("./cost.js").dailyOvertimeSurcharge
+                                                                >
+                                                              >
+                                                            : Name extends "overtime-tiered-multiplier"
+                                                              ? RuleEntryFields<
+                                                                  ReturnType<
+                                                                    typeof import("./cost.js").tieredOvertimeMultiplier
+                                                                  >
+                                                                >
+                                                              : never;
+
+type ValidateScheduleRuleEntry<TRuleRegistry extends CpsatRuleRegistry, Entry> =
+  Entry extends ScheduleRuleEntry<TRuleRegistry>
+    ? Entry
+    : Entry extends RuleEntry<infer Name, infer Fields>
+      ? string extends Name
+        ? Entry
+        : Name extends keyof TRuleRegistry & string
+          ? Name extends keyof BuiltInRuleRegistry
+            ? Fields extends BuiltInScheduleRuleAuthoringFields<Name>
+              ? Entry
+              : never
+            : Fields extends Omit<CpsatRuleConfigEntryFor<Pick<TRuleRegistry, Name>>, "name">
+              ? Entry
+              : never
+          : never
+      : never;
+
+type ValidateScheduleRules<
+  TRuleRegistry extends CpsatRuleRegistry,
+  TRules extends readonly unknown[],
+> = {
+  readonly [Index in keyof TRules]: ValidateScheduleRuleEntry<TRuleRegistry, TRules[Index]>;
+};
+
+type BuiltInScheduleConfigInput<
+  R extends readonly string[],
+  S extends readonly string[],
+  T extends Record<string, SemanticTimeEntry>,
+  TRules extends readonly unknown[],
+> = Omit<ScheduleConfig<R, S, T, BuiltInRuleRegistry>, "rules" | "ruleRegistry"> & {
+  rules?: ValidateScheduleRules<BuiltInRuleRegistry, TRules>;
+  ruleRegistry?: undefined;
+};
+
+type CustomScheduleConfigInput<
+  R extends readonly string[],
+  S extends readonly string[],
+  T extends Record<string, SemanticTimeEntry>,
+  TCustomRuleRegistry extends CpsatRuleRegistry,
+  TRules extends readonly unknown[],
+> = Omit<
+  ScheduleConfig<R, S, T, BuiltInRuleRegistry & TCustomRuleRegistry>,
+  "rules" | "ruleRegistry"
+> & {
+  ruleRegistry: TCustomRuleRegistry;
+  rules?: ValidateScheduleRules<BuiltInRuleRegistry & TCustomRuleRegistry, TRules>;
+};
+
+type BuiltInPartialScheduleConfigInput<TRules extends readonly unknown[]> = Partial<
+  Omit<
+    ScheduleConfig<
+      readonly string[],
+      readonly string[],
+      Record<string, SemanticTimeEntry>,
+      BuiltInRuleRegistry
+    >,
+    "rules" | "ruleRegistry"
+  >
+> & {
+  rules?: ValidateScheduleRules<BuiltInRuleRegistry, TRules>;
+  ruleRegistry?: undefined;
+};
+
+type CustomPartialScheduleConfigInput<
+  TCustomRuleRegistry extends CpsatRuleRegistry,
+  TRules extends readonly unknown[],
+> = Partial<
+  Omit<
+    ScheduleConfig<
+      readonly string[],
+      readonly string[],
+      Record<string, SemanticTimeEntry>,
+      BuiltInRuleRegistry & TCustomRuleRegistry
+    >,
+    "rules" | "ruleRegistry"
+  >
+> & {
+  ruleRegistry: TCustomRuleRegistry;
+  rules?: ValidateScheduleRules<BuiltInRuleRegistry & TCustomRuleRegistry, TRules>;
+};
+
+type UnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) extends (
+  value: infer Result,
+) => void
+  ? Result
+  : never;
+
+type MergedRegistryFromArgs<Args extends readonly WithArg[]> = UnionToIntersection<
+  RegistryFromWithArg<Args[number]>
+>;
 
 // ============================================================================
 // SolveResult
@@ -36,7 +273,34 @@ type WithArg = Schedule | SchedulingMember[];
 export type SolveStatus = "optimal" | "feasible" | "infeasible" | "no_solution";
 
 /**
+ * Strategy for {@link Schedule.solve} and {@link Schedule.compile}.
+ *
+ * @remarks
+ * `{ type: "optimize" }` optimizes objectives and soft constraints.
+ * `{ type: "feasibility-only" }` asks the solver for a hard-feasible solution
+ * only, ignoring objectives and soft-constraint penalties. Feasibility-only
+ * results do not guarantee cost, objective optimality, or soft-constraint
+ * diagnostics.
+ *
+ * @category Schedule Definition
+ */
+export type SolveStrategy =
+  | {
+      /** Optimize objectives and soft constraints. */
+      readonly type: "optimize";
+    }
+  | {
+      /** Find a hard-feasible solution without optimizing objectives or soft constraints. */
+      readonly type: "feasibility-only";
+    };
+
+/**
  * Result of {@link Schedule.solve}.
+ *
+ * @remarks
+ * Feasibility-only solves return hard-feasible assignments when one is found,
+ * but they do not optimize objectives or compute objective-derived metadata.
+ * Cost is therefore only produced for optimized solves.
  *
  * @category Schedule Definition
  */
@@ -45,9 +309,9 @@ export interface SolveResult {
   status: SolveStatus;
   /** Shift assignments (empty when infeasible or no solution). */
   assignments: ShiftAssignment[];
-  /** Validation diagnostics from compilation. */
+  /** Validation results collected during compilation and solving. */
   validation: ScheduleValidation;
-  /** Cost breakdown (present when cost rules are used and a solution is found). */
+  /** Cost breakdown for optimized solves when cost rules are used and a solution is found. */
   cost?: CostBreakdown;
 }
 
@@ -58,7 +322,18 @@ export interface SolveResult {
  */
 export interface SolveOptions {
   /** The date range to schedule. */
-  dateRange: { start: string; end: string };
+  dateRange: { start: DateString; end: DateString };
+  /** Solver time limit in seconds. */
+  timeLimitSeconds?: number;
+  /**
+   * Strategy used by the solver.
+   *
+   * `{ type: "optimize" }` optimizes objectives and soft constraints.
+   * `{ type: "feasibility-only" }` finds any hard-feasible solution, ignoring
+   * objectives, soft-constraint penalties, and objective-derived metadata such
+   * as cost.
+   */
+  strategy?: SolveStrategy;
   /**
    * Fixed assignments from a prior solve (e.g., rolling schedule).
    * These are injected as fixed variables in the solver.
@@ -84,12 +359,17 @@ export interface SolveOptions {
  * `roleIds`, `times`, `coverage`, and `shiftPatterns` are required.
  * These four fields form the minimum solvable schedule.
  *
+ * The `TRuleRegistry` generic represents the full active rule registry for the
+ * schedule. In `schedule()`, that registry always includes the built-in rules,
+ * and `ruleRegistry` adds any custom extensions on top.
+ *
  * @category Schedule Definition
  */
 export interface ScheduleConfig<
   R extends readonly string[] = readonly string[],
   S extends readonly string[] = readonly [],
   T extends Record<string, SemanticTimeEntry> = Record<string, SemanticTimeEntry>,
+  TRuleRegistry extends BuiltInRuleRegistry = BuiltInRuleRegistry,
 > {
   /** Declared role IDs. */
   roleIds: R;
@@ -102,13 +382,51 @@ export interface ScheduleConfig<
   /** Available shift patterns. */
   shiftPatterns: ShiftPattern[];
   /** Scheduling rules and constraints. */
-  rules?: RuleEntry[];
+  rules?: ScheduleRuleEntry<TRuleRegistry>[];
   /**
-   * Custom rule factories. Keys are rule names, values are functions
-   * that take a config object and return a {@link CompilationRule}.
+   * Additional rule descriptors keyed by rule name.
+   *
+   * @remarks
+   * These entries are merged with the built-in rule registry at compile time.
    * Built-in rule names cannot be overridden.
    */
-  ruleFactories?: Record<string, CreateCpsatRuleFunction>;
+  ruleRegistry?: CustomRuleRegistry<TRuleRegistry>;
+  /** Team members (typically added via `.with()` at runtime). */
+  members?: SchedulingMember[];
+  /** Days of the week the business operates (inclusion filter). */
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
+  /** Which day starts the week for weekly rules. Defaults to `"monday"`. */
+  weekStartsOn?: DayOfWeek;
+}
+
+/**
+ * Configuration for {@link scheduleWithRuleRegistry}.
+ *
+ * @remarks
+ * Unlike {@link ScheduleConfig}, this config does not implicitly include the
+ * built-in rule registry. The provided registry is the complete active rule
+ * registry for the schedule.
+ *
+ * @category Schedule Definition
+ */
+export interface ScheduleWithRuleRegistryConfig<
+  R extends readonly string[] = readonly string[],
+  S extends readonly string[] = readonly [],
+  T extends Record<string, SemanticTimeEntry> = Record<string, SemanticTimeEntry>,
+  TRuleRegistry extends CpsatRuleRegistry = CpsatRuleRegistry,
+> {
+  /** Declared role IDs. */
+  roleIds: R;
+  /** Declared skill IDs. When omitted, coverage targets can only be roles. */
+  skillIds?: S;
+  /** Named semantic time periods. */
+  times: T;
+  /** Staffing requirements per time period (entries stack additively). */
+  coverage: NoInfer<CoverageEntry<keyof T & string, R[number] | S[number]>>[];
+  /** Available shift patterns. */
+  shiftPatterns: ShiftPattern[];
+  /** Scheduling rules and constraints. */
+  rules?: ScheduleRuleEntry<TRuleRegistry>[];
   /** Team members (typically added via `.with()` at runtime). */
   members?: SchedulingMember[];
   /** Days of the week the business operates (inclusion filter). */
@@ -128,8 +446,8 @@ interface MergedScheduleConfig {
   times: Record<string, SemanticTimeEntry>;
   coverage: CoverageEntry[];
   shiftPatterns: ShiftPattern[];
-  rules: RuleEntry[];
-  ruleFactories: Record<string, CreateCpsatRuleFunction>;
+  rules: ScheduleRuleEntry<CpsatRuleRegistry>[];
+  ruleRegistry: CpsatRuleRegistry;
   members: SchedulingMember[];
   dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
   weekStartsOn?: DayOfWeek;
@@ -147,7 +465,7 @@ interface MergedScheduleConfig {
  *
  * @category Schedule Definition
  */
-export class Schedule {
+export class Schedule<TRuleRegistry extends CpsatRuleRegistry = BuiltInRuleRegistry> {
   readonly #config: Readonly<MergedScheduleConfig>;
 
   /** @internal */
@@ -165,7 +483,7 @@ export class Schedule {
       coverage: [...this.#config.coverage],
       shiftPatterns: [...this.#config.shiftPatterns],
       rules: [...this.#config.rules],
-      ruleFactories: { ...this.#config.ruleFactories },
+      ruleRegistry: { ...this.#config.ruleRegistry },
       members: [...this.#config.members],
     };
   }
@@ -221,7 +539,9 @@ export class Schedule {
    * Validation runs eagerly: role/skill disjointness, coverage targets
    * referencing declared roles/skills, member role references, etc.
    */
-  with(...args: WithArg[]): Schedule {
+  with<const Args extends readonly WithArg[]>(
+    ...args: Args
+  ): Schedule<TRuleRegistry & MergedRegistryFromArgs<Args>> {
     const merged = mergeConfig(this.#config, args);
     return new Schedule(merged);
   }
@@ -237,6 +557,7 @@ export class Schedule {
    * @param options - Date range and optional pinned assignments
    */
   async solve(client: SolverClient, options: SolveOptions): Promise<SolveResult> {
+    const strategy = resolveSolveStrategy(options.strategy);
     const compiled = this.compile(options);
     if (!compiled.canSolve) {
       return {
@@ -247,7 +568,7 @@ export class Schedule {
     }
 
     const response = await client.solve(compiled.request);
-    return buildSolveResult(response, compiled, this.#config);
+    return buildSolveResult(response, compiled, this.#config, strategy);
   }
 
   /**
@@ -260,7 +581,8 @@ export class Schedule {
       throw new Error("Pinned assignments are not yet supported.");
     }
 
-    const modelConfig = resolveToModelConfig(this.#config, options);
+    const strategy = resolveSolveStrategy(options.strategy);
+    const modelConfig = resolveToModelConfig(this.#config, options, strategy);
     const builder = new ModelBuilder(modelConfig);
     const result = builder.compile();
     return { ...result, builder };
@@ -276,6 +598,10 @@ export class Schedule {
  *
  * Returns an immutable {@link Schedule} that can be composed via `.with()`
  * and solved via `.solve()`.
+ *
+ * @remarks
+ * `schedule()` always uses the built-in rule registry as its default. Passing
+ * `ruleRegistry` extends that default with custom rules.
  *
  * @example
  * ```typescript
@@ -313,8 +639,65 @@ export function schedule<
   const R extends readonly string[],
   const S extends readonly string[] = readonly [],
   const T extends Record<string, SemanticTimeEntry> = Record<string, SemanticTimeEntry>,
->(config: ScheduleConfig<R, S, T>): Schedule {
-  const merged = buildMergedConfig(config as unknown as ScheduleConfig);
+  const TRules extends readonly unknown[] = readonly ScheduleRuleEntry<BuiltInRuleRegistry>[],
+>(config: BuiltInScheduleConfigInput<R, S, T, TRules>): Schedule<BuiltInRuleRegistry>;
+export function schedule<
+  const R extends readonly string[],
+  const S extends readonly string[] = readonly [],
+  const T extends Record<string, SemanticTimeEntry> = Record<string, SemanticTimeEntry>,
+  TCustomRuleRegistry extends CpsatRuleRegistry = CpsatRuleRegistry,
+  const TRules extends readonly unknown[] = readonly ScheduleRuleEntry<
+    BuiltInRuleRegistry & TCustomRuleRegistry
+  >[],
+>(
+  config: CustomScheduleConfigInput<R, S, T, TCustomRuleRegistry, TRules>,
+): Schedule<BuiltInRuleRegistry & TCustomRuleRegistry>;
+export function schedule(config: {
+  roleIds: readonly string[];
+  skillIds?: readonly string[];
+  times: Record<string, SemanticTimeEntry>;
+  coverage: CoverageEntry[];
+  shiftPatterns: ShiftPattern[];
+  rules?: readonly RuleEntry[];
+  ruleRegistry?: CpsatRuleRegistry;
+  members?: SchedulingMember[];
+  dayOfWeek?: readonly [DayOfWeek, ...DayOfWeek[]];
+  weekStartsOn?: DayOfWeek;
+}): Schedule<CpsatRuleRegistry> {
+  const customRuleRegistry = config.ruleRegistry ?? {};
+  validateRuleRegistryExtension(customRuleRegistry);
+  const merged = buildMergedConfig(config, {
+    ...builtInCpsatRuleRegistry,
+    ...customRuleRegistry,
+  });
+  validateConfig(merged);
+  return new Schedule(merged);
+}
+
+/**
+ * Create a schedule definition with an explicit complete rule registry.
+ *
+ * @remarks
+ * Use this when you want full control over the active rule registry, including
+ * schedules that do not include the built-in rules.
+ *
+ * @category Schedule Definition
+ */
+export function scheduleWithRuleRegistry<
+  const R extends readonly string[],
+  const S extends readonly string[] = readonly [],
+  const T extends Record<string, SemanticTimeEntry> = Record<string, SemanticTimeEntry>,
+  TRuleRegistry extends CpsatRuleRegistry = CpsatRuleRegistry,
+  const TRules extends readonly unknown[] = readonly ScheduleRuleEntry<TRuleRegistry>[],
+>(
+  ruleRegistry: TRuleRegistry,
+  config: Omit<ScheduleWithRuleRegistryConfig<R, S, T, TRuleRegistry>, "rules"> & {
+    rules?: ValidateScheduleRules<TRuleRegistry, TRules>;
+  },
+): Schedule<TRuleRegistry> {
+  assertValidCpsatRuleRegistry(ruleRegistry);
+  assertNoBuiltInCpsatRuleOverrides(ruleRegistry);
+  const merged = buildMergedConfig(config, ruleRegistry);
   validateConfig(merged);
   return new Schedule(merged);
 }
@@ -337,16 +720,46 @@ export function schedule<
  *
  * @category Schedule Definition
  */
+export function partialSchedule<
+  const TRules extends readonly unknown[] = readonly ScheduleRuleEntry<BuiltInRuleRegistry>[],
+>(config: BuiltInPartialScheduleConfigInput<TRules>): Schedule<BuiltInRuleRegistry>;
+export function partialSchedule<
+  TCustomRuleRegistry extends CpsatRuleRegistry = CpsatRuleRegistry,
+  const TRules extends readonly unknown[] = readonly ScheduleRuleEntry<
+    BuiltInRuleRegistry & TCustomRuleRegistry
+  >[],
+>(
+  config: CustomPartialScheduleConfigInput<TCustomRuleRegistry, TRules>,
+): Schedule<BuiltInRuleRegistry & TCustomRuleRegistry>;
 export function partialSchedule(
-  config: Partial<ScheduleConfig<readonly string[], readonly string[]>>,
-): Schedule {
-  const merged = buildMergedConfig({
-    roleIds: [],
-    times: {},
-    coverage: [],
-    shiftPatterns: [],
-    ...config,
-  } as ScheduleConfig);
+  config: Partial<{
+    roleIds: readonly string[];
+    skillIds: readonly string[];
+    times: Record<string, SemanticTimeEntry>;
+    coverage: CoverageEntry[];
+    shiftPatterns: ShiftPattern[];
+    rules: readonly RuleEntry[];
+    ruleRegistry: CpsatRuleRegistry;
+    members: SchedulingMember[];
+    dayOfWeek: readonly [DayOfWeek, ...DayOfWeek[]];
+    weekStartsOn: DayOfWeek;
+  }>,
+): Schedule<CpsatRuleRegistry> {
+  const customRuleRegistry = config.ruleRegistry ?? {};
+  validateRuleRegistryExtension(customRuleRegistry);
+  const merged = buildMergedConfig(
+    {
+      roleIds: [],
+      times: {},
+      coverage: [],
+      shiftPatterns: [],
+      ...config,
+    } as ScheduleConfig,
+    {
+      ...builtInCpsatRuleRegistry,
+      ...customRuleRegistry,
+    },
+  );
   validateConfig(merged);
   return new Schedule(merged);
 }
@@ -355,15 +768,30 @@ export function partialSchedule(
 // Internal: Build merged config from user input
 // ============================================================================
 
-function buildMergedConfig(config: ScheduleConfig): MergedScheduleConfig {
+function buildMergedConfig<
+  R extends readonly string[],
+  S extends readonly string[],
+  T extends Record<string, SemanticTimeEntry>,
+  TRuleRegistry extends CpsatRuleRegistry,
+  TRules extends readonly unknown[] = readonly ScheduleRuleEntry<CpsatRuleRegistry>[],
+>(
+  config:
+    | (Omit<ScheduleConfig<R, S, T, BuiltInRuleRegistry & TRuleRegistry>, "rules"> & {
+        rules?: TRules;
+      })
+    | (Omit<ScheduleWithRuleRegistryConfig<R, S, T, TRuleRegistry>, "rules"> & {
+        rules?: TRules;
+      }),
+  ruleRegistry: CpsatRuleRegistry,
+): MergedScheduleConfig {
   return {
     roleIds: [...config.roleIds],
     skillIds: [...(config.skillIds ?? [])],
     times: { ...config.times },
     coverage: [...config.coverage],
     shiftPatterns: [...config.shiftPatterns],
-    rules: [...(config.rules ?? [])],
-    ruleFactories: config.ruleFactories ? { ...config.ruleFactories } : {},
+    rules: [...(config.rules ?? [])] as ScheduleRuleEntry<CpsatRuleRegistry>[],
+    ruleRegistry: { ...ruleRegistry },
     members: [...(config.members ?? [])],
     dayOfWeek: config.dayOfWeek,
     weekStartsOn: config.weekStartsOn,
@@ -374,18 +802,16 @@ function buildMergedConfig(config: ScheduleConfig): MergedScheduleConfig {
 // Internal: Validate merged config
 // ============================================================================
 
+function validateRuleRegistryExtension(ruleRegistry: CpsatRuleRegistry): void {
+  assertValidCpsatRuleRegistry(ruleRegistry);
+  assertNoBuiltInCpsatRuleOverrides(ruleRegistry);
+}
+
 function validateConfig(config: MergedScheduleConfig): void {
   const roles = new Set<string>(config.roleIds);
   const skills = new Set<string>(config.skillIds);
 
-  // Validate custom rule factories don't override built-in names
-  for (const name of Object.keys(config.ruleFactories)) {
-    if (name in builtInCpsatRuleFactories) {
-      throw new Error(
-        `Custom rule factory "${name}" conflicts with a built-in rule. Choose a different name.`,
-      );
-    }
-  }
+  assertValidCpsatRuleRegistry(config.ruleRegistry);
 
   // Validate role/skill disjointness
   for (const skill of skills) {
@@ -491,7 +917,10 @@ function validateCoverageEntry(
 // Internal: Merge logic
 // ============================================================================
 
-function mergeConfig(base: Readonly<MergedScheduleConfig>, args: WithArg[]): MergedScheduleConfig {
+function mergeConfig(
+  base: Readonly<MergedScheduleConfig>,
+  args: readonly WithArg[],
+): MergedScheduleConfig {
   const result: MergedScheduleConfig = {
     roleIds: [...base.roleIds],
     skillIds: [...base.skillIds],
@@ -499,7 +928,7 @@ function mergeConfig(base: Readonly<MergedScheduleConfig>, args: WithArg[]): Mer
     coverage: [...base.coverage],
     shiftPatterns: [...base.shiftPatterns],
     rules: [...base.rules],
-    ruleFactories: { ...base.ruleFactories },
+    ruleRegistry: { ...base.ruleRegistry },
     members: [...base.members],
     dayOfWeek: base.dayOfWeek,
     weekStartsOn: base.weekStartsOn,
@@ -522,7 +951,7 @@ function mergeConfig(base: Readonly<MergedScheduleConfig>, args: WithArg[]): Mer
   return result;
 }
 
-function mergeScheduleFragment(result: MergedScheduleConfig, s: Schedule): void {
+function mergeScheduleFragment(result: MergedScheduleConfig, s: Schedule<CpsatRuleRegistry>): void {
   const other = s._getConfig();
 
   // dayOfWeek: error on conflict (semantics of union vs intersection are ambiguous)
@@ -597,14 +1026,14 @@ function mergeScheduleFragment(result: MergedScheduleConfig, s: Schedule): void 
   // Rules: additive
   result.rules.push(...other.rules);
 
-  // Rule factories: merge, error on collision
-  for (const [name, factory] of Object.entries(other.ruleFactories)) {
-    if (name in result.ruleFactories && result.ruleFactories[name] !== factory) {
+  // Rule registry: merge, error on collision
+  for (const [name, descriptor] of Object.entries(other.ruleRegistry)) {
+    if (name in result.ruleRegistry && result.ruleRegistry[name] !== descriptor) {
       throw new Error(
-        `Rule factory "${name}" already registered. Cannot merge schedules with colliding rule factories.`,
+        `Rule registry entry "${name}" already registered. Cannot merge schedules with colliding rule registries.`,
       );
     }
-    result.ruleFactories[name] = factory;
+    result.ruleRegistry[name] = descriptor;
   }
 
   // Members: additive, error on duplicate ID
@@ -640,7 +1069,8 @@ function mergeMembers(result: MergedScheduleConfig, incoming: SchedulingMember[]
 function resolveToModelConfig(
   config: Readonly<MergedScheduleConfig>,
   options: SolveOptions,
-): ModelBuilderConfig {
+  strategy: SolveStrategy,
+): ModelBuilderConfig<CpsatRuleRegistry, AnyCpsatRuleConfigEntry> {
   const roles = new Set<string>(config.roleIds);
   const skills = new Set<string>(config.skillIds);
   const memberIds = new Set<string>(config.members.map((m) => m.id));
@@ -677,7 +1107,7 @@ function resolveToModelConfig(
     "overtime-tiered-multiplier",
   ]);
   const hasCostRules = allRules.some((r) => costRuleNames.has(r._rule));
-  if (hasCostRules) {
+  if (strategy.type === "optimize" && hasCostRules) {
     const missingPay = config.members.filter((m) => !m.pay).map((m) => m.id);
     if (missingPay.length > 0) {
       throw new Error(
@@ -696,11 +1126,10 @@ function resolveToModelConfig(
     schedulingPeriod: resolvedPeriod,
     coverage: resolvedCoverage,
     ruleConfigs,
-    ruleFactories:
-      Object.keys(config.ruleFactories).length > 0
-        ? { ...builtInCpsatRuleFactories, ...config.ruleFactories }
-        : undefined,
+    ruleRegistry: config.ruleRegistry,
     weekStartsOn: config.weekStartsOn,
+    solverOptions: buildSolverOptions(options),
+    strategy,
   };
 }
 
@@ -708,10 +1137,37 @@ function resolveToModelConfig(
 // Internal: Build SolveResult from solver response
 // ============================================================================
 
-function mapSolverStatus(solverStatus: SolverResponse["status"]): SolveStatus {
+function resolveSolveStrategy(strategy: unknown): SolveStrategy {
+  if (strategy === undefined) {
+    return { type: "optimize" };
+  }
+
+  if (typeof strategy !== "object" || strategy === null || !("type" in strategy)) {
+    throw new Error("Solve strategy must be an object with a type field.");
+  }
+
+  const strategyType = (strategy as { type: unknown }).type;
+  if (strategyType === "optimize" || strategyType === "feasibility-only") {
+    return { type: strategyType };
+  }
+
+  throw new Error(`Unknown solve strategy "${String(strategyType)}".`);
+}
+
+function buildSolverOptions(options: SolveOptions): SolverRequest["options"] | undefined {
+  if (options.timeLimitSeconds === undefined) {
+    return undefined;
+  }
+  return { timeLimitSeconds: options.timeLimitSeconds };
+}
+
+function mapSolverStatus(
+  solverStatus: SolverResponse["status"],
+  strategy: SolveStrategy,
+): SolveStatus {
   switch (solverStatus) {
     case "OPTIMAL":
-      return "optimal";
+      return strategy.type === "feasibility-only" ? "feasible" : "optimal";
     case "FEASIBLE":
       return "feasible";
     case "INFEASIBLE":
@@ -728,14 +1184,26 @@ function buildSolveResult(
   response: SolverResponse,
   compiled: CompilationResult & { builder: ModelBuilder },
   config: Readonly<MergedScheduleConfig>,
+  strategy: SolveStrategy,
 ): SolveResult {
-  const status = mapSolverStatus(response.status);
-  const parsed = parseSolverResponse(response);
+  const status = mapSolverStatus(response.status, strategy);
+  const hasFinalSolution = status === "optimal" || status === "feasible";
+  const parsed = hasFinalSolution
+    ? parseSolverResponse(response)
+    : {
+        status: response.status,
+        assignments: [],
+        statistics: response.statistics,
+        error: response.error,
+      };
+
+  compiled.builder.reporter.analyzeSolution(response, {
+    analyzeSoftConstraints: strategy.type === "optimize",
+  });
 
   // Run post-solve validation when a solution exists
-  if (parsed.assignments.length > 0 && (status === "optimal" || status === "feasible")) {
+  if (parsed.assignments.length > 0 && hasFinalSolution && strategy.type === "optimize") {
     const resolved = resolveAssignments(parsed.assignments, compiled.builder.shiftPatterns);
-    compiled.builder.reporter.analyzeSolution(response);
     compiled.builder.validateSolution(resolved);
   }
 
@@ -747,14 +1215,18 @@ function buildSolveResult(
     validation,
   };
 
-  // Compute cost breakdown when cost rules are present and a solution was found
-  if (parsed.assignments.length > 0 && (status === "optimal" || status === "feasible")) {
-    const hasCostRules = config.rules.some((r) => r._rule === "minimize-cost");
-    if (hasCostRules) {
+  // Compute cost breakdown when cost artifacts are present and a solution was found
+  if (parsed.assignments.length > 0 && hasFinalSolution && strategy.type === "optimize") {
+    const hasCostArtifacts = compiled.builder.rules.some((rule) =>
+      rule.artifacts.some((artifact) => artifact.kind === "cost"),
+    );
+    if (hasCostArtifacts) {
       result.cost = calculateScheduleCost(parsed.assignments, {
         members: config.members,
         shiftPatterns: config.shiftPatterns,
         rules: compiled.builder.rules,
+        days: compiled.builder.days,
+        weekStartsOn: compiled.builder.weekStartsOn,
       });
     }
   }
@@ -783,7 +1255,7 @@ function buildCoverageRequirements<T extends string>(
       targetCount: number;
       priority?: Priority;
       dayOfWeek?: [DayOfWeek, ...DayOfWeek[]];
-      dates?: string[];
+      dates?: DateString[];
     } = {
       semanticTime: entry.timeName,
       targetCount: entry.count,
@@ -809,7 +1281,7 @@ function buildSimpleCoverageTarget<T extends string>(
     targetCount: number;
     priority?: Priority;
     dayOfWeek?: [DayOfWeek, ...DayOfWeek[]];
-    dates?: string[];
+    dates?: DateString[];
   },
   roles: Set<string>,
   skills: Set<string>,
@@ -849,12 +1321,27 @@ function buildSimpleCoverageTarget<T extends string>(
 /**
  * Build a VariantCoverageRequirement from a variant-form CoverageEntry.
  */
+function requireCoverageVariants<T extends string>(
+  entry: CoverageEntry<T, string>,
+): [CoverageVariant, ...CoverageVariant[]] {
+  if (!entry.variants || entry.variants.length === 0) {
+    throw new Error(`Coverage entry for "${entry.timeName}" must define at least one variant.`);
+  }
+
+  const first = entry.variants[0];
+  if (!first) {
+    throw new Error(`Coverage entry for "${entry.timeName}" must define at least one variant.`);
+  }
+
+  return [first, ...entry.variants.slice(1)];
+}
+
 function buildVariantCoverageRequirement<T extends string>(
   entry: CoverageEntry<T, string>,
   roles: Set<string>,
   skills: Set<string>,
 ): MixedCoverageRequirement<T> {
-  const variants = entry.variants! as unknown as [CoverageVariant, ...CoverageVariant[]];
+  const variants = requireCoverageVariants(entry);
 
   const resolveTarget = (): {
     roleIds?: [string, ...string[]];
@@ -885,23 +1372,23 @@ function buildVariantCoverageRequirement<T extends string>(
 // ============================================================================
 
 function resolveRules(
-  rules: RuleEntry[],
+  rules: ScheduleRuleEntry<CpsatRuleRegistry>[],
   roles: Set<string>,
   skills: Set<string>,
   memberIds: Set<string>,
-): CpsatRuleConfigEntry[] {
+): AnyCpsatRuleConfigEntry[] {
   const ctx: RuleResolveContext = { roles, skills, memberIds };
 
   return rules.map((rule) => {
     // Rules with custom resolvers handle their own translation
     if (rule._resolve) {
-      return rule._resolve(ctx) as CpsatRuleConfigEntry;
+      return rule._resolve(ctx) as AnyCpsatRuleConfigEntry;
     }
 
     // Default resolution: appliesTo → entity scope, dates → specificDates
     const { _type, _rule, _resolve, appliesTo, dates, ...passthrough } = rule as RuleEntry & {
       appliesTo?: string | string[];
-      dates?: string[];
+      dates?: DateString[];
     };
 
     const entityScope = resolveAppliesTo(appliesTo, roles, skills, memberIds);
@@ -912,8 +1399,8 @@ function resolveRules(
       ...passthrough,
       ...entityScope,
       ...resolvedDates,
-    } as CpsatRuleConfigEntry;
-  }) as CpsatRuleConfigEntry[];
+    } as AnyCpsatRuleConfigEntry;
+  }) as AnyCpsatRuleConfigEntry[];
 }
 
 // ============================================================================
@@ -927,7 +1414,9 @@ function resolveRules(
  * (multipliers, surcharges) reference cost variables it creates.
  * Non-cost rules retain their original relative order.
  */
-function sortCostRulesFirst(rules: RuleEntry[]): RuleEntry[] {
+function sortCostRulesFirst(
+  rules: ScheduleRuleEntry<CpsatRuleRegistry>[],
+): ScheduleRuleEntry<CpsatRuleRegistry>[] {
   return rules.toSorted((a, b) => {
     const aIsCostBase = a._rule === "minimize-cost" ? 0 : 1;
     const bIsCostBase = b._rule === "minimize-cost" ? 0 : 1;

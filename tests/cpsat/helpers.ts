@@ -1,25 +1,61 @@
 import { inject } from "vitest";
 import { HttpSolverClient } from "../../src/client.js";
-import type { CompilationRule, ModelBuilderConfig } from "../../src/cpsat/model-builder.js";
+import type { CompiledRule } from "../../src/cpsat/rule-descriptor.js";
+import type { ModelBuilderConfig } from "../../src/cpsat/model-builder.js";
+import type { ShiftAssignment } from "../../src/cpsat/response.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CoverageRequirement, ShiftPattern, SchedulingMember } from "../../src/cpsat/types.js";
-import type { TimeOfDay, SchedulingPeriod } from "../../src/types.js";
+import { isDateString, type TimeOfDay, type SchedulingPeriod } from "../../src/types.js";
 import { resolveDaysFromPeriod } from "../../src/datetime.utils.js";
 
-export const decodeAssignments = (values: Record<string, number> = {}) =>
-  Object.entries(values)
-    .filter(([name, value]) => value === 1 && name.startsWith("assign:"))
-    .map(([name]) => {
-      const [, memberId, shiftPatternId, day] = name.split(":");
-      return { memberId, shiftPatternId, day };
+export const decodeAssignments = (values: Record<string, number> = {}): ShiftAssignment[] => {
+  const roleAssignments = new Map<string, ShiftAssignment>();
+  const aggregateAssignments = new Map<string, ShiftAssignment>();
+
+  for (const [name, value] of Object.entries(values)) {
+    if (value !== 1) continue;
+
+    if (name.startsWith("assign_role:")) {
+      const [, memberId, shiftPatternId, roleId, day] = name.split(":");
+      if (!memberId || !shiftPatternId || !roleId || day === undefined || !isDateString(day)) {
+        continue;
+      }
+      roleAssignments.set(`${memberId}:${shiftPatternId}:${day}`, {
+        memberId,
+        shiftPatternId,
+        roleId,
+        day,
+      });
+      continue;
+    }
+
+    if (!name.startsWith("assign:")) continue;
+
+    const [, memberId, shiftPatternId, day] = name.split(":");
+    if (!memberId || !shiftPatternId || day === undefined || !isDateString(day)) continue;
+
+    aggregateAssignments.set(`${memberId}:${shiftPatternId}:${day}`, {
+      memberId,
+      shiftPatternId,
+      day,
     });
+  }
+
+  const assignments = [...roleAssignments.values()];
+  for (const [key, assignment] of aggregateAssignments) {
+    if (!roleAssignments.has(key)) {
+      assignments.push(assignment);
+    }
+  }
+  return assignments;
+};
 
 export const solveWithRules = async (
   client: HttpSolverClient,
-  baseConfig: Omit<ModelBuilderConfig, "rules" | "ruleConfigs" | "ruleFactories">,
+  baseConfig: Omit<ModelBuilderConfig, "rules" | "ruleConfigs" | "ruleRegistry">,
   ruleConfigs: CpsatRuleConfigEntry[],
-  customRules: CompilationRule[] = [],
+  customRules: CompiledRule[] = [],
 ) => {
   const builder = new ModelBuilder({
     ...baseConfig,
@@ -44,10 +80,7 @@ export function getSolverClient(): HttpSolverClient {
  * Base type for scheduling scenario configuration.
  * This is what ModelBuilder accepts (minus rule-related fields).
  */
-export type BaseScenarioConfig = Omit<
-  ModelBuilderConfig,
-  "rules" | "ruleConfigs" | "ruleFactories"
->;
+export type BaseScenarioConfig = Omit<ModelBuilderConfig, "rules" | "ruleConfigs" | "ruleRegistry">;
 
 // ============================================================================
 // Simple Configuration Helpers
@@ -93,7 +126,7 @@ export function createSimpleConfig(opts: {
     ],
     schedulingPeriod,
     coverage: days.map((day) => ({
-      day,
+      day: day.iso,
       roleIds,
       startTime: shiftStart,
       endTime: shiftEnd,
@@ -190,7 +223,7 @@ export const createBaseConfig = (overrides: BaseConfigOverrides = {}): BaseScena
     overrides.coverage ??
     days.flatMap((day) =>
       shiftPatterns.map((pattern) => ({
-        day,
+        day: day.iso,
         roleIds: pattern.roleIds ?? roleIds,
         startTime: pattern.startTime,
         endTime: pattern.endTime,

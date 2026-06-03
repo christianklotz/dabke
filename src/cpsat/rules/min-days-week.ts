@@ -1,7 +1,8 @@
 import * as z from "zod";
 import { DayOfWeekSchema } from "../../types.js";
-import type { CompilationRule } from "../model-builder.js";
-import type { Term } from "../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { RuleCompileContext } from "../rule-descriptor.js";
+import type { ValidationReporter } from "../validation-reporter.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
 import {
   PrioritySchema,
@@ -10,6 +11,11 @@ import {
   resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentVarsForDay } from "./assignment-terms.js";
+import { hasAnyAssignablePattern } from "./pattern-eligibility.js";
+import { assignedDayVariableName } from "./variables.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
+import { buildAssignedDayIndicator } from "./assigned-day.js";
 
 const MinDaysWeekBase = z.object({
   days: z.number().int().min(0),
@@ -17,104 +23,100 @@ const MinDaysWeekBase = z.object({
   weekStartsOn: DayOfWeekSchema.optional(),
 });
 
-const MinDaysWeekSchema = MinDaysWeekBase.and(entityScope(["members", "roles", "skills"]));
+export const MinDaysWeekSchema = MinDaysWeekBase.and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createMinDaysWeekRule}.
- *
- * - `days` (required): minimum number of days required per scheduling week
- * - `priority` (required): how strictly the solver enforces this rule
- * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link minDaysWeekRuleDescriptor}.
  */
 export type MinDaysWeekConfig = z.infer<typeof MinDaysWeekSchema>;
 
-/**
- * Enforces a minimum number of days a person must work per scheduling week.
- *
- * @remarks
- * Creates a binary "works on day" variable for each member and day, then
- * constrains the weekly sum. This counts distinct days, regardless of how
- * many shifts are assigned on a single day.
- *
- * @param config - See {@link MinDaysWeekConfig}
- * @example
- * ```ts
- * createMinDaysWeekRule({ days: 3, priority: "HIGH" });
- * ```
- */
-export function createMinDaysWeekRule(config: MinDaysWeekConfig): CompilationRule {
-  const parsed = MinDaysWeekSchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { days, priority, weekStartsOn } = parsed;
-  const group = ruleGroup(`min-days-week:${days}`, `Min ${days}d per week`, scope);
+export const minDaysWeekRuleDescriptor = defineRuleDescriptor({
+  name: "min-days-week",
+  schema: MinDaysWeekSchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { days, priority, weekStartsOn } = config;
+    const group = ruleGroup(`min-days-week:${days}`, `Min ${days}d per week`, scope);
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
+    const weeks = splitIntoWeeks([...ctx.days], weekStartsOn ?? ctx.weekStartsOn);
 
-  return {
-    compile(b) {
-      if (days <= 0) return;
+    const artifacts = members.flatMap((member) =>
+      weeks.flatMap((weekDays) => {
+        const weekStart = weekDays[0];
+        if (!weekStart) return [];
 
-      const members = resolveMembersFromScope(scope, b.members);
-      const weeks = splitIntoWeeks(b.days, weekStartsOn ?? b.weekStartsOn);
+        const supportArtifacts = weekDays.flatMap(
+          (day) =>
+            buildAssignedDayIndicator({
+              memberId: member.id,
+              day,
+              assignmentVars: assignmentVarsForDay(member, day, ctx.shiftPatterns),
+            }).artifacts,
+        );
 
-      for (const emp of members) {
-        for (const weekDays of weeks) {
-          const weekWorkVars: string[] = [];
+        const assignedDayVars = weekDays
+          .filter((day) => assignmentVarsForDay(member, day, ctx.shiftPatterns).length > 0)
+          .map((day) => assignedDayVariableName(member.id, day.iso));
+        if (assignedDayVars.length === 0) return supportArtifacts;
 
-          for (const day of weekDays) {
-            const dayAssignments = b.shiftPatterns
-              .filter((p) => b.canAssign(emp, p) && b.patternAvailableOnDay(p, day))
-              .map((p) => b.assignment(emp.id, p.id, day));
+        const description = `${member.id} min ${days}d in week starting ${weekStart.iso}`;
+        const context = { memberIds: [member.id], days: weekDays.map((day) => day.iso) };
+        const constraintId = `min-days-week:${member.id}:${weekStart.iso}`;
+        const terms = assignedDayVars.map((varName) => ({ var: varName, coeff: 1 }));
 
-            if (dayAssignments.length === 0) continue;
+        const finalArtifacts =
+          priority === "MANDATORY"
+            ? [
+                hardConstraint({
+                  group,
+                  description,
+                  context,
+                  validation: reportValidation(constraintId),
+                  terms,
+                  comparator: ">=",
+                  targetValue: days,
+                }),
+                {
+                  kind: "pre-solve-feedback" as const,
+                  run(_preSolveContext: RuleCompileContext, reporter: ValidationReporter) {
+                    const possibleDays = weekDays.filter((day) =>
+                      hasAnyAssignablePattern(member, day, ctx.shiftPatterns),
+                    ).length;
+                    if (possibleDays >= days) return;
+                    reporter.reportRuleError({
+                      rule: "min-days-week",
+                      message: `${member.id} cannot reach ${days} assigned days in week starting ${weekStart.iso}; only ${possibleDays} day${possibleDays === 1 ? " is" : "s are"} assignable.`,
+                      context,
+                      suggestions: [
+                        `Reduce the weekly day minimum for ${member.id}`,
+                        `Add more assignable days in the week starting ${weekStart.iso}`,
+                      ],
+                      group,
+                    });
+                  },
+                },
+              ]
+            : [
+                softConstraint({
+                  group,
+                  description,
+                  context,
+                  validation: reportValidation(),
+                  terms,
+                  comparator: ">=",
+                  targetValue: days,
+                  penalty: priorityToPenalty(priority),
+                  constraintId,
+                }),
+              ];
 
-            const worksVar = b.boolVar(`works_day_${emp.id}_${day}`);
-            weekWorkVars.push(worksVar);
+        return supportArtifacts.concat(finalArtifacts);
+      }),
+    );
 
-            // worksVar >= each assignment (if any assignment is 1, worksVar must be 1)
-            for (const assignVar of dayAssignments) {
-              b.addLinear(
-                [
-                  { var: worksVar, coeff: 1 },
-                  { var: assignVar, coeff: -1 },
-                ],
-                ">=",
-                0,
-              );
-            }
-
-            // worksVar <= sum(assignments) (if no assignment is 1, worksVar must be 0)
-            b.addLinear(
-              [{ var: worksVar, coeff: 1 }, ...dayAssignments.map((v) => ({ var: v, coeff: -1 }))],
-              "<=",
-              0,
-            );
-          }
-
-          if (weekWorkVars.length === 0) continue;
-
-          const weekLabel = weekDays[0]!;
-          const constraintId = `min-days-week:${emp.id}:${weekLabel}`;
-          const terms: Term[] = weekWorkVars.map((v) => ({ var: v, coeff: 1 }));
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, ">=", days);
-          } else {
-            b.addSoftLinear(terms, ">=", days, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "min-days-week",
-              description: `${emp.id} min ${days}d in week starting ${weekLabel}`,
-              targetValue: days,
-              comparator: ">=",
-              day: weekLabel,
-              context: { memberIds: [emp.id], days: weekDays },
-              group,
-            });
-          }
-        }
-      }
-    },
-  };
-}
+    return {
+      rule: "min-days-week",
+      artifacts,
+    };
+  },
+});

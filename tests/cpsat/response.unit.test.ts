@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseSolverResponse, resolveAssignments } from "../../src/cpsat/response.js";
+import type { ShiftAssignment } from "../../src/cpsat/response.js";
 import type { SolverResponse } from "../../src/client.types.js";
 import type { ShiftPattern } from "../../src/cpsat/types.js";
 
@@ -14,6 +15,7 @@ describe("parseSolverResponse", () => {
         "shift:morning:2026-01-10": 1,
       },
       statistics: { solveTimeMs: 100 },
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -33,12 +35,42 @@ describe("parseSolverResponse", () => {
     expect(result.statistics?.solveTimeMs).toBe(100);
   });
 
+  it("should extract role-specific assignments without duplicating aggregate assignment variables", () => {
+    const response: SolverResponse = {
+      status: "OPTIMAL",
+      values: {
+        "assign:alice:floor:2026-01-10": 1,
+        "assign_role:alice:floor:server:2026-01-10": 1,
+        "assign:bob:floor:2026-01-10": 1,
+        "assign_role:bob:floor:bartender:2026-01-10": 1,
+      },
+      softConstraintViolations: [],
+    };
+
+    const result = parseSolverResponse(response);
+
+    expect(result.assignments).toHaveLength(2);
+    expect(result.assignments).toContainEqual({
+      memberId: "alice",
+      shiftPatternId: "floor",
+      roleId: "server",
+      day: "2026-01-10",
+    });
+    expect(result.assignments).toContainEqual({
+      memberId: "bob",
+      shiftPatternId: "floor",
+      roleId: "bartender",
+      day: "2026-01-10",
+    });
+  });
+
   it("should handle feasible response", () => {
     const response: SolverResponse = {
       status: "FEASIBLE",
       values: {
         "assign:emp1:shift1:2026-01-10": 1,
       },
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -77,6 +109,7 @@ describe("parseSolverResponse", () => {
       values: {
         "assign:john_doe:morning_shift:2026-01-10": 1,
       },
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -97,6 +130,7 @@ describe("parseSolverResponse", () => {
         "works:alice:2026-01-10": 1,
         "assign:alice:morning:2026-01-10": 1,
       },
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -114,6 +148,7 @@ describe("parseSolverResponse", () => {
         "assign:a:b:c:d": 1, // too many parts
         "assign:alice:morning:2026-01-10": 1,
       },
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -128,6 +163,7 @@ describe("parseSolverResponse", () => {
         "assign:alice:morning:not-a-date": 1,
         "assign:alice:morning:2026-01-10": 1,
       },
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -139,6 +175,7 @@ describe("parseSolverResponse", () => {
     const response: SolverResponse = {
       status: "OPTIMAL",
       values: {},
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -150,6 +187,7 @@ describe("parseSolverResponse", () => {
   it("should handle undefined values", () => {
     const response: SolverResponse = {
       status: "OPTIMAL",
+      softConstraintViolations: [],
     };
 
     const result = parseSolverResponse(response);
@@ -176,7 +214,7 @@ describe("resolveAssignments", () => {
   ];
 
   it("should resolve assignments to concrete times", () => {
-    const assignments = [
+    const assignments: ShiftAssignment[] = [
       { memberId: "alice", shiftPatternId: "morning", day: "2026-01-10" },
       { memberId: "bob", shiftPatternId: "evening", day: "2026-01-10" },
     ];
@@ -198,8 +236,26 @@ describe("resolveAssignments", () => {
     });
   });
 
+  it("should preserve assigned role when resolving concrete times", () => {
+    const assignments: ShiftAssignment[] = [
+      { memberId: "alice", shiftPatternId: "morning", roleId: "server", day: "2026-01-10" },
+    ];
+
+    const resolved = resolveAssignments(assignments, shiftPatterns);
+
+    expect(resolved).toEqual([
+      {
+        memberId: "alice",
+        roleId: "server",
+        day: "2026-01-10",
+        startTime: { hours: 9, minutes: 0 },
+        endTime: { hours: 13, minutes: 0 },
+      },
+    ]);
+  });
+
   it("should skip assignments with unknown pattern IDs", () => {
-    const assignments = [
+    const assignments: ShiftAssignment[] = [
       { memberId: "alice", shiftPatternId: "unknown", day: "2026-01-10" },
       { memberId: "bob", shiftPatternId: "morning", day: "2026-01-10" },
     ];
@@ -216,7 +272,9 @@ describe("resolveAssignments", () => {
   });
 
   it("should handle empty patterns", () => {
-    const assignments = [{ memberId: "alice", shiftPatternId: "morning", day: "2026-01-10" }];
+    const assignments: ShiftAssignment[] = [
+      { memberId: "alice", shiftPatternId: "morning", day: "2026-01-10" },
+    ];
 
     const resolved = resolveAssignments(assignments, []);
     expect(resolved).toHaveLength(0);

@@ -1,27 +1,26 @@
 import * as z from "zod";
 import { DayOfWeekSchema } from "../../types.js";
-import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingMember, Term } from "../types.js";
-import type { ShiftAssignment } from "../response.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { CostArtifact } from "../rule-descriptor.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
-  timeOfDayToMinutes,
+  OBJECTIVE_WEIGHTS,
   normalizeEndMinutes,
   splitIntoWeeks,
+  timeOfDayToMinutes,
   unionMinutes,
-  OBJECTIVE_WEIGHTS,
 } from "../utils.js";
 import {
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
+  timeScope,
 } from "./scope.types.js";
-import { patternDurationMinutes } from "./cost-utils.js";
+import { patternDurationMinutes } from "./pattern-time.js";
 
-const OvertimeWeeklySurchargeSchema = z
+export const OvertimeWeeklySurchargeSchema = z
   .object({
     after: z.number().min(0),
     amount: z.number().min(0),
@@ -30,156 +29,168 @@ const OvertimeWeeklySurchargeSchema = z
   .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
-/** Configuration for {@link createOvertimeWeeklySurchargeRule}. */
+/** Configuration for {@link overtimeWeeklySurchargeRuleDescriptor}. */
 export type OvertimeWeeklySurchargeConfig = z.infer<typeof OvertimeWeeklySurchargeSchema>;
 
-/**
- * Creates a weekly overtime flat surcharge rule.
- *
- * Hours beyond the threshold per week get a flat surcharge per hour,
- * independent of the member's base rate.
- */
-export function createOvertimeWeeklySurchargeRule(
-  config: OvertimeWeeklySurchargeConfig,
-): CompilationRule {
-  const parsed = OvertimeWeeklySurchargeSchema.parse(config);
-  const { after, amount, weekStartsOn } = parsed;
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-  const thresholdMinutes = after * 60;
-  let resolvedWeekStartsOn = weekStartsOn ?? "monday";
+export const overtimeWeeklySurchargeRuleDescriptor = defineRuleDescriptor({
+  name: "overtime-weekly-surcharge",
+  schema: OvertimeWeeklySurchargeSchema,
+  compile(config) {
+    const { after, amount, weekStartsOn } = config;
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+    const thresholdMinutes = after * 60;
+    let resolvedWeekStartsOn = weekStartsOn ?? "monday";
 
-  return {
-    compile(b) {
-      resolvedWeekStartsOn = weekStartsOn ?? b.weekStartsOn;
-      if (amount <= 0) return;
+    const costArtifact: CostArtifact = {
+      kind: "cost",
+      validation: {
+        strategy: "skip",
+        category: "no-meaningful-feedback",
+        rationale:
+          "Overtime cost artifacts influence optimization and post-solve accounting, not validation feedback.",
+      },
+      compileObjective(builder) {
+        resolvedWeekStartsOn = weekStartsOn ?? builder.weekStartsOn;
+        if (amount <= 0) return;
 
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+        const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
+        const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
+        if (targetMembers.length === 0 || activeDays.length === 0) return;
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const weeks = splitIntoWeeks(activeDays, weekStartsOn ?? builder.weekStartsOn);
+        const hasCostContext = builder.costContext?.active === true;
+        const surchargePerMinute = amount / 60;
 
-      const weeks = splitIntoWeeks(activeDays, weekStartsOn ?? b.weekStartsOn);
+        for (const member of targetMembers) {
+          for (const [weekIndex, weekDays] of weeks.entries()) {
+            let memberWeekMaxMinutes = 0;
+            const terms = [] as Array<{ var: string; coeff: number }>;
 
-      const hasCostContext = b.costContext?.active === true;
-      const surchargePerMinute = amount / 60;
-
-      for (const emp of targetMembers) {
-        for (const [weekIdx, weekDays] of weeks.entries()) {
-          let empWeekMaxMinutes = 0;
-          const terms: Term[] = [];
-          for (const day of weekDays) {
-            const dayRanges: Array<{ start: number; end: number }> = [];
-            for (const pattern of b.shiftPatterns) {
-              if (!b.canAssign(emp, pattern)) continue;
-              if (!b.patternAvailableOnDay(pattern, day)) continue;
-              const start = timeOfDayToMinutes(pattern.startTime);
-              dayRanges.push({
-                start,
-                end: normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime)),
-              });
-              terms.push({
-                var: b.assignment(emp.id, pattern.id, day),
-                coeff: patternDurationMinutes(pattern),
-              });
+            for (const day of weekDays) {
+              const dayRanges: Array<{ start: number; end: number }> = [];
+              for (const pattern of builder.shiftPatterns) {
+                if (
+                  !builder.canAssign(member, pattern) ||
+                  !builder.patternAvailableOnDay(pattern, day)
+                ) {
+                  continue;
+                }
+                const start = timeOfDayToMinutes(pattern.startTime);
+                dayRanges.push({
+                  start,
+                  end: normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime)),
+                });
+                terms.push({
+                  var: builder.assignment(member.id, pattern.id, day),
+                  coeff: patternDurationMinutes(pattern),
+                });
+              }
+              memberWeekMaxMinutes += unionMinutes(dayRanges);
             }
-            empWeekMaxMinutes += unionMinutes(dayRanges);
+
+            if (terms.length === 0) continue;
+            const maxOvertime = Math.max(0, memberWeekMaxMinutes - thresholdMinutes);
+            if (maxOvertime === 0) continue;
+
+            const overtimeVar = builder.intVar(
+              `overtime:surcharge:${member.id}:w${weekIndex}`,
+              0,
+              maxOvertime,
+            );
+            builder.addLinear(
+              [
+                { var: overtimeVar, coeff: 1 },
+                ...terms.map((term) => ({ var: term.var, coeff: -term.coeff })),
+              ],
+              ">=",
+              -thresholdMinutes,
+            );
+
+            if (hasCostContext) {
+              const totalOvertimeCost = surchargePerMinute * maxOvertime;
+              const normalizedMax = totalOvertimeCost / builder.costContext!.normalizationFactor;
+              builder.addPenalty(overtimeVar, Math.max(1, Math.round(normalizedMax / maxOvertime)));
+            } else {
+              builder.addPenalty(
+                overtimeVar,
+                Math.max(1, Math.round(OBJECTIVE_WEIGHTS.COST / maxOvertime)),
+              );
+            }
           }
+        }
+      },
+      calculateCost(assignments, costContext) {
+        if (amount <= 0) return { entries: [] };
 
-          if (terms.length === 0) continue;
+        const patternMap = new Map(
+          costContext.shiftPatterns.map((pattern) => [pattern.id, pattern]),
+        );
+        const activeDays = new Set(
+          resolveActiveDaysFromScope(timeScopeValue, [...costContext.days]).map((day) => day.iso),
+        );
+        const targetMemberIds = new Set(
+          resolveMembersFromScope(entityScopeValue, [...costContext.members]).map(
+            (member) => member.id,
+          ),
+        );
+        const activeDaysList = costContext.days.filter((day) => activeDays.has(day.iso));
+        const weeks = splitIntoWeeks(activeDaysList, resolvedWeekStartsOn);
 
-          const maxOvertime = Math.max(0, empWeekMaxMinutes - thresholdMinutes);
-          if (maxOvertime === 0) continue;
+        const entries = [] as Array<{
+          memberId: string;
+          day: string;
+          category: string;
+          amount: number;
+        }>;
+        for (const weekDays of weeks) {
+          const weekDaySet = new Set(weekDays.map((day) => day.iso));
+          const memberWeekData = new Map<
+            string,
+            { totalMinutes: number; dayMinutes: Map<string, number> }
+          >();
 
-          const overtimeVar = b.intVar(`overtime:surcharge:${emp.id}:w${weekIdx}`, 0, maxOvertime);
-
-          b.addLinear(
-            [
-              { var: overtimeVar, coeff: 1 },
-              ...terms.map((t) => ({ var: t.var, coeff: -t.coeff })),
-            ],
-            ">=",
-            -thresholdMinutes,
-          );
-
-          if (hasCostContext) {
-            const totalOvertimeCost = surchargePerMinute * maxOvertime;
-            const normalizedMax = totalOvertimeCost / b.costContext!.normalizationFactor;
-            b.addPenalty(overtimeVar, Math.max(1, Math.round(normalizedMax / maxOvertime)));
-          } else {
-            b.addPenalty(
-              overtimeVar,
-              Math.max(1, Math.round(OBJECTIVE_WEIGHTS.COST / maxOvertime)),
+          for (const assignment of assignments) {
+            if (!weekDaySet.has(assignment.day) || !activeDays.has(assignment.day)) continue;
+            if (!targetMemberIds.has(assignment.memberId)) continue;
+            const pattern = patternMap.get(assignment.shiftPatternId);
+            if (!pattern) continue;
+            const duration = patternDurationMinutes(pattern);
+            let data = memberWeekData.get(assignment.memberId);
+            if (!data) {
+              data = { totalMinutes: 0, dayMinutes: new Map() };
+              memberWeekData.set(assignment.memberId, data);
+            }
+            data.totalMinutes += duration;
+            data.dayMinutes.set(
+              assignment.day,
+              (data.dayMinutes.get(assignment.day) ?? 0) + duration,
             );
           }
-        }
-      }
-    },
 
-    cost(
-      assignments: ShiftAssignment[],
-      members: ReadonlyArray<SchedulingMember>,
-      shiftPatterns: ReadonlyArray<ShiftPattern>,
-    ): CostContribution {
-      if (amount <= 0) return { entries: [] };
-
-      const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
-      const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
-      const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
-      const targetEmpIds = new Set(
-        resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
-      );
-
-      const activeDaysList = allDays.filter((d) => activeDays.has(d));
-      const weeks = splitIntoWeeks(activeDaysList, resolvedWeekStartsOn);
-
-      const entries: CostContribution["entries"] = [];
-
-      for (const weekDays of weeks) {
-        const weekDaySet = new Set(weekDays);
-
-        const empWeekData = new Map<
-          string,
-          { totalMinutes: number; dayMinutes: Map<string, number> }
-        >();
-
-        for (const a of assignments) {
-          if (!weekDaySet.has(a.day)) continue;
-          if (!activeDays.has(a.day)) continue;
-          if (!targetEmpIds.has(a.memberId)) continue;
-
-          const pattern = patternMap.get(a.shiftPatternId);
-          if (!pattern) continue;
-          const duration = patternDurationMinutes(pattern);
-
-          let data = empWeekData.get(a.memberId);
-          if (!data) {
-            data = { totalMinutes: 0, dayMinutes: new Map() };
-            empWeekData.set(a.memberId, data);
-          }
-          data.totalMinutes += duration;
-          data.dayMinutes.set(a.day, (data.dayMinutes.get(a.day) ?? 0) + duration);
-        }
-
-        for (const [empId, data] of empWeekData) {
-          const overtimeMinutes = Math.max(0, data.totalMinutes - thresholdMinutes);
-          if (overtimeMinutes <= 0) continue;
-
-          const totalOvertimeCost = (amount * overtimeMinutes) / 60;
-
-          for (const [day, dayMinutes] of data.dayMinutes) {
-            const proportion = dayMinutes / data.totalMinutes;
-            entries.push({
-              memberId: empId,
-              day,
-              category: COST_CATEGORY.OVERTIME,
-              amount: totalOvertimeCost * proportion,
-            });
+          for (const [memberId, data] of memberWeekData) {
+            const overtimeMinutes = Math.max(0, data.totalMinutes - thresholdMinutes);
+            if (overtimeMinutes <= 0) continue;
+            const totalOvertimeCost = (amount * overtimeMinutes) / 60;
+            for (const [day, dayMinutes] of data.dayMinutes) {
+              const proportion = dayMinutes / data.totalMinutes;
+              entries.push({
+                memberId,
+                day,
+                category: COST_CATEGORY.OVERTIME,
+                amount: totalOvertimeCost * proportion,
+              });
+            }
           }
         }
-      }
 
-      return { entries };
-    },
-  };
-}
+        return { entries };
+      },
+    };
+
+    return {
+      rule: "overtime-weekly-surcharge",
+      artifacts: [costArtifact],
+    };
+  },
+});

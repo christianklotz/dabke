@@ -23,12 +23,12 @@ describe("CP-SAT: member-assignment-priority rule", () => {
       {
         name: "assignment-priority",
         memberIds: ["bob"],
-        preference: "high",
+        preference: "prefer",
       },
       {
         name: "assignment-priority",
         memberIds: ["alice"],
-        preference: "low",
+        preference: "avoid",
       },
     ] satisfies CpsatRuleConfigEntry[]);
     expect(response.status).toBe("OPTIMAL");
@@ -55,13 +55,13 @@ describe("CP-SAT: member-assignment-priority rule", () => {
       {
         name: "assignment-priority",
         memberIds: ["alice"],
-        preference: "low",
+        preference: "avoid",
       },
     ] satisfies CpsatRuleConfigEntry[]);
 
     expect(response.status).toBe("OPTIMAL");
     const assignments = decodeAssignments(response.values);
-    // Alice must be assigned despite low preference because coverage requires it
+    // Alice must be assigned despite avoid preference because coverage requires it
     expect(assignments).toContainEqual(expect.objectContaining({ memberId: "alice" }));
   }, 30_000);
 
@@ -83,7 +83,7 @@ describe("CP-SAT: member-assignment-priority rule", () => {
       {
         name: "assignment-priority",
         memberIds: ["bob"],
-        preference: "high",
+        preference: "prefer",
       },
     ] satisfies CpsatRuleConfigEntry[]);
 

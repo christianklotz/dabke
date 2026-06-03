@@ -16,6 +16,7 @@ import {
   cover,
   shift,
   maxHoursPerWeek,
+  maxConcurrentAssignments,
   minRestBetweenShifts,
   timeOff,
   minimizeCost,
@@ -55,6 +56,7 @@ const venue = schedule({
 
   rules: [
     maxHoursPerWeek(40),
+    maxConcurrentAssignments(3, { appliesTo: "barista" }),
     minRestBetweenShifts(11),
     timeOff({ appliesTo: "alice", dayOfWeek: weekend }),
     minimizeCost(),
@@ -145,20 +147,26 @@ const ready = venue.with([
 
 ### Scheduling
 
-| Function                   | Description                          |
-| -------------------------- | ------------------------------------ |
-| `maxHoursPerDay(hours)`    | Max hours per person per day         |
-| `maxHoursPerWeek(hours)`   | Max hours per person per week        |
-| `minHoursPerDay(hours)`    | Min hours per person per day         |
-| `minHoursPerWeek(hours)`   | Min hours per person per week        |
-| `maxShiftsPerDay(n)`       | Max shift assignments per day        |
-| `maxConsecutiveDays(n)`    | Max consecutive working days         |
-| `minConsecutiveDays(n)`    | Min consecutive working days         |
-| `minRestBetweenShifts(h)`  | Min rest hours between shifts        |
-| `timeOff(opts)`            | Block assignments during periods     |
-| `preference(level, opts)`  | Prefer or avoid assigning members    |
-| `preferLocation(id, opts)` | Prefer members at specific locations |
-| `assignTogether(opts)`     | Keep members on the same shifts      |
+| Function                             | Description                            |
+| ------------------------------------ | -------------------------------------- |
+| `maxHoursPerDay(hours)`              | Max hours per person per day           |
+| `maxHoursPerWeek(hours)`             | Max hours per person per week          |
+| `minHoursPerDay(hours)`              | Min hours per person per day           |
+| `minHoursPerWeek(hours)`             | Min hours per person per week          |
+| `maxShiftsPerDay(n)`                 | Max shift assignments per day          |
+| `maxConcurrentAssignments(n)`        | Max concurrent assignments in a window |
+| `targetPeakConcurrentAssignments(n)` | Preferred peak concurrent assignments  |
+| `maxConsecutiveDays(n)`              | Max consecutive assigned days          |
+| `minConsecutiveDays(n)`              | Min consecutive assigned days          |
+| `maxDaysOfWeekPerPeriod(n, days, p)` | Max matching weekdays across a period  |
+| `minDaysOfWeekPerPeriod(n, days, p)` | Min matching weekdays across a period  |
+| `minRestBetweenShifts(h)`            | Min rest hours between shifts          |
+| `timeOff(opts)`                      | Block assignments during periods       |
+| `preferAssignment(opts)`             | Prefer assigning targeted members      |
+| `avoidAssignment(opts)`              | Avoid assigning targeted members       |
+| `preferRole(id, opts)`               | Prefer members in a specific role      |
+| `preferLocation(id, opts)`           | Prefer members at specific locations   |
+| `assignTogether(opts)`               | Keep members on the same shifts        |
 
 ### Cost
 
@@ -173,19 +181,6 @@ const ready = venue.with([
 | `dailyOvertimeMultiplier(opts)`          | Daily overtime pay multiplier            |
 | `dailyOvertimeSurcharge(opts)`           | Daily overtime flat surcharge            |
 | `tieredOvertimeMultiplier(tiers, opts?)` | Graduated overtime rates                 |
-
----
-
-## LLM Integration
-
-Generate per-section API reference docs from TSDoc:
-
-```bash
-npm run generate:reference -- --outdir ./references
-```
-
-This produces a `README.md` index, an `api.md` API surface listing,
-and one detail file per category (schedule, rules, coverage, etc.).
 
 ---
 

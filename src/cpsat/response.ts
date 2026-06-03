@@ -1,6 +1,6 @@
 import type { SolverResponse } from "../client.types.js";
 import type { ShiftPattern } from "./types.js";
-import type { TimeOfDay } from "../types.js";
+import { isDateString, type DateString, type TimeOfDay } from "../types.js";
 
 /**
  * A raw assignment from the solver: which member works which shift on which day.
@@ -12,8 +12,10 @@ export interface ShiftAssignment {
   memberId: string;
   /** The shift pattern this member is assigned to. */
   shiftPatternId: string;
+  /** The concrete role this member is filling for the assignment. */
+  roleId?: string;
   /** The date of the assignment (YYYY-MM-DD). */
-  day: string;
+  day: DateString;
 }
 
 /**
@@ -24,8 +26,10 @@ export interface ShiftAssignment {
 export interface ResolvedShiftAssignment {
   /** The assigned member's ID. */
   memberId: string;
+  /** The concrete role this member is filling for the assignment. */
+  roleId?: string;
   /** The date of the assignment (YYYY-MM-DD). */
-  day: string;
+  day: DateString;
   /** When the shift starts. */
   startTime: TimeOfDay;
   /** When the shift ends. */
@@ -51,12 +55,20 @@ export interface SolverResult {
 /**
  * Extracts shift assignments from solver response.
  *
- * Parses variable names matching the pattern `assign:${memberId}:${patternId}:${day}`
- * and returns assignments where the variable value is 1 (true).
+ * Parses role-specific variable names matching the pattern
+ * `assign_role:${memberId}:${patternId}:${roleId}:${day}` and aggregate
+ * assignment variable names matching `assign:${memberId}:${patternId}:${day}`.
  *
  * @remarks
- * IDs are validated by ModelBuilder to not contain colons,
- * ensuring unambiguous parsing.
+ * The model uses aggregate assignment variables as the canonical shift presence
+ * literals for intervals, objectives, shift-level rules, and skill-only coverage.
+ * Role-specific variables are emitted when the solver also chooses a concrete
+ * role for that shift. When both variable shapes exist for the same member,
+ * pattern, and day, the role-specific assignment is returned so callers can see
+ * the selected role without receiving a duplicate aggregate assignment.
+ *
+ * IDs are validated by ModelBuilder to not contain colons, ensuring unambiguous
+ * parsing.
  *
  * @param response - The solver response containing variable values
  * @returns Parsed schedule result with assignments
@@ -85,22 +97,49 @@ export function parseSolverResponse(response: SolverResponse): SolverResult {
     };
   }
 
-  const assignments: ShiftAssignment[] = [];
+  const roleAssignments = new Map<string, ShiftAssignment>();
+  const aggregateAssignments = new Map<string, ShiftAssignment>();
 
   for (const [varName, value] of Object.entries(response.values ?? {})) {
     if (value !== 1) continue;
+
+    if (varName.startsWith("assign_role:")) {
+      const parts = varName.split(":");
+      if (parts.length !== 5) continue;
+
+      const [, memberId, shiftPatternId, roleId, day] = parts;
+      if (!memberId || !shiftPatternId || !roleId || !day) continue;
+      if (!isDateString(day)) continue;
+
+      roleAssignments.set(assignmentKey(memberId, shiftPatternId, day), {
+        memberId,
+        shiftPatternId,
+        roleId,
+        day,
+      });
+      continue;
+    }
+
     if (!varName.startsWith("assign:")) continue;
 
-    // Pattern: assign:${memberId}:${patternId}:${day}
-    // IDs are validated to not contain colons, so splitting is unambiguous.
     const parts = varName.split(":");
     if (parts.length !== 4) continue;
-
     const [, memberId, shiftPatternId, day] = parts;
     if (!memberId || !shiftPatternId || !day) continue;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    if (!isDateString(day)) continue;
 
-    assignments.push({ memberId, shiftPatternId, day });
+    aggregateAssignments.set(assignmentKey(memberId, shiftPatternId, day), {
+      memberId,
+      shiftPatternId,
+      day,
+    });
+  }
+
+  const assignments = [...roleAssignments.values()];
+  for (const [key, assignment] of aggregateAssignments) {
+    if (!roleAssignments.has(key)) {
+      assignments.push(assignment);
+    }
   }
 
   return {
@@ -142,10 +181,15 @@ export function resolveAssignments(
 
       return {
         memberId: a.memberId,
+        ...(a.roleId ? { roleId: a.roleId } : {}),
         day: a.day,
         startTime: pattern.startTime,
         endTime: pattern.endTime,
       };
     })
     .filter((a): a is ResolvedShiftAssignment => a !== null);
+}
+
+function assignmentKey(memberId: string, shiftPatternId: string, day: DateString): string {
+  return `${memberId}:${shiftPatternId}:${day}`;
 }

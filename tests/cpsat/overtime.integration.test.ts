@@ -79,6 +79,8 @@ describe("CP-SAT: overtime rules", () => {
       members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
+      days: builder.days,
+      weekStartsOn: builder.weekStartsOn,
     });
 
     // 40h base: 40 * 2000 = 80000
@@ -116,6 +118,8 @@ describe("CP-SAT: overtime rules", () => {
       members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
+      days: builder.days,
+      weekStartsOn: builder.weekStartsOn,
     });
 
     // 40h base: 80000
@@ -159,6 +163,8 @@ describe("CP-SAT: overtime rules", () => {
       members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
+      days: builder.days,
+      weekStartsOn: builder.weekStartsOn,
     });
 
     // 40h total, base: 80000
@@ -237,6 +243,8 @@ describe("CP-SAT: salaried members", () => {
       members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
+      days: builder.days,
+      weekStartsOn: builder.weekStartsOn,
     });
 
     // Weekly salary: 5200000 / 52 = 100000

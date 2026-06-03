@@ -68,29 +68,42 @@ export { shift } from "./shift-patterns.js";
 // Rules
 export {
   defineRule,
+  defineRuleFor,
   maxHoursPerDay,
   maxHoursPerWeek,
   minHoursPerDay,
   minHoursPerWeek,
   maxDaysPerWeek,
   minDaysPerWeek,
+  targetDaysPerWeek,
   maxShiftsPerDay,
+  maxConcurrentAssignments,
+  targetPeakConcurrentAssignments,
   maxConsecutiveDays,
   minConsecutiveDays,
   minRestBetweenShifts,
   mustAssign,
-  preference,
+  preferAssignment,
+  avoidAssignment,
+  preferRole,
   preferLocation,
   timeOff,
   assignTogether,
+  maxDaysOfWeekPerPeriod,
+  minDaysOfWeekPerPeriod,
 } from "./rules.js";
 export type {
   RuleEntry,
   RuleResolveContext,
   RuleOptions,
   EntityOnlyRuleOptions,
+  TargetDaysPerWeekOptions,
   TimeOffOptions,
   AssignTogetherOptions,
+  MaxConcurrentAssignmentsOptions,
+  TargetPeakConcurrentAssignmentsOptions,
+  DaysOfWeekPerPeriodOptions,
+  ScheduleRuleEntry,
 } from "./rules.js";
 
 // Cost Optimization
@@ -108,5 +121,12 @@ export {
 export type { CostRuleOptions } from "./cost.js";
 
 // Schedule Definition
-export { schedule, partialSchedule, Schedule } from "./definition.js";
-export type { ScheduleConfig, SolveResult, SolveStatus, SolveOptions } from "./definition.js";
+export { schedule, scheduleWithRuleRegistry, partialSchedule, Schedule } from "./definition.js";
+export type {
+  ScheduleConfig,
+  ScheduleWithRuleRegistryConfig,
+  SolveResult,
+  SolveStatus,
+  SolveStrategy,
+  SolveOptions,
+} from "./definition.js";

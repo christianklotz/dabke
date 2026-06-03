@@ -2,6 +2,16 @@ import assert from "node:assert";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
+import type { DateString } from "../../src/types.js";
+import {
+  cover,
+  maxShiftsPerDay,
+  schedule,
+  shift,
+  summarizeValidation,
+  t,
+  time,
+} from "../../src/index.js";
 import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT compilation integration", () => {
@@ -62,6 +72,48 @@ describe("CP-SAT compilation integration", () => {
     ] satisfies CpsatRuleConfigEntry[]);
 
     expect(response.status).toBe("INFEASIBLE");
+  }, 30_000);
+
+  it("returns validation groups for tracked hard constraints with explicit hard diagnostics", async () => {
+    const rota = schedule({
+      roleIds: ["waiter"],
+      times: {
+        early: time({ startTime: t(10), endTime: t(18) }),
+        late: time({ startTime: t(18), endTime: t(23) }),
+      },
+      coverage: [cover("early", "waiter", 2), cover("late", "waiter", 1)],
+      shiftPatterns: [
+        shift("early", t(10), t(18), { roleIds: ["waiter"] }),
+        shift("late", t(18), t(23), { roleIds: ["waiter"] }),
+      ],
+      rules: [maxShiftsPerDay(1)],
+    }).with([
+      { id: "alice", roleIds: ["waiter"] },
+      { id: "bob", roleIds: ["waiter"] },
+    ]);
+
+    const compiled = rota.compile({
+      dateRange: { start: "2024-02-01", end: "2024-02-01" },
+    });
+    const response = await client.solve({
+      ...compiled.request,
+      options: { ...compiled.request.options, diagnostics: "hard" },
+    });
+
+    expect(response.status).toBe("INFEASIBLE");
+
+    compiled.builder.reporter.analyzeSolution(response, { analyzeSoftConstraints: false });
+    const validation = compiled.builder.reporter.getValidation();
+
+    const groupKeys = validation.errors.flatMap((error) =>
+      "group" in error && error.group ? [error.group.key] : [],
+    );
+    expect(groupKeys).toContain("coverage:late:waiter:1");
+    expect(groupKeys.some((key) => key.startsWith("rule:max-shifts-day:1"))).toBe(true);
+
+    const summaryKeys = summarizeValidation(validation).map((summary) => summary.groupKey);
+    expect(summaryKeys).toContain("coverage:late:waiter:1");
+    expect(summaryKeys.some((key) => key.startsWith("rule:max-shifts-day:1"))).toBe(true);
   }, 30_000);
 
   describe("coverage with split shifts", () => {
@@ -720,10 +772,10 @@ describe("CP-SAT compilation integration", () => {
   });
 
   describe("weekStartsOn inheritance", () => {
-    let client: ReturnType<typeof getSolverClient>;
+    let scopedClient: ReturnType<typeof getSolverClient>;
 
     beforeAll(() => {
-      client = getSolverClient();
+      scopedClient = getSolverClient();
     });
 
     it("uses ModelBuilder.weekStartsOn when weekly rule omits weekStartsOn", async () => {
@@ -757,13 +809,13 @@ describe("CP-SAT compilation integration", () => {
         },
       ];
 
-      const baseline = await solveWithRules(client, baseConfig, []);
+      const baseline = await solveWithRules(scopedClient, baseConfig, []);
       expect(baseline.status).toBe("OPTIMAL");
       const baselineAssignments = decodeAssignments(baseline.values);
       expect(baselineAssignments).toHaveLength(2);
 
       const saturdayWeek = await solveWithRules(
-        client,
+        scopedClient,
         { ...baseConfig, weekStartsOn: "saturday" },
         rule,
       );
@@ -775,7 +827,7 @@ describe("CP-SAT compilation integration", () => {
       expect(saturdayAssignments).toHaveLength(2);
 
       const mondayWeek = await solveWithRules(
-        client,
+        scopedClient,
         { ...baseConfig, weekStartsOn: "monday" },
         rule,
       );
@@ -794,7 +846,7 @@ describe("CP-SAT compilation integration", () => {
       //   Mon Feb 5, Tue Feb 6, Wed Feb 7
       // Expected: 5 assignments (Thu, Fri, Mon, Tue, Wed)
 
-      const days = [
+      const days: DateString[] = [
         "2024-02-01", // Thu
         "2024-02-02", // Fri
         "2024-02-03", // Sat
@@ -805,7 +857,7 @@ describe("CP-SAT compilation integration", () => {
       ];
 
       // Coverage only for weekdays
-      const weekdays = [
+      const weekdays: DateString[] = [
         "2024-02-01", // Thu
         "2024-02-02", // Fri
         "2024-02-05", // Mon

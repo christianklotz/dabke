@@ -5,6 +5,11 @@ from typing import Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 
+SolverMode = Literal["optimize", "satisfy"]
+SolverStatus = Literal["OPTIMAL", "FEASIBLE", "INFEASIBLE", "TIMEOUT", "ERROR"]
+DiagnosticMode = Literal["none", "hard"]
+
+
 class Variable(BaseModel):
     """Decision variable.
 
@@ -65,6 +70,7 @@ class Constraint(BaseModel):
     if_: str | None = Field(default=None, alias="if")
     then: str | None = None
     id: str | None = None
+    stage: str | None = None
 
 
 class Objective(BaseModel):
@@ -76,6 +82,12 @@ class Objective(BaseModel):
     terms: list[Term]
 
 
+class SolverObjectiveStage(Objective):
+    """A named objective stage for lexicographic solving."""
+
+    id: str
+
+
 class Options(BaseModel):
     """Solver tuning options."""
 
@@ -83,6 +95,7 @@ class Options(BaseModel):
 
     timeLimitSeconds: float = 60.0
     solutionLimit: int | None = None  # Only solutionLimit=1 is supported (stops after first feasible solution)
+    diagnostics: DiagnosticMode = "none"
 
 
 class SolverRequest(BaseModel):
@@ -93,11 +106,25 @@ class SolverRequest(BaseModel):
     variables: list[Variable]
     constraints: list[Constraint]
     objective: Objective | None = None
+    objectiveStages: list[SolverObjectiveStage] | None = None
+    mode: SolverMode | None = None
     options: Options | None = None
 
 
-class SoftConstraintViolation(BaseModel):
-    """A soft constraint violation in the solver output."""
+class SolverStageResult(BaseModel):
+    """Metadata for one objective stage solve."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    status: SolverStatus
+    objectiveValue: float | None = None
+    bestObjectiveBound: float | None = None
+    solveTimeMs: int
+
+
+class SolverSoftConstraintViolation(BaseModel):
+    """A raw solver-stage soft constraint violation."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -107,14 +134,24 @@ class SoftConstraintViolation(BaseModel):
     actualValue: int
 
 
+class SolverHardConstraintConflict(BaseModel):
+    """A hard constraint included in a sufficient infeasible constraint set."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    constraintId: str
+
+
 class SolverResponse(BaseModel):
     """Response payload produced by the solver service."""
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["OPTIMAL", "FEASIBLE", "INFEASIBLE", "TIMEOUT", "ERROR"]
+    status: SolverStatus
     values: dict[str, int] | None = None
     statistics: dict[str, int | float] | None = None
     error: str | None = None
     solutionInfo: str | None = None
-    softViolations: list[SoftConstraintViolation] | None = None
+    hardConstraintConflicts: list[SolverHardConstraintConflict] | None = None
+    softConstraintViolations: list[SolverSoftConstraintViolation] | None = None
+    stageResults: list[SolverStageResult] | None = None

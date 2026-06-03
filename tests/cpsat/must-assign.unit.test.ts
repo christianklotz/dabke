@@ -9,9 +9,7 @@ function getSoftConstraints(
   request: { constraints: Array<{ type: string; id?: string }> },
   prefix: string,
 ) {
-  return request.constraints.filter(
-    (c) => c.type === "soft_linear" && c.id?.startsWith(prefix),
-  );
+  return request.constraints.filter((c) => c.type === "soft_linear" && c.id?.startsWith(prefix));
 }
 
 describe("CP-SAT: must-assign rule (unit)", () => {
@@ -100,12 +98,12 @@ describe("CP-SAT: must-assign rule (unit)", () => {
 
     builder.compile();
 
-    const tracked = (
-      builder.reporter as {
-        getTrackedConstraints?: () => Array<{ rule?: string; description: string }>;
-      }
-    )
-      .getTrackedConstraints?.() ?? [];
+    const tracked =
+      (
+        builder.reporter as {
+          getTrackedConstraints?: () => Array<{ rule?: string; description: string }>;
+        }
+      ).getTrackedConstraints?.() ?? [];
     const mustAssignTracked = tracked.filter((c) => c.rule === "must-assign");
     expect(mustAssignTracked.length).toBe(1);
     expect(mustAssignTracked[0]!.description).toContain("staffing obligation");

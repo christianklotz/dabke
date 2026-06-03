@@ -18,6 +18,7 @@ import {
 } from "../../src/index.js";
 import { calculateScheduleCost, COST_CATEGORY } from "../../src/cpsat/cost.js";
 import type { ShiftAssignment } from "../../src/cpsat/response.js";
+import type { DateString } from "../../src/types.js";
 
 // ============================================================================
 // factory functions produce correct RuleEntry
@@ -116,7 +117,10 @@ describe("cost rule factory functions", () => {
 // ============================================================================
 
 describe("pay validation", () => {
-  const dateRange = { start: "2026-02-09", end: "2026-02-15" };
+  const dateRange = { start: "2026-02-09", end: "2026-02-15" } satisfies {
+    start: DateString;
+    end: DateString;
+  };
 
   it("throws when cost rules present but members lack pay", () => {
     const s = schedule({
@@ -246,6 +250,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // 3 hours * 2000/hr = 6000
@@ -278,6 +284,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 3 * 2000 = 6000, Premium: 3 * 2000 * 0.5 = 3000, Total: 9000
@@ -308,6 +316,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 3 * 2000 = 6000, Surcharge: 3 * 500 = 1500, Total: 7500
@@ -338,6 +348,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 5 * 2000 = 10000
@@ -375,6 +387,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 40h * 2000 = 80000
@@ -406,6 +420,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 12h * 2000 = 24000
@@ -449,6 +465,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 40h * 2000 = 80000
@@ -485,6 +503,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Weekly salary: 5200000 / 52 = 100000
@@ -520,6 +540,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Day 1: alice 6000 + bob 4500 = 10500
@@ -550,6 +572,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     expect(cost.total).toBe(0);
@@ -570,12 +594,24 @@ describe("calculateScheduleCost", () => {
       .compile({ dateRange: { start: "2026-02-09", end: "2026-02-09" } });
 
     const customRule = {
-      compile() {},
-      cost() {
-        return {
-          entries: [{ memberId: "alice", day: "2026-02-09", category: "hazard-pay", amount: 500 }],
-        };
-      },
+      rule: "custom-cost",
+      artifacts: [
+        {
+          kind: "cost" as const,
+          validation: {
+            strategy: "skip" as const,
+            category: "no-meaningful-feedback" as const,
+            rationale: "Custom post-solve accounting only.",
+          },
+          calculateCost() {
+            return {
+              entries: [
+                { memberId: "alice", day: "2026-02-09", category: "hazard-pay", amount: 500 },
+              ],
+            };
+          },
+        },
+      ],
     };
 
     const assignments: ShiftAssignment[] = [
@@ -586,6 +622,8 @@ describe("calculateScheduleCost", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: [...compiled.builder.rules, customRule],
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 6000, custom: 500

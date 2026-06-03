@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
+/* oxlint-disable vitest/require-mock-type-parameters */
+
+import * as z from "zod";
+import { describe, it, expect, vi } from "vitest";
+import type { SolverRequest } from "../src/client.types.js";
 import {
   schedule,
+  scheduleWithRuleRegistry,
   partialSchedule,
   Schedule,
   t,
@@ -8,6 +13,7 @@ import {
   cover,
   shift,
   defineRule,
+  defineRuleFor,
   maxHoursPerDay,
   maxHoursPerWeek,
   minHoursPerDay,
@@ -16,17 +22,27 @@ import {
   maxConsecutiveDays,
   minConsecutiveDays,
   minRestBetweenShifts,
-  preference,
+  preferAssignment,
+  avoidAssignment,
+  preferRole,
   preferLocation,
   timeOff,
   assignTogether,
   mustAssign,
+  minimizeCost,
   maxDaysPerWeek,
   minDaysPerWeek,
+  targetPeakConcurrentAssignments,
   weekdays,
   weekend,
 } from "../src/schedule/index.js";
 import type { RuleEntry } from "../src/schedule/index.js";
+import { defineRuleDescriptor } from "../src/index.js";
+import type { DateString } from "../src/types.js";
+import { builtInCpsatRuleRegistry } from "../src/cpsat/rules.js";
+import { TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID } from "../src/cpsat/rules/target-peak-concurrent-assignments.js";
+
+const UNSTAGED_OBJECTIVE_STAGE_ID = "__dabke_unstaged__";
 
 // ============================================================================
 // t() helper
@@ -303,11 +319,26 @@ describe("rule functions", () => {
     expect(rule.appliesTo).toBe("full-time");
   });
 
-  it("preference", () => {
-    const rule = preference("high", { appliesTo: "waiter" });
+  it("preferAssignment", () => {
+    const rule = preferAssignment({ appliesTo: "waiter" });
     expect(rule._rule).toBe("assignment-priority");
-    expect(rule.preference).toBe("high");
+    expect(rule.preference).toBe("prefer");
     expect(rule.appliesTo).toBe("waiter");
+  });
+
+  it("avoidAssignment", () => {
+    const rule = avoidAssignment({ appliesTo: "student", priority: "HIGH" });
+    expect(rule._rule).toBe("assignment-priority");
+    expect(rule.preference).toBe("avoid");
+    expect(rule.appliesTo).toBe("student");
+    expect(rule.priority).toBe("HIGH");
+  });
+
+  it("preferRole", () => {
+    const rule = preferRole("waiter", { appliesTo: "joanna" });
+    expect(rule._rule).toBe("role-preference");
+    expect(rule.roleId).toBe("waiter");
+    expect(rule.appliesTo).toBe("joanna");
   });
 
   it("preferLocation", () => {
@@ -352,15 +383,21 @@ describe("rule functions", () => {
 // defineRule
 // ============================================================================
 
-/** No-op rule factory for testing custom rule registration. */
-function noopFactory(_config: Record<string, unknown>) {
-  return { compile() {} };
+/** No-op rule registry for testing custom rule registration. */
+const noopFactory = {
+  name: "debug",
+  schema: z.object({}).passthrough(),
+  compile(_config: Record<string, unknown>) {
+    return { rule: "debug", artifacts: [] };
+  },
+};
+
+function debugRule(flag: boolean): RuleEntry {
+  return defineRule("debug", { flag });
 }
 
 describe("defineRule()", () => {
-  function debugRule(flag: boolean): RuleEntry {
-    return defineRule("debug", { flag });
-  }
+  const defineDebugRule = defineRuleFor({ debug: noopFactory });
 
   it("creates a RuleEntry with _type and _rule", () => {
     const rule = debugRule(true);
@@ -376,7 +413,13 @@ describe("defineRule()", () => {
     expect(rule.label).toBe("test");
   });
 
-  it("custom rule compiles with registered factory", () => {
+  it("defineRuleFor binds rule names to a registry", () => {
+    const rule = defineDebugRule("debug", { flag: true });
+    expect(rule._rule).toBe("debug");
+    expect(rule.flag).toBe(true);
+  });
+
+  it("custom rule compiles with registered rule registry", () => {
     let factoryCalled = false;
     const s = schedule({
       roleIds: ["waiter"],
@@ -384,11 +427,15 @@ describe("defineRule()", () => {
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [debugRule(true)],
-      ruleFactories: {
-        debug: (config) => {
-          factoryCalled = true;
-          expect(config.flag).toBe(true);
-          return { compile() {} };
+      ruleRegistry: {
+        debug: {
+          name: "debug",
+          schema: z.object({}).passthrough(),
+          compile(config: Record<string, unknown>) {
+            factoryCalled = true;
+            expect(config.flag).toBe(true);
+            return { rule: "debug", artifacts: [] };
+          },
         },
       },
     });
@@ -414,7 +461,7 @@ describe("defineRule()", () => {
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [rule],
-      ruleFactories: { debug: noopFactory },
+      ruleRegistry: { debug: noopFactory },
     });
     s.with([{ id: "alice", roleIds: ["waiter"] }]).compile({
       dateRange: { start: "2025-02-03", end: "2025-02-07" },
@@ -432,10 +479,14 @@ describe("defineRule()", () => {
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [rule],
-      ruleFactories: {
-        debug: (config) => {
-          capturedConfig = config;
-          return { compile() {} };
+      ruleRegistry: {
+        debug: {
+          name: "debug",
+          schema: z.object({}).passthrough(),
+          compile(config: Record<string, unknown>) {
+            capturedConfig = config;
+            return { rule: "debug", artifacts: [] };
+          },
         },
       },
     });
@@ -443,8 +494,9 @@ describe("defineRule()", () => {
       dateRange: { start: "2025-02-03", end: "2025-02-07" },
     });
     expect(capturedConfig).toBeDefined();
-    // appliesTo "waiter" resolved through scoping to concrete memberIds
-    expect(capturedConfig!.memberIds).toEqual(["alice"]);
+    // appliesTo "waiter" is preserved as role scope for custom descriptors
+    expect(capturedConfig!.roleIds).toEqual(["waiter"]);
+    expect(capturedConfig!.memberIds).toBeUndefined();
     // appliesTo itself is stripped
     expect(capturedConfig!.appliesTo).toBeUndefined();
   });
@@ -456,7 +508,7 @@ describe("defineRule()", () => {
       coverage: [cover("lunch", "waiter", 1)],
       shiftPatterns: [shift("s", t(12), t(15))],
       rules: [maxHoursPerDay(10), debugRule(true)],
-      ruleFactories: { debug: noopFactory },
+      ruleRegistry: { debug: noopFactory },
     });
     const compiled = s
       .with([{ id: "alice", roleIds: ["waiter"] }])
@@ -466,38 +518,690 @@ describe("defineRule()", () => {
     expect(compiled.builder.rules.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("custom factories merge across schedules", () => {
+  it("solve() computes cost from custom cost artifacts", async () => {
+    const customCostDescriptor = defineRuleDescriptor({
+      name: "custom-cost",
+      schema: z.object({}).passthrough(),
+      compile() {
+        return {
+          rule: "custom-cost",
+          artifacts: [
+            {
+              kind: "cost" as const,
+              calculateCost(assignments) {
+                return {
+                  entries: assignments.map((assignment) => ({
+                    memberId: assignment.memberId,
+                    day: assignment.day,
+                    category: "custom",
+                    amount: 123,
+                  })),
+                };
+              },
+              validation: {
+                strategy: "skip" as const,
+                category: "no-meaningful-feedback" as const,
+                rationale: "Custom cost artifacts do not emit validation feedback.",
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    const client = {
+      solve: vi.fn(async () => ({
+        status: "OPTIMAL" as const,
+        values: { "assign:alice:s:2025-02-03": 1 },
+        softConstraintViolations: [],
+      })),
+    };
+
+    const result = await schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "waiter", 1)],
+      shiftPatterns: [shift("s", t(12), t(15))],
+      rules: [defineRule("custom-cost", {})],
+      ruleRegistry: { "custom-cost": customCostDescriptor },
+    })
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .solve(client, {
+        dateRange: { start: "2025-02-03", end: "2025-02-03" },
+      });
+
+    expect(result.status).toBe("optimal");
+    expect(result.cost?.total).toBe(123);
+    expect(result.cost?.byMember.get("alice")?.categories.get("custom")).toBe(123);
+    expect(client.solve).toHaveBeenCalledOnce();
+  });
+
+  it("compile() emits a peak-target stage before the normal objective tail", () => {
+    const compiled = schedule({
+      roleIds: ["stylist"],
+      skillIds: ["senior"],
+      times: {
+        opening: time({ startTime: t(10), endTime: t(11), dayOfWeek: ["thursday"] }),
+        closing: time({ startTime: t(19), endTime: t(20), dayOfWeek: ["thursday"] }),
+      },
+      coverage: [cover("opening", "stylist", 2), cover("closing", "stylist", 2)],
+      shiftPatterns: [
+        shift("open", t(10), t(19), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+        shift("late", t(11), t(20), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+      ],
+      rules: [
+        targetPeakConcurrentAssignments(5, {
+          appliesTo: "stylist",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+        preferAssignment({ appliesTo: "senior", dayOfWeek: ["thursday"], priority: "HIGH" }),
+      ],
+    })
+      .with([
+        { id: "alice", roleIds: ["stylist"], skillIds: ["senior"] },
+        { id: "bob", roleIds: ["stylist"] },
+        { id: "charlie", roleIds: ["stylist"] },
+        { id: "diana", roleIds: ["stylist"] },
+        { id: "erin", roleIds: ["stylist"] },
+      ])
+      .compile({
+        dateRange: { start: "2025-02-06", end: "2025-02-06" },
+      });
+
+    const { request } = compiled;
+    expect(request.objective).toBeUndefined();
+    expect(request.objectiveStages?.map((stage) => stage.id)).toEqual([
+      TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+      UNSTAGED_OBJECTIVE_STAGE_ID,
+    ]);
+
+    const peakConstraints = request.constraints.filter(
+      (
+        constraint,
+      ): constraint is Extract<(typeof request.constraints)[number], { type: "soft_linear" }> =>
+        constraint.type === "soft_linear" &&
+        constraint.id?.startsWith("rule:target-peak-concurrent-assignments:") === true,
+    );
+    expect(peakConstraints).not.toHaveLength(0);
+    expect(
+      peakConstraints.every(
+        (constraint) => constraint.stage === TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+      ),
+    ).toBe(true);
+
+    const tailStage = request.objectiveStages?.find(
+      (stage) => stage.id === UNSTAGED_OBJECTIVE_STAGE_ID,
+    );
+    expect(tailStage?.terms).toEqual(
+      expect.arrayContaining([
+        { var: "shift:open:2025-02-06", coeff: 1000 },
+        { var: "assign:alice:open:2025-02-06", coeff: -25 },
+      ]),
+    );
+  });
+
+  it("compile() preserves weighted peak-target penalties in the target stage", () => {
+    const compiled = schedule({
+      roleIds: ["senior", "junior"],
+      times: {
+        service: time({ startTime: t(10), endTime: t(18), dayOfWeek: ["thursday"] }),
+      },
+      coverage: [],
+      shiftPatterns: [
+        shift("senior-day", t(10), t(18), { roleIds: ["senior"], dayOfWeek: ["thursday"] }),
+        shift("junior-day", t(10), t(18), { roleIds: ["junior"], dayOfWeek: ["thursday"] }),
+      ],
+      rules: [
+        targetPeakConcurrentAssignments(1, {
+          appliesTo: "senior",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+        targetPeakConcurrentAssignments(1, {
+          appliesTo: "junior",
+          dayOfWeek: ["thursday"],
+          priority: "LOW",
+        }),
+      ],
+    })
+      .with([
+        { id: "alice", roleIds: ["senior"] },
+        { id: "bob", roleIds: ["junior"] },
+      ])
+      .compile({
+        dateRange: { start: "2025-02-06", end: "2025-02-06" },
+      });
+
+    const peakConstraints = compiled.request.constraints.filter(
+      (
+        constraint,
+      ): constraint is Extract<
+        (typeof compiled.request.constraints)[number],
+        { type: "soft_linear" }
+      > =>
+        constraint.type === "soft_linear" &&
+        constraint.id?.startsWith("rule:target-peak-concurrent-assignments:") === true,
+    );
+
+    expect(compiled.request.objectiveStages?.map((stage) => stage.id)).toEqual([
+      TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+      UNSTAGED_OBJECTIVE_STAGE_ID,
+    ]);
+    expect(
+      peakConstraints.map((constraint) => constraint.penalty).toSorted((a, b) => a - b),
+    ).toEqual([100, 2500]);
+    expect(
+      peakConstraints.every(
+        (constraint) => constraint.stage === TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+      ),
+    ).toBe(true);
+  });
+
+  it("solve() sends a single staged request for peak-target schedules", async () => {
+    const client = {
+      solve: vi.fn(async (request: SolverRequest) => {
+        expect(request.objective).toBeUndefined();
+        expect(request.objectiveStages?.map((stage) => stage.id)).toEqual([
+          TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+          UNSTAGED_OBJECTIVE_STAGE_ID,
+        ]);
+
+        return {
+          status: "OPTIMAL" as const,
+          values: {
+            "assign:alice:open:2025-02-06": 1,
+            "assign:bob:open:2025-02-06": 1,
+            "assign:charlie:late:2025-02-06": 1,
+            "assign:diana:late:2025-02-06": 1,
+            "assign:erin:late:2025-02-06": 1,
+          },
+          softConstraintViolations: [],
+        };
+      }),
+    };
+
+    const result = await schedule({
+      roleIds: ["stylist"],
+      times: {
+        opening: time({ startTime: t(10), endTime: t(11), dayOfWeek: ["thursday"] }),
+        closing: time({ startTime: t(19), endTime: t(20), dayOfWeek: ["thursday"] }),
+      },
+      coverage: [cover("opening", "stylist", 2), cover("closing", "stylist", 2)],
+      shiftPatterns: [
+        shift("open", t(10), t(19), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+        shift("late", t(11), t(20), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+      ],
+      rules: [
+        targetPeakConcurrentAssignments(5, {
+          appliesTo: "stylist",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+      ],
+    })
+      .with([
+        { id: "alice", roleIds: ["stylist"] },
+        { id: "bob", roleIds: ["stylist"] },
+        { id: "charlie", roleIds: ["stylist"] },
+        { id: "diana", roleIds: ["stylist"] },
+        { id: "erin", roleIds: ["stylist"] },
+      ])
+      .solve(client, {
+        dateRange: { start: "2025-02-06", end: "2025-02-06" },
+      });
+
+    expect(result.status).toBe("optimal");
+    expect(client.solve).toHaveBeenCalledOnce();
+  });
+
+  it("solve() drops partial staged assignments from timeout responses", async () => {
+    const client = {
+      solve: vi.fn(async (request: SolverRequest) => {
+        expect(request.objectiveStages?.map((stage) => stage.id)).toContain(
+          TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+        );
+
+        return {
+          status: "TIMEOUT" as const,
+          values: {
+            "assign:alice:open:2025-02-06": 1,
+          },
+          stageResults: [
+            {
+              id: TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+              status: "OPTIMAL" as const,
+              solveTimeMs: 10,
+              objectiveValue: 0,
+              bestObjectiveBound: 0,
+            },
+            {
+              id: UNSTAGED_OBJECTIVE_STAGE_ID,
+              status: "TIMEOUT" as const,
+              solveTimeMs: 20,
+            },
+          ],
+        };
+      }),
+    };
+
+    const result = await schedule({
+      roleIds: ["stylist"],
+      times: {
+        service: time({ startTime: t(10), endTime: t(20), dayOfWeek: ["thursday"] }),
+      },
+      coverage: [],
+      shiftPatterns: [
+        shift("open", t(10), t(19), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+      ],
+      rules: [
+        targetPeakConcurrentAssignments(1, {
+          appliesTo: "stylist",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+      ],
+    })
+      .with([{ id: "alice", roleIds: ["stylist"] }])
+      .solve(client, {
+        dateRange: { start: "2025-02-06", end: "2025-02-06" },
+      });
+
+    expect(result.status).toBe("no_solution");
+    expect(result.assignments).toHaveLength(0);
+    expect(result.validation.errors.some((error) => error.type === "solver")).toBe(true);
+    expect(client.solve).toHaveBeenCalledOnce();
+  });
+
+  it("solve() does not run hard diagnostics implicitly for infeasible schedules", async () => {
+    const client = {
+      solve: vi.fn().mockResolvedValueOnce({
+        status: "INFEASIBLE" as const,
+        solutionInfo: "Schedule is infeasible",
+      }),
+    };
+
+    const result = await schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "waiter", 1)],
+      shiftPatterns: [shift("lunch", t(12), t(15), { roleIds: ["waiter"] })],
+    })
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .solve(client, {
+        dateRange: { start: "2025-02-03", end: "2025-02-03" },
+      });
+
+    expect(result.status).toBe("infeasible");
+    expect(client.solve).toHaveBeenCalledOnce();
+    const request = client.solve.mock.calls[0]?.[0] as SolverRequest | undefined;
+    expect(request?.options?.diagnostics).toBeUndefined();
+  });
+
+  it("compile() emits a satisfy request for feasibility-only solves", () => {
+    const compiled = schedule({
+      roleIds: ["stylist"],
+      times: {
+        service: time({ startTime: t(10), endTime: t(20), dayOfWeek: ["thursday"] }),
+      },
+      coverage: [],
+      shiftPatterns: [
+        shift("open", t(10), t(19), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+      ],
+      rules: [
+        targetPeakConcurrentAssignments(1, {
+          appliesTo: "stylist",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+      ],
+    })
+      .with([{ id: "alice", roleIds: ["stylist"] }])
+      .compile({
+        dateRange: { start: "2025-02-06", end: "2025-02-06" },
+        strategy: { type: "feasibility-only" },
+        timeLimitSeconds: 0.25,
+      });
+
+    expect(compiled.request.mode).toBe("satisfy");
+    expect(compiled.request.objective).toBeUndefined();
+    expect(compiled.request.objectiveStages).toBeUndefined();
+    expect(compiled.request.options).toEqual({ timeLimitSeconds: 0.25, solutionLimit: 1 });
+    expect(
+      compiled.request.constraints.some(
+        (constraint) =>
+          constraint.type === "soft_linear" &&
+          constraint.stage === TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID,
+      ),
+    ).toBe(false);
+  });
+
+  it("solve() uses satisfy mode and maps feasibility-only success to feasible", async () => {
+    const client = {
+      solve: vi.fn(async (request: SolverRequest) => {
+        expect(request.mode).toBe("satisfy");
+        expect(request.objective).toBeUndefined();
+        expect(request.objectiveStages).toBeUndefined();
+        expect(request.options).toEqual({ solutionLimit: 1 });
+
+        return {
+          status: "OPTIMAL" as const,
+          values: {
+            "assign:alice:open:2025-02-06": 1,
+          },
+          softConstraintViolations: [],
+        };
+      }),
+    };
+
+    const result = await schedule({
+      roleIds: ["stylist"],
+      times: {
+        service: time({ startTime: t(10), endTime: t(20), dayOfWeek: ["thursday"] }),
+      },
+      coverage: [],
+      shiftPatterns: [
+        shift("open", t(10), t(19), { roleIds: ["stylist"], dayOfWeek: ["thursday"] }),
+      ],
+      rules: [
+        targetPeakConcurrentAssignments(1, {
+          appliesTo: "stylist",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+      ],
+    })
+      .with([{ id: "alice", roleIds: ["stylist"] }])
+      .solve(client, {
+        dateRange: { start: "2025-02-06", end: "2025-02-06" },
+        strategy: { type: "feasibility-only" },
+      });
+
+    expect(result.status).toBe("feasible");
+    expect(result.assignments).toEqual([
+      { memberId: "alice", shiftPatternId: "open", day: "2025-02-06" },
+    ]);
+    expect(result.validation.passed).toHaveLength(0);
+    expect(client.solve).toHaveBeenCalledOnce();
+  });
+
+  it("compile() does not require pay data for feasibility-only cost rules", () => {
+    const ready = schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "waiter", 1)],
+      shiftPatterns: [shift("lunch", t(12), t(15))],
+      rules: [minimizeCost()],
+    }).with([{ id: "alice", roleIds: ["waiter"] }]);
+
+    expect(() =>
+      ready.compile({
+        dateRange: { start: "2025-02-03", end: "2025-02-03" },
+      }),
+    ).toThrow(/Cost rules require pay data/);
+
+    const compiled = ready.compile({
+      dateRange: { start: "2025-02-03", end: "2025-02-03" },
+      strategy: { type: "feasibility-only" },
+    });
+
+    expect(compiled.request.mode).toBe("satisfy");
+    expect(compiled.request.objective).toBeUndefined();
+    expect(compiled.request.objectiveStages).toBeUndefined();
+    expect(compiled.request.options).toEqual({ solutionLimit: 1 });
+  });
+
+  it("compile() keeps mandatory coverage and hard rules in feasibility-only solves", () => {
+    const compiled = schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "waiter", 1)],
+      shiftPatterns: [shift("lunch", t(12), t(15))],
+      rules: [maxShiftsPerDay(1)],
+    })
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .compile({
+        dateRange: { start: "2025-02-03", end: "2025-02-03" },
+        strategy: { type: "feasibility-only" },
+      });
+
+    expect(compiled.request.mode).toBe("satisfy");
+    expect(
+      compiled.request.constraints.some(
+        (constraint) =>
+          constraint.type === "linear" && constraint.op === ">=" && constraint.rhs === 1,
+      ),
+    ).toBe(true);
+    expect(
+      compiled.request.constraints.some((constraint) => constraint.type === "soft_linear"),
+    ).toBe(false);
+  });
+
+  it("solve() does not report soft coverage as passed in feasibility-only solves", async () => {
+    const client = {
+      solve: vi.fn(async (request: SolverRequest) => {
+        expect(request.mode).toBe("satisfy");
+        return {
+          status: "OPTIMAL" as const,
+          values: {
+            "assign:alice:lunch:2025-02-03": 1,
+          },
+          softConstraintViolations: [],
+        };
+      }),
+    };
+
+    const result = await schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "waiter", 1, { priority: "HIGH" })],
+      shiftPatterns: [shift("lunch", t(12), t(15))],
+    })
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .solve(client, {
+        dateRange: { start: "2025-02-03", end: "2025-02-03" },
+        strategy: { type: "feasibility-only" },
+      });
+
+    expect(result.status).toBe("feasible");
+    expect(result.validation.passed).toHaveLength(0);
+  });
+
+  it("compile() ignores objective-only rule prechecks in feasibility-only solves", () => {
+    const ready = schedule({
+      roleIds: ["waiter", "pass"],
+      times: { service: time({ startTime: t(12), endTime: t(22) }) },
+      coverage: [cover("service", "waiter", 1)],
+      shiftPatterns: [shift("waiter", t(12), t(22), { roleIds: ["waiter"] })],
+      rules: [preferRole("pass", { appliesTo: "joanna" })],
+    }).with([{ id: "joanna", roleIds: ["waiter"] }]);
+
+    const optimized = ready.compile({
+      dateRange: { start: "2025-02-03", end: "2025-02-03" },
+    });
+    expect(optimized.canSolve).toBe(false);
+    expect(
+      optimized.validation.errors.some(
+        (error) => error.type === "rule" && error.rule === "role-preference",
+      ),
+    ).toBe(true);
+
+    const feasibilityOnly = ready.compile({
+      dateRange: { start: "2025-02-03", end: "2025-02-03" },
+      strategy: { type: "feasibility-only" },
+    });
+
+    expect(feasibilityOnly.canSolve).toBe(true);
+    expect(feasibilityOnly.request.mode).toBe("satisfy");
+    expect(
+      feasibilityOnly.validation.errors.some(
+        (error) => error.type === "rule" && error.rule === "role-preference",
+      ),
+    ).toBe(false);
+  });
+
+  it("compile() keeps the single-objective shape when peak-target rules emit no artifacts", () => {
+    const compiled = schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [],
+      shiftPatterns: [shift("lunch", t(12), t(15), { roleIds: ["waiter"] })],
+      rules: [
+        targetPeakConcurrentAssignments(5, {
+          appliesTo: "waiter",
+          dayOfWeek: ["thursday"],
+          priority: "HIGH",
+        }),
+      ],
+    })
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .compile({ dateRange: { start: "2025-02-03", end: "2025-02-03" } });
+
+    const peakConstraints = compiled.request.constraints.filter(
+      (constraint) =>
+        constraint.type === "soft_linear" &&
+        constraint.id?.startsWith("rule:target-peak-concurrent-assignments:") === true,
+    );
+
+    expect(compiled.request.objective).toBeDefined();
+    expect(compiled.request.objectiveStages).toBeUndefined();
+    expect(peakConstraints).toHaveLength(0);
+  });
+
+  it("compile() preserves the single-objective request shape without staged rules", () => {
+    const compiled = schedule({
+      roleIds: ["waiter"],
+      times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+      coverage: [cover("lunch", "waiter", 2, { priority: "HIGH" })],
+      shiftPatterns: [shift("lunch", t(12), t(15))],
+    })
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .compile({ dateRange: { start: "2025-02-03", end: "2025-02-03" } });
+
+    const softConstraints = compiled.request.constraints.filter(
+      (
+        constraint,
+      ): constraint is Extract<
+        (typeof compiled.request.constraints)[number],
+        { type: "soft_linear" }
+      > => constraint.type === "soft_linear",
+    );
+
+    expect(compiled.request.objective).toBeDefined();
+    expect(compiled.request.objectiveStages).toBeUndefined();
+    expect(softConstraints).not.toHaveLength(0);
+    expect(softConstraints.every((constraint) => constraint.stage === undefined)).toBe(true);
+  });
+
+  it("custom rule registries merge across schedules", () => {
     const base = partialSchedule({
       roleIds: ["waiter"],
-      ruleFactories: { debug: noopFactory },
+      ruleRegistry: { debug: noopFactory },
     });
     const extra = partialSchedule({
       rules: [debugRule(false)],
-      ruleFactories: { debug: noopFactory },
+      ruleRegistry: { debug: noopFactory },
     });
-    // Same factory reference — merges fine
+    // Same descriptor reference, merges fine
     const merged = base.with(extra);
     expect(merged.ruleNames).toContain("debug");
   });
 
-  it("throws on conflicting factory registrations", () => {
+  it("throws on conflicting rule registry registrations", () => {
     const a = partialSchedule({
       roleIds: ["waiter"],
-      ruleFactories: { debug: noopFactory },
+      ruleRegistry: { debug: noopFactory },
     });
     const b = partialSchedule({
-      ruleFactories: { debug: () => ({ compile() {} }) },
+      ruleRegistry: {
+        debug: {
+          name: "debug",
+          schema: z.object({}).passthrough(),
+          compile() {
+            return { rule: "debug", artifacts: [] };
+          },
+        },
+      },
     });
-    expect(() => a.with(b)).toThrow('Rule factory "debug" already registered');
+    expect(() => a.with(b)).toThrow('Rule registry entry "debug" already registered');
   });
 
-  it("throws if custom factory name collides with built-in", () => {
+  it("throws if custom registry entry name collides with built-in", () => {
     expect(() =>
       partialSchedule({
         roleIds: ["waiter"],
-        ruleFactories: { "max-hours-day": noopFactory },
+        ruleRegistry: {
+          "max-hours-day": {
+            name: "max-hours-day",
+            schema: z.object({}).passthrough(),
+            compile() {
+              return { rule: "max-hours-day", artifacts: [] };
+            },
+          },
+        },
       }),
-    ).toThrow("conflicts with a built-in rule");
+    ).toThrow('Cannot override built-in CP-SAT rule "max-hours-day" in custom registry');
+  });
+
+  it("accepts a combined registry that reuses built-in descriptors", () => {
+    expect(() =>
+      partialSchedule({
+        roleIds: ["waiter"],
+        ruleRegistry: {
+          ...builtInCpsatRuleRegistry,
+          debug: noopFactory,
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("throws if custom registry key does not match descriptor name", () => {
+    expect(() =>
+      partialSchedule({
+        roleIds: ["waiter"],
+        ruleRegistry: {
+          debug: {
+            name: "not-debug",
+            schema: z.object({}).passthrough(),
+            compile() {
+              return { rule: "not-debug", artifacts: [] };
+            },
+          },
+        },
+      }),
+    ).toThrow(
+      'Registered CP-SAT rule descriptor key "debug" must match descriptor.name "not-debug".',
+    );
+  });
+
+  it("throws if a built-in descriptor is aliased under a custom key", () => {
+    expect(() =>
+      partialSchedule({
+        roleIds: ["waiter"],
+        ruleRegistry: {
+          debug: builtInCpsatRuleRegistry["minimize-cost"],
+        },
+      }),
+    ).toThrow(
+      'Registered CP-SAT rule descriptor key "debug" must match descriptor.name "minimize-cost".',
+    );
+  });
+
+  it("scheduleWithRuleRegistry supports custom-only registries", () => {
+    const compiled = scheduleWithRuleRegistry(
+      { debug: noopFactory },
+      {
+        roleIds: ["waiter"],
+        times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+        coverage: [cover("lunch", "waiter", 1)],
+        shiftPatterns: [shift("s", t(12), t(15))],
+        rules: [defineDebugRule("debug", { flag: true })],
+      },
+    )
+      .with([{ id: "alice", roleIds: ["waiter"] }])
+      .compile({ dateRange: { start: "2025-02-03", end: "2025-02-07" } });
+
+    expect(compiled.canSolve).toBe(true);
   });
 });
 
@@ -505,21 +1209,21 @@ describe("defineRule()", () => {
 // schedule() - validation
 // ============================================================================
 
-describe("schedule() validation", () => {
-  const minConfig = () => ({
-    roleIds: ["waiter"] as const,
-    times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
-    coverage: [cover("lunch", "waiter", 1)],
-    shiftPatterns: [shift("lunch_shift", t(12), t(15))],
-  });
+const minScheduleConfig = () => ({
+  roleIds: ["waiter"] as const,
+  times: { lunch: time({ startTime: t(12), endTime: t(15) }) },
+  coverage: [cover("lunch", "waiter", 1)],
+  shiftPatterns: [shift("lunch_shift", t(12), t(15))],
+});
 
+describe("schedule() validation", () => {
   it("creates a Schedule", () => {
-    const s = schedule(minConfig());
+    const s = schedule(minScheduleConfig());
     expect(s).toBeInstanceOf(Schedule);
   });
 
   it("exposes inspection getters", () => {
-    const s = schedule(minConfig());
+    const s = schedule(minScheduleConfig());
     expect(s.roleIds).toEqual(["waiter"]);
     expect(s.skillIds).toEqual([]);
     expect(s.timeNames).toEqual(["lunch"]);
@@ -529,7 +1233,7 @@ describe("schedule() validation", () => {
   it("throws if role and skill overlap", () => {
     expect(() =>
       schedule({
-        ...minConfig(),
+        ...minScheduleConfig(),
         roleIds: ["waiter"] as const,
         skillIds: ["waiter"] as const,
       }),
@@ -539,7 +1243,7 @@ describe("schedule() validation", () => {
   it("throws if shift pattern references unknown role", () => {
     expect(() =>
       schedule({
-        ...minConfig(),
+        ...minScheduleConfig(),
         shiftPatterns: [shift("s", t(9), t(17), { roleIds: ["chef"] })],
       }),
     ).toThrow('unknown role "chef"');
@@ -619,7 +1323,7 @@ describe("schedule().compile()", () => {
       maxHoursPerWeek(48),
       maxHoursPerWeek(20, { appliesTo: "senior" }),
       minRestBetweenShifts(10),
-      preference("high", { appliesTo: "waiter" }),
+      preferAssignment({ appliesTo: "waiter" }),
       timeOff({ appliesTo: "mauro", dayOfWeek: weekend }),
       assignTogether(["alice", "bob"], { priority: "HIGH" }),
     ],
@@ -634,7 +1338,10 @@ describe("schedule().compile()", () => {
     { id: "mauro", roleIds: ["manager"], skillIds: ["keyholder"] },
   ];
 
-  const dateRange = { start: "2025-02-03", end: "2025-02-09" };
+  const dateRange = {
+    start: "2025-02-03",
+    end: "2025-02-09",
+  } satisfies { start: DateString; end: DateString };
 
   it("produces a CompilationResult", () => {
     const ready = venue.with(memberList);
@@ -688,6 +1395,37 @@ describe("schedule().compile()", () => {
 
     // Only weekdays should be in the days (5 days, not 7)
     expect(compiled.builder.days).toHaveLength(5);
+  });
+
+  it("preferRole reports error when member lacks the preferred role", () => {
+    const s = schedule({
+      roleIds: ["waiter", "pass"] as const,
+      times: { service: time({ startTime: t(12), endTime: t(22) }) },
+      coverage: [cover("service", "waiter", 1), cover("service", "pass", 1)],
+      shiftPatterns: [
+        shift("waiter_shift", t(12), t(22), { roleIds: ["waiter"] }),
+        shift("pass_shift", t(12), t(22), { roleIds: ["pass"] }),
+      ],
+      rules: [
+        // Bug: joanna only has "waiter", not "pass", so preferRole("pass") is wrong
+        preferRole("pass", { appliesTo: "joanna" }),
+      ],
+    });
+
+    const compiled = s
+      .with([
+        { id: "joanna", roleIds: ["waiter"] },
+        { id: "leon", roleIds: ["pass"] },
+      ])
+      .compile({ dateRange: { start: "2025-02-03", end: "2025-02-03" } });
+
+    expect(compiled.validation.errors.length).toBeGreaterThan(0);
+    const roleError = compiled.validation.errors.find(
+      (e) => e.type === "rule" && e.rule === "role-preference",
+    );
+    expect(roleError).toBeDefined();
+    expect(roleError!.message).toContain("joanna");
+    expect(roleError!.message).toContain("pass");
   });
 });
 

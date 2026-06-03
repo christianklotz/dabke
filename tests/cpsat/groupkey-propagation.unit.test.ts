@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import type { DateString } from "../../src/types.js";
+import { schedulingDay } from "../../src/types.js";
 import { defineSemanticTimes } from "../../src/cpsat/semantic-time.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import {
@@ -9,6 +11,7 @@ import type { TimeOfDay } from "../../src/types.js";
 import type { SolverResponse } from "../../src/client.types.js";
 
 const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
+const toSchedulingDay = (iso: string) => schedulingDay(iso as DateString);
 
 describe("group propagation", () => {
   it("should propagate group from coverage through to validation passed items", () => {
@@ -26,7 +29,7 @@ describe("group propagation", () => {
     ]);
 
     // 2026-02-02 is Monday, 2026-02-03 is Tuesday
-    const days = ["2026-02-02", "2026-02-03"];
+    const days = ["2026-02-02", "2026-02-03"].map(toSchedulingDay);
     const resolved = times.resolve(coverage, days);
 
     // Check that resolved coverage has group with correct title
@@ -54,7 +57,7 @@ describe("group propagation", () => {
     const response: SolverResponse = {
       status: "OPTIMAL",
       values: {},
-      softViolations: [],
+      softConstraintViolations: [],
     };
 
     reporter.analyzeSolution(response);
@@ -88,7 +91,7 @@ describe("group propagation", () => {
       { semanticTime: "afternoon", roleIds: ["staff"], targetCount: 2 },
     ]);
 
-    const days = ["2026-02-02"];
+    const days = ["2026-02-02"].map(toSchedulingDay);
     const resolved = times.resolve(coverage, days);
 
     const reporter = new ValidationReporterImpl();
@@ -109,7 +112,7 @@ describe("group propagation", () => {
     const response: SolverResponse = {
       status: "OPTIMAL",
       values: {},
-      softViolations: [],
+      softConstraintViolations: [],
     };
 
     reporter.analyzeSolution(response);
@@ -140,7 +143,7 @@ describe("group propagation", () => {
       { semanticTime: "working_hours", roleIds: ["staff"], targetCount: 2 },
     ]);
 
-    const days = ["2026-02-02", "2026-02-03", "2026-02-04"];
+    const days = ["2026-02-02", "2026-02-03", "2026-02-04"].map(toSchedulingDay);
     const resolved = times.resolve(coverage, days);
 
     const reporter = new ValidationReporterImpl();
@@ -161,7 +164,7 @@ describe("group propagation", () => {
     const response: SolverResponse = {
       status: "OPTIMAL",
       values: {},
-      softViolations: [],
+      softConstraintViolations: [],
     };
 
     reporter.analyzeSolution(response);

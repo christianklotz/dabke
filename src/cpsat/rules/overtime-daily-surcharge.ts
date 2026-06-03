@@ -1,25 +1,24 @@
 import * as z from "zod";
-import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingMember, Term } from "../types.js";
-import type { ShiftAssignment } from "../response.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { CostArtifact } from "../rule-descriptor.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
-  timeOfDayToMinutes,
-  normalizeEndMinutes,
-  unionMinutes,
   OBJECTIVE_WEIGHTS,
+  normalizeEndMinutes,
+  timeOfDayToMinutes,
+  unionMinutes,
 } from "../utils.js";
 import {
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
+  timeScope,
 } from "./scope.types.js";
-import { patternDurationMinutes } from "./cost-utils.js";
+import { patternDurationMinutes } from "./pattern-time.js";
 
-const OvertimeDailySurchargeSchema = z
+export const OvertimeDailySurchargeSchema = z
   .object({
     after: z.number().min(0),
     amount: z.number().min(0),
@@ -27,130 +26,146 @@ const OvertimeDailySurchargeSchema = z
   .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
-/** Configuration for {@link createOvertimeDailySurchargeRule}. */
+/** Configuration for {@link overtimeDailySurchargeRuleDescriptor}. */
 export type OvertimeDailySurchargeConfig = z.infer<typeof OvertimeDailySurchargeSchema>;
 
-/**
- * Creates a daily overtime flat surcharge rule.
- *
- * Hours beyond the threshold per day get a flat surcharge per hour,
- * independent of the member's base rate.
- */
-export function createOvertimeDailySurchargeRule(
-  config: OvertimeDailySurchargeConfig,
-): CompilationRule {
-  const parsed = OvertimeDailySurchargeSchema.parse(config);
-  const { after, amount } = parsed;
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-  const thresholdMinutes = after * 60;
+export const overtimeDailySurchargeRuleDescriptor = defineRuleDescriptor({
+  name: "overtime-daily-surcharge",
+  schema: OvertimeDailySurchargeSchema,
+  compile(config) {
+    const { after, amount } = config;
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+    const thresholdMinutes = after * 60;
 
-  return {
-    compile(b) {
-      if (amount <= 0) return;
+    const costArtifact: CostArtifact = {
+      kind: "cost",
+      validation: {
+        strategy: "skip",
+        category: "no-meaningful-feedback",
+        rationale:
+          "Overtime cost artifacts influence optimization and post-solve accounting, not validation feedback.",
+      },
+      compileObjective(builder) {
+        if (amount <= 0) return;
 
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+        const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
+        const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
+        if (targetMembers.length === 0 || activeDays.length === 0) return;
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const hasCostContext = builder.costContext?.active === true;
+        const surchargePerMinute = amount / 60;
+        for (const member of targetMembers) {
+          for (const day of activeDays) {
+            const dayRanges: Array<{ start: number; end: number }> = [];
+            const terms = [] as Array<{ var: string; coeff: number }>;
+            for (const pattern of builder.shiftPatterns) {
+              if (
+                !builder.canAssign(member, pattern) ||
+                !builder.patternAvailableOnDay(pattern, day)
+              ) {
+                continue;
+              }
+              const start = timeOfDayToMinutes(pattern.startTime);
+              dayRanges.push({
+                start,
+                end: normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime)),
+              });
+              terms.push({
+                var: builder.assignment(member.id, pattern.id, day),
+                coeff: patternDurationMinutes(pattern),
+              });
+            }
 
-      const hasCostContext = b.costContext?.active === true;
-      const surchargePerMinute = amount / 60;
+            if (terms.length === 0) continue;
+            const maxOvertime = Math.max(0, unionMinutes(dayRanges) - thresholdMinutes);
+            if (maxOvertime === 0) continue;
 
-      for (const emp of targetMembers) {
-        for (const day of activeDays) {
-          const dayRanges: Array<{ start: number; end: number }> = [];
-          const terms: Term[] = [];
-          for (const pattern of b.shiftPatterns) {
-            if (!b.canAssign(emp, pattern)) continue;
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            const start = timeOfDayToMinutes(pattern.startTime);
-            dayRanges.push({
-              start,
-              end: normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime)),
-            });
-            terms.push({
-              var: b.assignment(emp.id, pattern.id, day),
-              coeff: patternDurationMinutes(pattern),
-            });
-          }
-
-          if (terms.length === 0) continue;
-
-          const maxOvertime = Math.max(0, unionMinutes(dayRanges) - thresholdMinutes);
-          if (maxOvertime === 0) continue;
-
-          const overtimeVar = b.intVar(`overtime:daily-surcharge:${emp.id}:${day}`, 0, maxOvertime);
-
-          b.addLinear(
-            [
-              { var: overtimeVar, coeff: 1 },
-              ...terms.map((t) => ({ var: t.var, coeff: -t.coeff })),
-            ],
-            ">=",
-            -thresholdMinutes,
-          );
-
-          if (hasCostContext) {
-            const totalOvertimeCost = surchargePerMinute * maxOvertime;
-            const normalizedMax = totalOvertimeCost / b.costContext!.normalizationFactor;
-            b.addPenalty(overtimeVar, Math.max(1, Math.round(normalizedMax / maxOvertime)));
-          } else {
-            b.addPenalty(
-              overtimeVar,
-              Math.max(1, Math.round(OBJECTIVE_WEIGHTS.COST / maxOvertime)),
+            const overtimeVar = builder.intVar(
+              `overtime:daily-surcharge:${member.id}:${day.iso}`,
+              0,
+              maxOvertime,
             );
+            builder.addLinear(
+              [
+                { var: overtimeVar, coeff: 1 },
+                ...terms.map((term) => ({ var: term.var, coeff: -term.coeff })),
+              ],
+              ">=",
+              -thresholdMinutes,
+            );
+
+            if (hasCostContext) {
+              const totalOvertimeCost = surchargePerMinute * maxOvertime;
+              const normalizedMax = totalOvertimeCost / builder.costContext!.normalizationFactor;
+              builder.addPenalty(overtimeVar, Math.max(1, Math.round(normalizedMax / maxOvertime)));
+            } else {
+              builder.addPenalty(
+                overtimeVar,
+                Math.max(1, Math.round(OBJECTIVE_WEIGHTS.COST / maxOvertime)),
+              );
+            }
           }
         }
-      }
-    },
+      },
+      calculateCost(assignments, costContext) {
+        if (amount <= 0) return { entries: [] };
 
-    cost(
-      assignments: ShiftAssignment[],
-      members: ReadonlyArray<SchedulingMember>,
-      shiftPatterns: ReadonlyArray<ShiftPattern>,
-    ): CostContribution {
-      if (amount <= 0) return { entries: [] };
+        const patternMap = new Map(
+          costContext.shiftPatterns.map((pattern) => [pattern.id, pattern]),
+        );
+        const activeDays = new Set(
+          resolveActiveDaysFromScope(timeScopeValue, [...costContext.days]).map((day) => day.iso),
+        );
+        const targetMemberIds = new Set(
+          resolveMembersFromScope(entityScopeValue, [...costContext.members]).map(
+            (member) => member.id,
+          ),
+        );
+        const memberDayMinutes = new Map<string, Map<string, number>>();
 
-      const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
-      const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
-      const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
-      const targetEmpIds = new Set(
-        resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
-      );
-
-      const memberDayMinutes = new Map<string, Map<string, number>>();
-
-      for (const a of assignments) {
-        if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.memberId)) continue;
-        const pattern = patternMap.get(a.shiftPatternId);
-        if (!pattern) continue;
-        let dayMap = memberDayMinutes.get(a.memberId);
-        if (!dayMap) {
-          dayMap = new Map();
-          memberDayMinutes.set(a.memberId, dayMap);
+        for (const assignment of assignments) {
+          if (!activeDays.has(assignment.day) || !targetMemberIds.has(assignment.memberId))
+            continue;
+          const pattern = patternMap.get(assignment.shiftPatternId);
+          if (!pattern) continue;
+          let dayMap = memberDayMinutes.get(assignment.memberId);
+          if (!dayMap) {
+            dayMap = new Map();
+            memberDayMinutes.set(assignment.memberId, dayMap);
+          }
+          dayMap.set(
+            assignment.day,
+            (dayMap.get(assignment.day) ?? 0) + patternDurationMinutes(pattern),
+          );
         }
-        dayMap.set(a.day, (dayMap.get(a.day) ?? 0) + patternDurationMinutes(pattern));
-      }
 
-      const entries: CostContribution["entries"] = [];
-
-      for (const [empId, dayMap] of memberDayMinutes) {
-        for (const [day, minutes] of dayMap) {
-          const overtimeMinutes = Math.max(0, minutes - thresholdMinutes);
-          if (overtimeMinutes <= 0) continue;
-
-          entries.push({
-            memberId: empId,
-            day,
-            category: COST_CATEGORY.OVERTIME,
-            amount: (amount * overtimeMinutes) / 60,
-          });
+        const entries = [] as Array<{
+          memberId: string;
+          day: string;
+          category: string;
+          amount: number;
+        }>;
+        for (const [memberId, dayMap] of memberDayMinutes) {
+          for (const [day, minutes] of dayMap) {
+            const overtimeMinutes = Math.max(0, minutes - thresholdMinutes);
+            if (overtimeMinutes <= 0) continue;
+            entries.push({
+              memberId,
+              day,
+              category: COST_CATEGORY.OVERTIME,
+              amount: (amount * overtimeMinutes) / 60,
+            });
+          }
         }
-      }
 
-      return { entries };
-    },
-  };
-}
+        return { entries };
+      },
+    };
+
+    return {
+      rule: "overtime-daily-surcharge",
+      artifacts: [costArtifact],
+    };
+  },
+});

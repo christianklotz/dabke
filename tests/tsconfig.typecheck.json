@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "../src/**/*",
+    "./cpsat/scope.types.typecheck.ts",
+    "./cpsat/rule-registry.typecheck.ts",
+    "./schedule.rule-registry.typecheck.ts"
+  ],
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  }
+}

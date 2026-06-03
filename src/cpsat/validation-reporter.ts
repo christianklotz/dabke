@@ -1,4 +1,5 @@
 import type { SolverResponse } from "../client.types.js";
+import type { DateString } from "../types.js";
 import {
   type ScheduleError,
   type ScheduleViolation,
@@ -24,7 +25,7 @@ export interface ValidationReporter {
   reportRuleError(error: Omit<RuleError, "type" | "id">): void;
   reportSolverError(message: string): void;
 
-  // Violations (soft constraint issues)
+  // Violations (non-fatal feedback)
   reportCoverageViolation(violation: Omit<CoverageViolation, "type" | "id">): void;
   reportRuleViolation(violation: Omit<RuleViolation, "type" | "id">): void;
 
@@ -41,8 +42,16 @@ export interface ValidationReporter {
   getExclusions(): CoverageExclusion[];
 
   // Post-solve analysis
-  analyzeSolution(response: SolverResponse): void;
+  analyzeSolution(response: SolverResponse, options?: AnalyzeSolutionOptions): void;
 }
+
+export interface AnalyzeSolutionOptions {
+  /** Whether solver-reported soft constraint diagnostics should update validation. */
+  analyzeSoftConstraints?: boolean;
+}
+
+const MISSING_SOFT_CONSTRAINT_VIOLATIONS_ERROR =
+  "Solver response missing softConstraintViolations for tracked soft constraints.";
 
 /**
  * Generates a deterministic ID for a coverage-based validation item.
@@ -91,19 +100,28 @@ export class ValidationReporterImpl implements ValidationReporter {
   #passed: SchedulePassed[] = [];
   #trackedConstraints = new Map<string, TrackedConstraint>();
   #exclusions: CoverageExclusion[] = [];
+  #validationIdCounts = new Map<string, number>();
   #solverErrorCount = 0;
+
+  #nextValidationId(baseId: string): string {
+    const count = (this.#validationIdCounts.get(baseId) ?? 0) + 1;
+    this.#validationIdCounts.set(baseId, count);
+    return count === 1 ? baseId : `${baseId}:${count}`;
+  }
 
   excludeFromCoverage(exclusion: CoverageExclusion): void {
     this.#exclusions.push(exclusion);
   }
 
   reportCoverageError(error: Omit<CoverageError, "type" | "id">): void {
-    const id = coverageId("error", error.day, error.timeSlots, error.roleIds, error.skillIds);
+    const id = this.#nextValidationId(
+      coverageId("error", error.day, error.timeSlots, error.roleIds, error.skillIds),
+    );
     this.#errors.push({ id, type: "coverage", ...error });
   }
 
   reportRuleError(error: Omit<RuleError, "type" | "id">): void {
-    const id = ruleId("error", error.rule, error.context);
+    const id = this.#nextValidationId(ruleId("error", error.rule, error.context));
     this.#errors.push({ id, type: "rule", ...error });
   }
 
@@ -114,28 +132,32 @@ export class ValidationReporterImpl implements ValidationReporter {
   }
 
   reportCoverageViolation(violation: Omit<CoverageViolation, "type" | "id">): void {
-    const id = coverageId(
-      "violation",
-      violation.day,
-      violation.timeSlots,
-      violation.roleIds,
-      violation.skillIds,
+    const id = this.#nextValidationId(
+      coverageId(
+        "violation",
+        violation.day,
+        violation.timeSlots,
+        violation.roleIds,
+        violation.skillIds,
+      ),
     );
     this.#violations.push({ id, type: "coverage", ...violation });
   }
 
   reportRuleViolation(violation: Omit<RuleViolation, "type" | "id">): void {
-    const id = ruleId("violation", violation.rule, violation.context);
+    const id = this.#nextValidationId(ruleId("violation", violation.rule, violation.context));
     this.#violations.push({ id, type: "rule", ...violation });
   }
 
   reportCoveragePassed(passed: Omit<CoveragePassed, "type" | "id">): void {
-    const id = coverageId("passed", passed.day, passed.timeSlots, passed.roleIds, passed.skillIds);
+    const id = this.#nextValidationId(
+      coverageId("passed", passed.day, passed.timeSlots, passed.roleIds, passed.skillIds),
+    );
     this.#passed.push({ id, type: "coverage", ...passed });
   }
 
   reportRulePassed(passed: Omit<RulePassed, "type" | "id">): void {
-    const id = ruleId("passed", passed.rule, passed.context);
+    const id = this.#nextValidationId(ruleId("passed", passed.rule, passed.context));
     this.#passed.push({ id, type: "rule", ...passed });
   }
 
@@ -163,10 +185,16 @@ export class ValidationReporterImpl implements ValidationReporter {
     return [...this.#trackedConstraints.values()];
   }
 
-  analyzeSolution(response: SolverResponse): void {
+  analyzeSolution(response: SolverResponse, options?: AnalyzeSolutionOptions): void {
     if (response.status !== "OPTIMAL" && response.status !== "FEASIBLE") {
       if (response.status === "INFEASIBLE") {
+        this.#reportHardConstraintConflicts(
+          (response.hardConstraintConflicts ?? []).map((conflict) => conflict.constraintId),
+        );
         this.reportSolverError(response.solutionInfo ?? "Schedule is infeasible");
+        if (response.error) {
+          this.reportSolverError(response.error);
+        }
       } else if (response.status === "TIMEOUT") {
         this.reportSolverError("Solver timed out");
       } else if (response.error) {
@@ -175,16 +203,33 @@ export class ValidationReporterImpl implements ValidationReporter {
       return;
     }
 
-    const solverViolations = response.softViolations ?? [];
+    const analyzeSoftConstraints = options?.analyzeSoftConstraints ?? true;
+
+    const hasTrackedSoftConstraints = [...this.#trackedConstraints.values()].some(
+      (constraint) => constraint.source === "soft",
+    );
+
+    if (
+      analyzeSoftConstraints &&
+      hasTrackedSoftConstraints &&
+      response.softConstraintViolations === undefined
+    ) {
+      throw new Error(MISSING_SOFT_CONSTRAINT_VIOLATIONS_ERROR);
+    }
+
+    const solverViolations = analyzeSoftConstraints
+      ? (response.softConstraintViolations ?? [])
+      : [];
 
     for (const violation of solverViolations) {
       const tracked = this.#trackedConstraints.get(violation.constraintId);
 
       if (tracked?.type === "coverage") {
+        if (!tracked.day) continue;
         const roles = tracked.roleIds?.join(", ") ?? "staff";
         const slot = tracked.timeSlot ?? "all day";
         this.reportCoverageViolation({
-          day: tracked.day ?? "",
+          day: tracked.day,
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
           roleIds: tracked.roleIds,
           skillIds: tracked.skillIds,
@@ -216,11 +261,13 @@ export class ValidationReporterImpl implements ValidationReporter {
     // Mark tracked coverage constraints as passed if not violated
     const violatedIds = new Set(solverViolations.map((v) => v.constraintId));
     for (const tracked of this.#trackedConstraints.values()) {
+      if (!analyzeSoftConstraints && tracked.source === "soft") continue;
       if (violatedIds.has(tracked.id)) continue;
 
       if (tracked.type === "coverage") {
+        if (!tracked.day) continue;
         this.reportCoveragePassed({
-          day: tracked.day ?? "",
+          day: tracked.day,
           timeSlots: tracked.timeSlot ? [tracked.timeSlot] : [],
           roleIds: tracked.roleIds,
           skillIds: tracked.skillIds,
@@ -228,6 +275,110 @@ export class ValidationReporterImpl implements ValidationReporter {
           group: tracked.group,
         });
       }
+    }
+  }
+
+  #reportHardConstraintConflicts(constraintIds: readonly string[]): void {
+    if (constraintIds.length === 0) {
+      return;
+    }
+
+    type CoverageGroup = {
+      day: DateString;
+      timeSlots: Set<string>;
+      roleIds?: string[];
+      skillIds?: readonly string[];
+      group?: TrackedConstraint["group"];
+      descriptions: string[];
+    };
+    type RuleGroup = {
+      rule: string;
+      days: Set<DateString>;
+      memberIds: Set<string>;
+      group?: TrackedConstraint["group"];
+      descriptions: string[];
+    };
+
+    const coverageGroups = new Map<string, CoverageGroup>();
+    const ruleGroups = new Map<string, RuleGroup>();
+
+    for (const constraintId of constraintIds) {
+      const tracked = this.#trackedConstraints.get(constraintId);
+      if (!tracked) continue;
+
+      if (tracked.type === "coverage") {
+        if (!tracked.day) continue;
+        const key = [
+          tracked.group?.key ?? tracked.id,
+          tracked.day,
+          tracked.roleIds?.join(",") ?? "_",
+          tracked.skillIds?.join(",") ?? "_",
+        ].join(":");
+        const existing = coverageGroups.get(key);
+        if (existing) {
+          if (tracked.timeSlot) existing.timeSlots.add(tracked.timeSlot);
+          existing.descriptions.push(tracked.description);
+          continue;
+        }
+        coverageGroups.set(key, {
+          day: tracked.day,
+          timeSlots: new Set(tracked.timeSlot ? [tracked.timeSlot] : []),
+          roleIds: tracked.roleIds,
+          skillIds: tracked.skillIds,
+          group: tracked.group,
+          descriptions: [tracked.description],
+        });
+        continue;
+      }
+
+      const key = tracked.group?.key ?? tracked.id;
+      const existing = ruleGroups.get(key);
+      if (existing) {
+        for (const day of tracked.context.days ?? []) existing.days.add(day);
+        for (const memberId of tracked.context.memberIds ?? []) existing.memberIds.add(memberId);
+        existing.descriptions.push(tracked.description);
+        continue;
+      }
+      ruleGroups.set(key, {
+        rule: tracked.rule ?? "unknown",
+        days: new Set(tracked.context.days ?? []),
+        memberIds: new Set(tracked.context.memberIds ?? []),
+        group: tracked.group,
+        descriptions: [tracked.description],
+      });
+    }
+
+    for (const coverage of coverageGroups.values()) {
+      const label = coverage.group?.title ?? coverage.descriptions[0] ?? "Coverage requirement";
+      this.reportCoverageError({
+        day: coverage.day,
+        timeSlots: [...coverage.timeSlots].toSorted(),
+        roleIds: coverage.roleIds,
+        skillIds: coverage.skillIds,
+        message: `${label} is part of a sufficient infeasible constraint set.`,
+        suggestions: [
+          "Relax this mandatory coverage requirement",
+          "Relax conflicting mandatory rules or add eligible team members",
+        ],
+        group: coverage.group,
+      });
+    }
+
+    for (const rule of ruleGroups.values()) {
+      const label = rule.group?.title ?? rule.descriptions[0] ?? rule.rule;
+      this.reportRuleError({
+        rule: rule.rule,
+        message: `${label} is part of a sufficient infeasible constraint set.`,
+        context: {
+          days: [...rule.days].toSorted(),
+          memberIds: [...rule.memberIds].toSorted(),
+        },
+        suggestions: [
+          "Relax this mandatory rule",
+          "Relax conflicting mandatory coverage requirements or add eligible team members",
+        ],
+        group: rule.group,
+      });
     }
   }
 }
@@ -265,7 +416,7 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
     {
       type: "coverage" | "rule";
       title: string;
-      days: Set<string>;
+      days: Set<DateString>;
       passedCount: number;
       violatedCount: number;
       errorCount: number;
@@ -280,7 +431,7 @@ export function summarizeValidation(validation: ScheduleValidation): readonly Va
       groups.set(key, {
         type: item.type,
         title,
-        days: new Set(),
+        days: new Set<DateString>(),
         passedCount: 0,
         violatedCount: 0,
         errorCount: 0,

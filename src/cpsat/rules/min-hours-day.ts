@@ -1,6 +1,6 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
-import type { Term } from "../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { RuleArtifact } from "../rule-descriptor.js";
 import { priorityToPenalty } from "../utils.js";
 import {
   PrioritySchema,
@@ -9,8 +9,11 @@ import {
   resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentTermsForDay } from "./assignment-terms.js";
+import { maxAssignableMinutesForDay, patternDurationMinutes } from "./pattern-time.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
 
-const MinHoursDaySchema = z
+export const MinHoursDaySchema = z
   .object({
     hours: z.number().min(0),
     priority: PrioritySchema,
@@ -18,71 +21,89 @@ const MinHoursDaySchema = z
   .and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createMinHoursDayRule}.
- *
- * - `hours` (required): minimum hours required per day when scheduled
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link minHoursDayRuleDescriptor}.
  */
 export type MinHoursDayConfig = z.infer<typeof MinHoursDaySchema>;
 
 /**
- * Ensures a person works at least a minimum number of hours per day.
+ * Low-level descriptor for the `min-hours-day` rule.
  *
- * @param config - See {@link MinHoursDayConfig}
- * @example
- * ```ts
- * createMinHoursDayRule({ hours: 6, priority: "MANDATORY" });
- * ```
+ * @category Rules
  */
-export function createMinHoursDayRule(config: MinHoursDayConfig): CompilationRule {
-  const parsed = MinHoursDaySchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { hours, priority } = parsed;
-  const minMinutes = hours * 60;
-  const group = ruleGroup(`min-hours-day:${hours}`, `Min ${hours}h per day`, scope);
+export const minHoursDayRuleDescriptor = defineRuleDescriptor({
+  name: "min-hours-day",
+  schema: MinHoursDaySchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { hours, priority } = config;
+    const minMinutes = hours * 60;
+    const group = ruleGroup(`min-hours-day:${hours}`, `Min ${hours}h per day`, scope);
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
 
-  return {
-    compile(b) {
-      if (hours <= 0) return;
+    const artifacts: RuleArtifact[] = [];
+    for (const member of members) {
+      for (const day of ctx.days) {
+        const terms = assignmentTermsForDay(member, day, ctx.shiftPatterns, patternDurationMinutes);
+        if (terms.length === 0) continue;
 
-      const members = resolveMembersFromScope(scope, b.members);
+        const context = { memberIds: [member.id], days: [day.iso] };
+        const constraintId = `min-hours-day:${member.id}:${day.iso}`;
+        const description = `${member.id} min ${hours}h on ${day.iso}`;
 
-      for (const emp of members) {
-        for (const day of b.days) {
-          const terms: Term[] = [];
-          for (const pattern of b.shiftPatterns) {
-            if (!b.canAssign(emp, pattern)) continue;
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            terms.push({
-              var: b.assignment(emp.id, pattern.id, day),
-              coeff: b.patternDuration(pattern.id),
-            });
-          }
-
-          if (terms.length === 0) continue;
-
-          const constraintId = `min-hours-day:${emp.id}:${day}`;
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, ">=", minMinutes);
-          } else {
-            b.addSoftLinear(terms, ">=", minMinutes, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "min-hours-day",
-              description: `${emp.id} min ${hours}h on ${day}`,
-              targetValue: minMinutes,
-              comparator: ">=",
-              day,
-              context: { memberIds: [emp.id], days: [day] },
+        if (priority === "MANDATORY") {
+          artifacts.push(
+            hardConstraint({
               group,
-            });
-          }
+              description,
+              context,
+              validation: reportValidation(constraintId),
+              terms,
+              comparator: ">=",
+              targetValue: minMinutes,
+            }),
+            {
+              kind: "pre-solve-feedback",
+              run(preSolveContext, reporter) {
+                const maxMinutes = maxAssignableMinutesForDay(
+                  member,
+                  day,
+                  preSolveContext.shiftPatterns,
+                );
+                if (maxMinutes >= minMinutes) return;
+                reporter.reportRuleError({
+                  rule: "min-hours-day",
+                  message: `${member.id} cannot reach ${hours}h on ${day.iso}; maximum possible is ${Math.round((maxMinutes / 60) * 10) / 10}h.`,
+                  context,
+                  suggestions: [
+                    `Reduce the daily minimum for ${member.id}`,
+                    `Add a longer shift on ${day.iso}`,
+                  ],
+                  group,
+                });
+              },
+            },
+          );
+        } else {
+          artifacts.push(
+            softConstraint({
+              group,
+              description,
+              context,
+              validation: reportValidation(),
+              terms,
+              comparator: ">=",
+              targetValue: minMinutes,
+              penalty: priorityToPenalty(priority),
+              constraintId,
+            }),
+          );
         }
       }
-    },
-  };
-}
+    }
+
+    return {
+      rule: "min-hours-day",
+      artifacts,
+    };
+  },
+});

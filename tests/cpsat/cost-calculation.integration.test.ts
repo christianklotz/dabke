@@ -56,6 +56,8 @@ describe("CP-SAT: end-to-end cost calculation", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // 3 hours at 2000/hr = 6000 base
@@ -98,6 +100,8 @@ describe("CP-SAT: end-to-end cost calculation", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // 8 hours * 1500 = 12000
@@ -127,6 +131,8 @@ describe("CP-SAT: end-to-end cost calculation", () => {
       members: compiled.builder.members,
       shiftPatterns: compiled.builder.shiftPatterns,
       rules: compiled.builder.rules,
+      days: compiled.builder.days,
+      weekStartsOn: compiled.builder.weekStartsOn,
     });
 
     // Base: 3 * 2000 = 6000

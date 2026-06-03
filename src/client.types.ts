@@ -12,10 +12,15 @@ import type {
   SolverVariableSchema,
   SolverConstraintSchema,
   SolverObjectiveSchema,
+  SolverObjectiveStageSchema,
   SolverRequestSchema,
   SolverResponseSchema,
+  SolverStageResultSchema,
+  SolverDiagnosticModeSchema,
   SolverStatusSchema,
-  SoftConstraintViolationSchema,
+  SolverModeSchema,
+  SolverSoftConstraintViolationSchema,
+  SolverHardConstraintConflictSchema,
 } from "./client.schemas.js";
 
 // --------------------------------------------------------------------------
@@ -55,9 +60,35 @@ export type SolverConstraint = z.infer<typeof SolverConstraintSchema>;
  * An optimization objective for the solver.
  *
  * - `terms` (required): linear terms to minimize/maximize
- * - `minimize` (required): whether to minimize (true) or maximize (false)
+ * - `sense` (required): whether to minimize or maximize
  */
 export type SolverObjective = z.infer<typeof SolverObjectiveSchema>;
+
+/**
+ * A named objective optimized as one step in a lexicographic solve.
+ *
+ * - `id` (required): unique stage identifier
+ * - `sense` (required): whether to minimize or maximize
+ * - `terms` (required): linear terms to optimize
+ */
+export type SolverObjectiveStage = z.infer<typeof SolverObjectiveStageSchema>;
+
+/**
+ * Solver mode.
+ *
+ * `"optimize"` is the semantic default when omitted. `"satisfy"` asks the
+ * solver to find any hard-feasible solution without optimizing objectives or
+ * soft constraint penalties.
+ */
+export type SolverMode = z.infer<typeof SolverModeSchema>;
+
+/**
+ * Solver diagnostic mode.
+ *
+ * - `"none"`: solve normally without extra hard-conflict tracking
+ * - `"hard"`: track hard constraints with CP-SAT assumptions so infeasible responses include conflicts
+ */
+export type SolverDiagnosticMode = z.infer<typeof SolverDiagnosticModeSchema>;
 
 /**
  * The full request payload sent to the CP-SAT solver service.
@@ -65,21 +96,41 @@ export type SolverObjective = z.infer<typeof SolverObjectiveSchema>;
  * - `variables` (required): all decision variables
  * - `constraints` (required): all constraints
  * - `objective` (optional): optimization objective
- * - `timeoutSeconds` (optional): solver time limit
+ * - `objectiveStages` (optional): named objectives solved in lexicographic order
+ * - `mode` (optional): solving mode, defaulting semantically to `"optimize"`
+ * - `options` (optional): solver time limit, solution controls, and diagnostics mode
  */
 export type SolverRequest = z.infer<typeof SolverRequestSchema>;
 
 /**
- * The response payload returned by the CP-SAT solver service.
+ * The raw response payload returned by the CP-SAT solver service.
+ *
+ * @remarks
+ * This transport type is solver-stage only. It is later translated into the
+ * public `ScheduleValidation` feedback model with `errors`, `violations`, and
+ * `passed` items.
  *
  * - `status` (required): solve outcome (see {@link SolverStatus})
  * - `values` (optional): variable assignments when a solution is found
  * - `statistics` (optional): solve time, conflicts, branches
- * - `softViolations` (optional): which soft constraints were violated
+ * - `softConstraintViolations` (required on `OPTIMAL`/`FEASIBLE` responses): raw solver-stage records for violated soft constraints
+ * - `hardConstraintConflicts` (optional on `INFEASIBLE` responses): tracked hard constraints in a sufficient infeasible set
  * - `error` (optional): error message on failure
  * - `solutionInfo` (optional): solver diagnostic info
+ * - `stageResults` (optional): per-stage metadata for staged optimization
  */
 export type SolverResponse = z.infer<typeof SolverResponseSchema>;
+
+/**
+ * Metadata for one solved objective stage.
+ *
+ * - `id` (required): objective stage identifier
+ * - `status` (required): solve outcome for the stage
+ * - `objectiveValue` (optional): achieved objective value when available
+ * - `bestObjectiveBound` (optional): solver bound when available
+ * - `solveTimeMs` (required): wall-clock solve time for this stage
+ */
+export type SolverStageResult = z.infer<typeof SolverStageResultSchema>;
 
 /**
  * Solver outcome status.
@@ -91,12 +142,27 @@ export type SolverResponse = z.infer<typeof SolverResponseSchema>;
 export type SolverStatus = z.infer<typeof SolverStatusSchema>;
 
 /**
- * A soft constraint violation reported by the solver.
+ * A raw solver-stage record for a violated soft constraint.
+ *
+ * Successful solver responses always include a
+ * `softConstraintViolations` array, even when it is empty.
  *
  * - `constraintId` (required): which soft constraint was violated
  * - `violationAmount` (required): magnitude of the violation
  */
-export type SoftConstraintViolation = z.infer<typeof SoftConstraintViolationSchema>;
+export type SolverSoftConstraintViolation = z.infer<typeof SolverSoftConstraintViolationSchema>;
+
+/**
+ * A tracked hard constraint included in a sufficient infeasible constraint set.
+ *
+ * @remarks
+ * Hard constraints are not reported as violations because no solution exists to
+ * measure actual values against. The solver reports a sufficient conflict set
+ * from CP-SAT assumptions instead.
+ *
+ * - `constraintId` (required): which tracked hard constraint is part of the conflict set
+ */
+export type SolverHardConstraintConflict = z.infer<typeof SolverHardConstraintConflictSchema>;
 
 // --------------------------------------------------------------------------
 // Status constants (for convenience)

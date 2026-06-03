@@ -1,12 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { createTimeOffRule } from "../../src/cpsat/rules/time-off.js";
+import {
+  TimeOffSchema,
+  timeOffRuleDescriptor,
+  type TimeOffConfig,
+} from "../../src/cpsat/rules/time-off.js";
+import { ModelBuilder } from "../../src/cpsat/model-builder.js";
 import { ValidationReporterImpl } from "../../src/cpsat/validation-reporter.js";
-import type { RuleValidationContext } from "../../src/cpsat/model-builder.js";
+import type { RuleCompileContext } from "../../src/cpsat/rule-descriptor.js";
+import type { SolverResponse } from "../../src/client.types.js";
 import type { ResolvedShiftAssignment } from "../../src/cpsat/response.js";
+import type { DateString } from "../../src/types.js";
+import { schedulingDay } from "../../src/types.js";
+
+const toSchedulingDay = (iso: string) => schedulingDay(iso as DateString);
+
+function createTimeOffRule(config: TimeOffConfig) {
+  const parsed = TimeOffSchema.parse(config);
+
+  return {
+    validate(
+      assignments: ResolvedShiftAssignment[],
+      reporter: ValidationReporterImpl,
+      context: RuleCompileContext,
+    ) {
+      const compiled = timeOffRuleDescriptor.compile(parsed, context);
+      for (const artifact of compiled.artifacts) {
+        if (artifact.kind === "post-solve-feedback") {
+          artifact.run(assignments, reporter, context);
+        }
+      }
+    },
+  };
+}
 
 function createAssignment(
   memberId: string,
-  day: string,
+  day: DateString,
   startHours: number,
   endHours: number,
 ): ResolvedShiftAssignment {
@@ -82,6 +111,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
       expect(() =>
         createTimeOffRule({
           memberIds: ["alice"],
+          // @ts-expect-error: runtime schema validation case for invalid date input
           specificDates: ["2024-02-01", "Feb 2, 2024"],
           priority: "MANDATORY",
         }),
@@ -92,6 +122,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
       expect(() =>
         createTimeOffRule({
           memberIds: ["alice"],
+          // @ts-expect-error: runtime schema validation case for invalid date input
           dateRange: { start: "02/01/2024", end: "2024-02-05" },
           priority: "MANDATORY",
         }),
@@ -102,6 +133,7 @@ describe("CP-SAT time-off rule: schema validation", () => {
       expect(() =>
         createTimeOffRule({
           memberIds: ["alice"],
+          // @ts-expect-error: runtime schema validation case for invalid date input
           dateRange: { start: "2024-02-01", end: "February 5" },
           priority: "MANDATORY",
         }),
@@ -276,13 +308,13 @@ describe("CP-SAT time-off rule: schema validation", () => {
 });
 
 describe("CP-SAT time-off rule: validate()", () => {
-  const baseContext: RuleValidationContext = {
+  const baseContext: RuleCompileContext = {
     members: [
       { id: "alice", roleIds: ["barista"] },
       { id: "bob", roleIds: ["barista"] },
       { id: "charlie", roleIds: ["manager"] },
     ],
-    days: ["2024-02-01", "2024-02-02", "2024-02-03"],
+    days: ["2024-02-01", "2024-02-02", "2024-02-03"].map(toSchedulingDay),
     shiftPatterns: [
       {
         id: "morning",
@@ -291,6 +323,7 @@ describe("CP-SAT time-off rule: validate()", () => {
         endTime: { hours: 13, minutes: 0 },
       },
     ],
+    weekStartsOn: "monday",
   };
 
   describe("MANDATORY priority", () => {
@@ -326,14 +359,8 @@ describe("CP-SAT time-off rule: validate()", () => {
       rule.validate?.(assignments, reporter, baseContext);
 
       const validation = reporter.getValidation();
-      expect(validation.violations).toHaveLength(1);
-      const violation = validation.violations[0];
-      expect(violation?.type).toBe("rule");
-      if (violation?.type === "rule") {
-        expect(violation.rule).toBe("time-off");
-        expect(violation.message).toContain("alice");
-        expect(violation.message).toContain("2024-02-01");
-      }
+      expect(validation.violations).toHaveLength(0);
+      expect(validation.passed).toHaveLength(0);
     });
 
     it("reports passed when member does not work during requested time-off", () => {
@@ -393,7 +420,8 @@ describe("CP-SAT time-off rule: validate()", () => {
       rule.validate?.(assignments, reporter, baseContext);
 
       const validation = reporter.getValidation();
-      expect(validation.violations).toHaveLength(1);
+      expect(validation.violations).toHaveLength(0);
+      expect(validation.passed).toHaveLength(0);
     });
 
     it("reports passed when shift does not overlap with partial-day time-off", () => {
@@ -452,15 +480,10 @@ describe("CP-SAT time-off rule: validate()", () => {
       rule.validate?.(assignments, reporter, baseContext);
 
       const validation = reporter.getValidation();
-      // Alice violated, Bob passed
-      expect(validation.violations).toHaveLength(1);
+      // Alice is violated by solver-tracked reporting; validator only reports Bob as passed
+      expect(validation.violations).toHaveLength(0);
       expect(validation.passed).toHaveLength(1);
-      const violation = validation.violations[0];
       const passed = validation.passed[0];
-      expect(violation?.type).toBe("rule");
-      if (violation?.type === "rule") {
-        expect(violation.message).toContain("alice");
-      }
       expect(passed?.type).toBe("rule");
       if (passed?.type === "rule") {
         expect(passed.message).toContain("bob");
@@ -502,14 +525,9 @@ describe("CP-SAT time-off rule: validate()", () => {
       rule.validate?.(assignments, reporter, baseContext);
 
       const validation = reporter.getValidation();
-      expect(validation.violations).toHaveLength(1);
+      expect(validation.violations).toHaveLength(0);
       expect(validation.passed).toHaveLength(1);
-      const violation = validation.violations[0];
       const passed = validation.passed[0];
-      expect(violation?.type).toBe("rule");
-      if (violation?.type === "rule") {
-        expect(violation.message).toContain("2024-02-01");
-      }
       expect(passed?.type).toBe("rule");
       if (passed?.type === "rule") {
         expect(passed.message).toContain("2024-02-02");
@@ -532,8 +550,8 @@ describe("CP-SAT time-off rule: validate()", () => {
       rule.validate?.(assignments, reporter, baseContext);
 
       const validation = reporter.getValidation();
-      // 1 violation (02-02), 2 passed (02-01, 02-03)
-      expect(validation.violations).toHaveLength(1);
+      // Violations are reported through solver-tracked soft constraints; validator reports only passes
+      expect(validation.violations).toHaveLength(0);
       expect(validation.passed).toHaveLength(2);
     });
   });
@@ -576,5 +594,115 @@ describe("CP-SAT time-off rule: validate()", () => {
       expect(validation.passed[0]?.type).toBe("rule");
       expect(validation.passed[0]?.message).toContain("alice");
     });
+  });
+});
+
+describe("CP-SAT time-off rule: regression coverage", () => {
+  const compileContext: RuleCompileContext = {
+    members: [{ id: "alice", roleIds: ["barista"] }],
+    days: ["2024-02-01"].map(toSchedulingDay),
+    shiftPatterns: [
+      {
+        id: "morning",
+        roleIds: ["barista"],
+        startTime: { hours: 8, minutes: 0 },
+        endTime: { hours: 12, minutes: 0 },
+      },
+      {
+        id: "afternoon",
+        roleIds: ["barista"],
+        startTime: { hours: 13, minutes: 0 },
+        endTime: { hours: 17, minutes: 0 },
+      },
+    ],
+    weekStartsOn: "monday",
+  };
+
+  it("uses distinct soft constraint ids for different time windows on the same day", () => {
+    const morningRule = timeOffRuleDescriptor.compile(
+      TimeOffSchema.parse({
+        memberIds: ["alice"],
+        specificDates: ["2024-02-01"],
+        startTime: { hours: 8, minutes: 0 },
+        endTime: { hours: 12, minutes: 0 },
+        priority: "LOW",
+      }),
+      compileContext,
+    );
+    const afternoonRule = timeOffRuleDescriptor.compile(
+      TimeOffSchema.parse({
+        memberIds: ["alice"],
+        specificDates: ["2024-02-01"],
+        startTime: { hours: 13, minutes: 0 },
+        endTime: { hours: 17, minutes: 0 },
+        priority: "LOW",
+      }),
+      compileContext,
+    );
+
+    const morningConstraint = morningRule.artifacts.find(
+      (artifact) => artifact.kind === "soft-constraint",
+    );
+    const afternoonConstraint = afternoonRule.artifacts.find(
+      (artifact) => artifact.kind === "soft-constraint",
+    );
+
+    expect(morningConstraint?.kind).toBe("soft-constraint");
+    expect(afternoonConstraint?.kind).toBe("soft-constraint");
+    if (morningConstraint?.kind !== "soft-constraint") {
+      throw new Error("Expected morning time-off to compile to a soft constraint");
+    }
+    if (afternoonConstraint?.kind !== "soft-constraint") {
+      throw new Error("Expected afternoon time-off to compile to a soft constraint");
+    }
+
+    expect(morningConstraint.constraintId).not.toBe(afternoonConstraint.constraintId);
+  });
+
+  it("fails loudly when solver metadata omits soft violations for soft time-off", () => {
+    const builder = new ModelBuilder({
+      members: [{ id: "alice", roleIds: ["barista"] }],
+      shiftPatterns: [
+        {
+          id: "day",
+          roleIds: ["barista"],
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 13, minutes: 0 },
+        },
+      ],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [
+        {
+          day: "2024-02-01",
+          roleIds: ["barista"],
+          startTime: { hours: 9, minutes: 0 },
+          endTime: { hours: 13, minutes: 0 },
+          targetCount: 1,
+          priority: "MANDATORY",
+        },
+      ],
+      ruleConfigs: [
+        {
+          name: "time-off",
+          memberIds: ["alice"],
+          specificDates: ["2024-02-01"],
+          priority: "LOW",
+        },
+      ],
+    });
+
+    builder.compile();
+
+    const malformedResponse = {
+      status: "OPTIMAL",
+      values: { "assign:alice:day:2024-02-01": 1 },
+    };
+
+    expect(() =>
+      builder.reporter.analyzeSolution(
+        // @ts-expect-error: runtime validation coverage for malformed solver payload
+        malformedResponse satisfies SolverResponse,
+      ),
+    ).toThrow(/missing softConstraintViolations/i);
   });
 });

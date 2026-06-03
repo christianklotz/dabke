@@ -9,6 +9,9 @@ export type {
   SolverConstraint,
   SolverTerm,
   SolverObjective,
+  SolverObjectiveStage,
+  SolverMode,
+  SolverStageResult,
   FetcherLike,
 } from "./client.types.js";
 

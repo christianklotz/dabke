@@ -1,66 +1,59 @@
-import type { SolverConstraint, SolverRequest, SolverVariable } from "../client.types.js";
-import type { DayOfWeek, SchedulingPeriod } from "../types.js";
-import { resolveDaysFromPeriod, toDayOfWeekUTC } from "../datetime.utils.js";
+import type {
+  SolverConstraint,
+  SolverObjectiveStage,
+  SolverRequest,
+  SolverVariable,
+} from "../client.types.js";
+import type { DayOfWeek, SchedulingDay, SchedulingPeriod } from "../types.js";
+import { resolveDaysFromPeriod } from "../datetime.utils.js";
 import {
   MINUTES_PER_DAY,
   normalizeEndMinutes,
   OBJECTIVE_WEIGHTS,
-  parseDayString,
   priorityToPenalty,
   timeOfDayToMinutes,
 } from "./utils.js";
 import type {
   CoverageRequirement,
   ModelBuilderOptions,
+  ModelSolveStrategy,
   ShiftPattern,
   SchedulingMember,
   Term,
 } from "./types.js";
-import type { CpsatRuleConfigEntry, CpsatRuleFactories } from "./rules/rules.types.js";
+import type {
+  AnyCpsatRuleConfigEntry,
+  BuiltInCpsatRuleRegistry,
+  CpsatRuleConfigEntry,
+  CpsatRuleRegistry,
+} from "./rules/rules.types.js";
 import { buildCpsatRules } from "./rules/resolver.js";
-import { builtInCpsatRuleFactories } from "./rules/registry.js";
+import { builtInCpsatRuleRegistry } from "./rules/registry.js";
+import { TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID } from "./rules/target-peak-concurrent-assignments.js";
 import { ValidationReporterImpl } from "./validation-reporter.js";
 import type { ValidationReporter } from "./validation-reporter.js";
 import type { ScheduleValidation, CoverageExclusion } from "./validation.types.js";
 import type { ShiftAssignment, ResolvedShiftAssignment } from "./response.js";
+import type {
+  CompiledRule,
+  CostArtifact,
+  CostContribution,
+  PostSolveFeedbackArtifact,
+  RuleArtifact,
+  RuleCompileContext,
+} from "./rule-descriptor.js";
+
+type BoundRuleArtifact = {
+  readonly rule: string;
+  readonly artifact: RuleArtifact;
+};
+
+const UNSTAGED_OBJECTIVE_STAGE_ID = "__dabke_unstaged__";
 
 /**
  * Builds a CP-SAT solver request from high-level scheduling constructs
  * (team, shift patterns, coverage, and rule compilers).
  */
-/**
- * Context provided to rules during post-solve validation.
- */
-export interface RuleValidationContext {
-  readonly members: SchedulingMember[];
-  readonly days: string[];
-  readonly shiftPatterns: ShiftPattern[];
-}
-
-/**
- * A rule that adds constraints or objectives to the solver model.
- *
- * Rules implement `compile` to emit solver constraints during model building,
- * and optionally `validate` to check the solution after solving.
- * Use the `create*Rule` functions to create built-in rules.
- */
-export interface CompilationRule {
-  /** Emit constraints and objectives into the model builder. */
-  compile(builder: ModelBuilder): void;
-  /** Validate the solved schedule and report violations. */
-  validate?(
-    assignments: ResolvedShiftAssignment[],
-    reporter: ValidationReporter,
-    context: RuleValidationContext,
-  ): void;
-  /** Compute cost contribution for a solved schedule. */
-  cost?(
-    assignments: ShiftAssignment[],
-    members: ReadonlyArray<SchedulingMember>,
-    shiftPatterns: ReadonlyArray<ShiftPattern>,
-  ): CostContribution;
-}
-
 /**
  * Shared context for cost rules.
  *
@@ -72,26 +65,6 @@ export interface CostContext {
   normalizationFactor: number;
   /** Whether minimizeCost() is active (modifier rules check this). */
   active: boolean;
-}
-
-/**
- * A cost entry produced by a rule's `cost()` method.
- *
- * The `category` is an open-ended string. Built-in rules use well-known
- * categories from {@link COST_CATEGORY}. Custom rules can use any string.
- */
-export interface CostEntry {
-  memberId: string;
-  day: string;
-  category: string;
-  amount: number;
-}
-
-/**
- * Cost contribution from a single rule.
- */
-export interface CostContribution {
-  entries: CostEntry[];
 }
 
 /**
@@ -123,7 +96,19 @@ export interface CompilationResult {
  * };
  * ```
  */
-export interface ModelBuilderConfig extends ModelBuilderOptions {
+/**
+ * Configuration for {@link ModelBuilder}.
+ *
+ * @remarks
+ * The optional `Registry` generic keeps `ruleConfigs` type-safe for custom rule
+ * registries. When omitted, the config defaults to the built-in CP-SAT registry.
+ *
+ * @category Model Builder
+ */
+export interface ModelBuilderConfig<
+  Registry extends CpsatRuleRegistry = BuiltInCpsatRuleRegistry,
+  RuleConfigEntry extends AnyCpsatRuleConfigEntry = CpsatRuleConfigEntry<Registry>,
+> extends ModelBuilderOptions {
   /** Team members available for scheduling. */
   members: SchedulingMember[];
   /** Available shift patterns (time slots) that members can be assigned to. */
@@ -137,17 +122,17 @@ export interface ModelBuilderConfig extends ModelBuilderOptions {
   /**
    * Pre-compiled rules; use this for custom rules that are not part of the registry.
    */
-  rules?: CompilationRule[];
+  rules?: CompiledRule[];
   /**
-   * Named rule configurations that will be compiled using the provided rule factories.
+   * Named rule configurations that will be compiled using the provided rule registry.
    */
-  ruleConfigs?: CpsatRuleConfigEntry[];
+  ruleConfigs?: RuleConfigEntry[];
   /**
-   * Rule factories to use when compiling ruleConfigs. Defaults to built-in CP-SAT rules.
+   * Rule registry to use when compiling ruleConfigs. Defaults to the built-in CP-SAT registry.
    */
-  ruleFactories?: CpsatRuleFactories;
+  ruleRegistry?: Registry;
   /**
-   * Optional validation reporter for diagnostics.
+   * Optional validation reporter for validation feedback.
    */
   reporter?: ValidationReporter;
 }
@@ -161,11 +146,12 @@ export interface ModelBuilderConfig extends ModelBuilderOptions {
 export class ModelBuilder {
   readonly members: SchedulingMember[];
   readonly shiftPatterns: ShiftPattern[];
-  readonly days: string[];
+  readonly days: SchedulingDay[];
   readonly coverage: CoverageRequirement[];
-  readonly rules: CompilationRule[];
+  readonly rules: CompiledRule[];
   readonly weekStartsOn: DayOfWeek;
   readonly options: SolverRequest["options"] | undefined;
+  readonly strategy: ModelSolveStrategy;
   readonly coverageBucketMinutes: number;
   readonly reporter: ValidationReporter;
   readonly fairDistribution: boolean;
@@ -176,21 +162,38 @@ export class ModelBuilder {
   #variables = new Map<string, SolverVariable>();
   #constraints: SolverConstraint[] = [];
   #objective: Term[] = [];
+  #objectiveStageTerms = new Map<string, Term[]>();
+  #referencedObjectiveStages = new Set<string>();
+  #objectiveStageOrder: readonly string[] | undefined;
   #dayIndex = new Map<string, number>();
+  #dayByIso = new Map<string, SchedulingDay>();
   #shiftPatternMap = new Map<string, ShiftPattern>();
   #builtRequest: SolverRequest | undefined;
   #builtCompilation: CompilationResult | undefined;
+  #compiledArtifacts: BoundRuleArtifact[] = [];
+  #postSolveValidators: PostSolveFeedbackArtifact[] = [];
+  #costArtifacts: CostArtifact[] = [];
 
-  constructor(config: ModelBuilderConfig) {
+  constructor(config: ModelBuilderConfig<CpsatRuleRegistry, AnyCpsatRuleConfigEntry>) {
     // Validate IDs don't contain the separator character
     for (const member of config.members) {
       if (member.id.includes(":")) {
         throw new Error(`Member ID "${member.id}" cannot contain colons`);
       }
+      for (const roleId of member.roleIds) {
+        if (roleId.includes(":")) {
+          throw new Error(`Role ID "${roleId}" cannot contain colons`);
+        }
+      }
     }
     for (const pattern of config.shiftPatterns) {
       if (pattern.id.includes(":")) {
         throw new Error(`Shift pattern ID "${pattern.id}" cannot contain colons`);
+      }
+      for (const roleId of pattern.roleIds ?? []) {
+        if (roleId.includes(":")) {
+          throw new Error(`Role ID "${roleId}" cannot contain colons`);
+        }
       }
     }
 
@@ -203,28 +206,50 @@ export class ModelBuilder {
           `Coverage requirement for day "${cov.day}" must have at least one of roles or skills`,
         );
       }
+      for (const roleId of cov.roleIds ?? []) {
+        if (roleId.includes(":")) {
+          throw new Error(`Role ID "${roleId}" cannot contain colons`);
+        }
+      }
     }
 
     this.members = config.members;
     this.shiftPatterns = config.shiftPatterns;
     this.days = resolveDaysFromPeriod(config.schedulingPeriod);
     this.coverage = config.coverage;
+    const ruleCompileContext: RuleCompileContext = {
+      members: this.members,
+      shiftPatterns: this.shiftPatterns,
+      days: this.days,
+      weekStartsOn: config.weekStartsOn ?? "monday",
+      coverageBucketMinutes: config.coverageBucketMinutes ?? 15,
+    };
     const compiledRuleConfigs = config.ruleConfigs
       ? buildCpsatRules(
           config.ruleConfigs,
           this.members,
-          config.ruleFactories ?? builtInCpsatRuleFactories,
+          ruleCompileContext,
+          config.ruleRegistry ?? builtInCpsatRuleRegistry,
         )
       : [];
     this.rules = [...compiledRuleConfigs, ...(config.rules ?? [])];
     this.weekStartsOn = config.weekStartsOn ?? "monday";
     this.options = config.solverOptions;
+    this.strategy = resolveModelSolveStrategy(config.strategy);
+    this.#objectiveStageOrder =
+      config.objectiveStageOrder === undefined ? undefined : [...config.objectiveStageOrder];
     this.coverageBucketMinutes = config.coverageBucketMinutes ?? 15;
     this.reporter = config.reporter ?? new ValidationReporterImpl();
     this.fairDistribution = config.fairDistribution ?? true;
 
-    this.days.forEach((day, idx) => this.#dayIndex.set(day, idx));
+    this.days.forEach((day, idx) => {
+      this.#dayIndex.set(day.iso, idx);
+      this.#dayByIso.set(day.iso, day);
+    });
     this.shiftPatterns.forEach((pattern) => this.#shiftPatternMap.set(pattern.id, pattern));
+    this.#compiledArtifacts = this.rules.flatMap((rule) =>
+      rule.artifacts.map((artifact) => ({ rule: rule.rule, artifact })),
+    );
   }
 
   boolVar(name: string): string {
@@ -253,20 +278,54 @@ export class ModelBuilder {
     return name;
   }
 
-  shiftActive(patternId: string, day: string): string {
-    return this.boolVar(`shift:${patternId}:${day}`);
+  shiftActive(patternId: string, day: SchedulingDay): string {
+    return this.boolVar(`shift:${patternId}:${day.iso}`);
   }
 
-  assignment(memberId: string, patternId: string, day: string): string {
-    return this.boolVar(`assign:${memberId}:${patternId}:${day}`);
+  /**
+   * Returns the aggregate shift assignment variable for a member, pattern, and day.
+   *
+   * @remarks
+   * This variable means "the member works this shift pattern on this day". It is
+   * the presence literal for optional interval variables and the common variable
+   * used by shift-level rules, objectives, and skill-only coverage. Role-specific
+   * assignments are modeled separately and linked to this aggregate variable when
+   * a concrete role choice is available.
+   */
+  assignment(memberId: string, patternId: string, day: SchedulingDay): string {
+    return this.boolVar(`assign:${memberId}:${patternId}:${day.iso}`);
   }
 
-  addLinear(terms: Term[], op: "<=" | ">=" | "==", rhs: number): void {
-    this.#constraints.push({ type: "linear", terms, op, rhs });
+  /** Returns the role-specific assignment variable for a concrete role choice. */
+  #roleAssignment(memberId: string, patternId: string, roleId: string, day: SchedulingDay): string {
+    return this.boolVar(`assign_role:${memberId}:${patternId}:${roleId}:${day.iso}`);
   }
 
-  addSoftLinear(terms: Term[], op: "<=" | ">=", rhs: number, penalty: number, id?: string): void {
-    this.#constraints.push({ type: "soft_linear", terms, op, rhs, penalty, id });
+  addLinear(terms: Term[], op: "<=" | ">=" | "==", rhs: number, id?: string): void {
+    const constraint: SolverConstraint =
+      id === undefined
+        ? { type: "linear", terms, op, rhs }
+        : { type: "linear", terms, op, rhs, id };
+    this.#constraints.push(constraint);
+  }
+
+  addSoftLinear(
+    terms: Term[],
+    op: "<=" | ">=",
+    rhs: number,
+    penalty: number,
+    id?: string,
+    stage?: string,
+  ): void {
+    if (!this.#isOptimizing()) {
+      return;
+    }
+    this.#markObjectiveStageReference(stage);
+    const constraint: SolverConstraint =
+      stage === undefined
+        ? { type: "soft_linear", terms, op, rhs, penalty, id }
+        : { type: "soft_linear", terms, op, rhs, penalty, id, stage };
+    this.#constraints.push(constraint);
   }
 
   addExactlyOne(vars: string[]): void {
@@ -334,10 +393,25 @@ export class ModelBuilder {
   }
 
   addPenalty(varName: string, weight: number): void {
+    this.#addPenalty(varName, weight);
+  }
+
+  #addPenalty(varName: string, weight: number, stage?: string): void {
+    if (!this.#isOptimizing()) {
+      return;
+    }
+    this.#markObjectiveStageReference(stage);
     // CP-SAT requires integer coefficients. Round to nearest integer.
     const rounded = Math.round(weight);
     if (rounded === 0) return;
-    this.#objective.push({ var: varName, coeff: rounded });
+    const term = { var: varName, coeff: rounded };
+    if (stage !== undefined) {
+      const stageTerms = this.#objectiveStageTerms.get(stage) ?? [];
+      stageTerms.push(term);
+      this.#objectiveStageTerms.set(stage, stageTerms);
+      return;
+    }
+    this.#objective.push(term);
   }
 
   membersWithRole(roleId: string): SchedulingMember[] {
@@ -377,19 +451,60 @@ export class ModelBuilder {
     return pattern.roleIds.some((role) => member.roleIds.includes(role));
   }
 
+  #assignableRoleIds(member: SchedulingMember, pattern: ShiftPattern): string[] {
+    const patternRoleIds = pattern.roleIds;
+    const roles =
+      patternRoleIds && patternRoleIds.length > 0
+        ? member.roleIds.filter((roleId) => patternRoleIds.includes(roleId))
+        : member.roleIds;
+
+    return [...new Set(roles)];
+  }
+
+  /**
+   * Returns the variables that can satisfy one coverage bucket for this member and pattern.
+   *
+   * Role coverage uses role-specific variables so a single shift assignment fills
+   * one concrete role. Skill-only coverage has no role to choose, so it uses the
+   * aggregate assignment variable directly.
+   */
+  #coverageRoleAssignmentVars(
+    member: SchedulingMember,
+    pattern: ShiftPattern,
+    cov: CoverageRequirement,
+    day: SchedulingDay,
+  ): string[] {
+    if (!cov.roleIds || cov.roleIds.length === 0) {
+      return [this.assignment(member.id, pattern.id, day)];
+    }
+
+    const assignableRoles = this.#assignableRoleIds(member, pattern);
+    const coverageRoles = assignableRoles.filter((roleId) => cov.roleIds.includes(roleId));
+
+    return coverageRoles.map((roleId) => this.#roleAssignment(member.id, pattern.id, roleId, day));
+  }
+
+  #canCoverCoverage(
+    member: SchedulingMember,
+    pattern: ShiftPattern,
+    cov: CoverageRequirement,
+  ): boolean {
+    const assignableRoles = this.#assignableRoleIds(member, pattern);
+    if (cov.roleIds && cov.roleIds.length > 0) {
+      return assignableRoles.some((roleId) => cov.roleIds.includes(roleId));
+    }
+    return true;
+  }
+
   /**
    * Checks if a shift pattern can be used on a specific day.
    * Returns false if the pattern has dayOfWeek restrictions that exclude this day.
    */
-  patternAvailableOnDay(pattern: ShiftPattern, day: string): boolean {
-    // If pattern has no day restrictions, it's available every day
+  patternAvailableOnDay(pattern: ShiftPattern, day: SchedulingDay): boolean {
     if (!pattern.dayOfWeek || pattern.dayOfWeek.length === 0) {
       return true;
     }
-    // Check if this day's day-of-week is in the allowed list
-    const date = parseDayString(day);
-    const dow = toDayOfWeekUTC(date);
-    return pattern.dayOfWeek.includes(dow);
+    return pattern.dayOfWeek.includes(day.dayOfWeek);
   }
 
   patternDuration(patternId: string): number {
@@ -401,13 +516,13 @@ export class ModelBuilder {
     return end - start;
   }
 
-  startMinutes(pattern: ShiftPattern, day: string): number {
-    const base = this.#dayOffset(day);
+  startMinutes(pattern: ShiftPattern, day: SchedulingDay): number {
+    const base = this.#dayOffset(day.iso);
     return base + timeOfDayToMinutes(pattern.startTime);
   }
 
-  endMinutes(pattern: ShiftPattern, day: string): number {
-    const base = this.#dayOffset(day);
+  endMinutes(pattern: ShiftPattern, day: SchedulingDay): number {
+    const base = this.#dayOffset(day.iso);
     const startOffset = timeOfDayToMinutes(pattern.startTime);
     const endOffset = normalizeEndMinutes(startOffset, timeOfDayToMinutes(pattern.endTime));
     return base + endOffset;
@@ -418,13 +533,33 @@ export class ModelBuilder {
       return this.#builtCompilation;
     }
 
-    // 0. Apply all rules first (they may report exclusions and add constraints)
-    for (const rule of this.rules) {
-      rule.compile(this);
-    }
+    this.#runRulePrechecks();
+    this.#applyRuleArtifacts();
 
-    // Build exclusion lookup from reporter (populated by rules during compile)
+    // Build exclusion lookup from rule artifacts for coverage feasibility analysis.
     const mandatoryExclusions = buildExclusionLookup(this.reporter.getExclusions());
+
+    // Link concrete role choices to the aggregate assignment used by intervals and
+    // shift-level rules. This is the CP-SAT channeling pattern: exactly one role
+    // literal is true iff the aggregate assignment is true. Role-less members on
+    // unrestricted shifts deliberately skip this link; skill-only coverage uses
+    // the aggregate variable directly because there is no role decision to report.
+    for (const emp of this.members) {
+      for (const pattern of this.shiftPatterns) {
+        if (!this.canAssign(emp, pattern)) continue;
+        for (const day of this.days) {
+          if (!this.patternAvailableOnDay(pattern, day)) continue;
+          const assignmentVar = this.assignment(emp.id, pattern.id, day);
+          const roleTerms = this.#assignableRoleIds(emp, pattern).map((roleId) => ({
+            var: this.#roleAssignment(emp.id, pattern.id, roleId, day),
+            coeff: 1,
+          }));
+          if (roleTerms.length === 0) continue;
+
+          this.addLinear([...roleTerms, { var: assignmentVar, coeff: -1 }], "==", 0);
+        }
+      }
+    }
 
     // 1. Assignment implies shift is active
     for (const emp of this.members) {
@@ -455,7 +590,7 @@ export class ModelBuilder {
           const end = this.endMinutes(pattern, day);
           const size = end - start;
 
-          const intervalName = `interval:${emp.id}:${pattern.id}:${day}`;
+          const intervalName = `interval:${emp.id}:${pattern.id}:${day.iso}`;
           this.intervalVar(intervalName, start, end, size, presenceVar);
           empIntervals.push(intervalName);
         }
@@ -505,6 +640,8 @@ export class ModelBuilder {
     }
 
     for (const cov of this.coverage) {
+      const covDay = this.#dayByIso.get(cov.day);
+      if (!covDay) continue;
       const covStart = timeOfDayToMinutes(cov.startTime);
       const covEnd = normalizeEndMinutes(covStart, timeOfDayToMinutes(cov.endTime));
       const covKey = cov.roleIds?.join(",") ?? cov.skillIds?.join(",") ?? "unknown";
@@ -551,7 +688,7 @@ export class ModelBuilder {
         const lookupBucketStart = bucketStart % MINUTES_PER_DAY;
         // Get patterns that overlap this time bucket, then filter by day availability
         const allPatterns = patternsByBucketStart.get(lookupBucketStart) ?? [];
-        const patterns = allPatterns.filter((p) => this.patternAvailableOnDay(p, cov.day));
+        const patterns = allPatterns.filter((p) => this.patternAvailableOnDay(p, covDay));
 
         if (patterns.length === 0) {
           recordBucketIssue(
@@ -580,6 +717,7 @@ export class ModelBuilder {
         for (const emp of eligibleMembers) {
           for (const pattern of patterns) {
             if (!this.canAssign(emp, pattern)) continue;
+            if (!this.#canCoverCoverage(emp, pattern, cov)) continue;
             assignableMembers.add(emp.id);
             break;
           }
@@ -654,7 +792,14 @@ export class ModelBuilder {
         for (const pattern of patterns) {
           for (const emp of eligibleMembers) {
             if (!this.canAssign(emp, pattern)) continue;
-            coveringVarsSet.add(this.assignment(emp.id, pattern.id, cov.day));
+            for (const roleAssignment of this.#coverageRoleAssignmentVars(
+              emp,
+              pattern,
+              cov,
+              covDay,
+            )) {
+              coveringVarsSet.add(roleAssignment);
+            }
           }
         }
 
@@ -668,8 +813,8 @@ export class ModelBuilder {
         const constraintId = `coverage:${covKey}:${cov.day}:${bucketStart}`;
 
         if (cov.priority === "MANDATORY") {
-          this.addLinear(terms, ">=", cov.targetCount);
-        } else {
+          this.addLinear(terms, ">=", cov.targetCount, constraintId);
+        } else if (this.#isOptimizing()) {
           this.addSoftLinear(
             terms,
             ">=",
@@ -679,23 +824,26 @@ export class ModelBuilder {
           );
         }
 
-        // Track all coverage constraints (mandatory and soft) for post-solve reporting
-        this.reporter.trackConstraint({
-          id: constraintId,
-          type: "coverage",
-          description: `${cov.targetCount}x ${covKey} on ${cov.day} at ${formatMinutes(bucketStart)}`,
-          targetValue: cov.targetCount,
-          comparator: ">=",
-          day: cov.day,
-          timeSlot: formatMinutes(bucketStart),
-          roleIds: cov.roleIds,
-          skillIds: cov.skillIds,
-          context: {
-            days: [cov.day],
-            memberIds: eligibleMembers.map((e) => e.id),
-          },
-          group: cov.group,
-        });
+        // Track coverage constraints that can produce post-solve feedback.
+        if (cov.priority === "MANDATORY" || this.#isOptimizing()) {
+          this.reporter.trackConstraint({
+            id: constraintId,
+            type: "coverage",
+            source: cov.priority === "MANDATORY" ? "hard" : "soft",
+            description: `${cov.targetCount}x ${covKey} on ${cov.day} at ${formatMinutes(bucketStart)}`,
+            targetValue: cov.targetCount,
+            comparator: ">=",
+            day: cov.day,
+            timeSlot: formatMinutes(bucketStart),
+            roleIds: cov.roleIds,
+            skillIds: cov.skillIds,
+            context: {
+              days: [cov.day],
+              memberIds: eligibleMembers.map((e) => e.id),
+            },
+            group: cov.group,
+          });
+        }
       }
 
       for (const issue of bucketIssues.values()) {
@@ -717,11 +865,25 @@ export class ModelBuilder {
             group: cov.group,
           });
         }
-        // Note: soft coverage warnings are tracked via trackConstraint and reported post-solve
+        // Note: optimized solves report soft coverage post-solve via tracked constraints.
       }
     }
 
-    // 3. Default objective: shift minimization with optional fair distribution
+    if (this.#isOptimizing()) {
+      this.#addDefaultObjective();
+    }
+
+    this.#builtRequest = this.#buildRequest();
+    this.#builtCompilation = {
+      request: this.#builtRequest,
+      validation: this.reporter.getValidation(),
+      canSolve: !this.reporter.hasErrors(),
+    };
+    return this.#builtCompilation;
+  }
+
+  #addDefaultObjective(): void {
+    // Default objective: shift minimization with optional fair distribution
     //
     // The objective has three components (see OBJECTIVE_WEIGHTS in utils.ts):
     // a) Minimize number of active shift patterns (SHIFT_ACTIVE=1000)
@@ -785,14 +947,6 @@ export class ModelBuilder {
         }
       }
     }
-
-    this.#builtRequest = this.#buildRequest();
-    this.#builtCompilation = {
-      request: this.#builtRequest,
-      validation: this.reporter.getValidation(),
-      canSolve: !this.reporter.hasErrors(),
-    };
-    return this.#builtCompilation;
   }
 
   /**
@@ -800,18 +954,203 @@ export class ModelBuilder {
    * Call this after solving with the resolved assignments.
    */
   validateSolution(assignments: ResolvedShiftAssignment[]): void {
-    const context: RuleValidationContext = {
+    const context: RuleCompileContext = {
       members: this.members,
       days: this.days,
       shiftPatterns: this.shiftPatterns,
+      weekStartsOn: this.weekStartsOn,
     };
 
-    for (const rule of this.rules) {
-      rule.validate?.(assignments, this.reporter, context);
+    for (const validator of this.#postSolveValidators) {
+      validator.run(assignments, this.reporter, context);
     }
   }
 
+  calculateCost(assignments: readonly ShiftAssignment[]): CostContribution {
+    const context: RuleCompileContext = {
+      members: this.members,
+      days: this.days,
+      shiftPatterns: this.shiftPatterns,
+      weekStartsOn: this.weekStartsOn,
+    };
+
+    const entries = this.#costArtifacts.flatMap((artifact) =>
+      artifact.calculateCost ? [...artifact.calculateCost(assignments, context).entries] : [],
+    );
+
+    return { entries };
+  }
+
+  #runRulePrechecks(): void {
+    const context: RuleCompileContext = {
+      members: this.members,
+      days: this.days,
+      shiftPatterns: this.shiftPatterns,
+      weekStartsOn: this.weekStartsOn,
+    };
+
+    for (const rule of this.rules) {
+      const hasHardConstraint = rule.artifacts.some(
+        (artifact) => artifact.kind === "hard-constraint",
+      );
+      const shouldRunPrechecks = this.#isOptimizing() || hasHardConstraint;
+      if (!shouldRunPrechecks) continue;
+
+      for (const artifact of rule.artifacts) {
+        if (artifact.kind === "pre-solve-feedback") {
+          artifact.run(context, this.reporter);
+        }
+      }
+    }
+  }
+
+  #applyRuleArtifacts(): void {
+    this.#postSolveValidators = [];
+    this.#costArtifacts = [];
+
+    for (const { rule, artifact } of this.#compiledArtifacts) {
+      switch (artifact.kind) {
+        case "variable": {
+          if (artifact.variable.type === "bool") {
+            this.boolVar(artifact.variable.name);
+          } else {
+            this.intVar(artifact.variable.name, artifact.variable.min, artifact.variable.max);
+          }
+          break;
+        }
+        case "hard-constraint": {
+          const constraintId =
+            artifact.validation.strategy === "report" ? artifact.validation.id : undefined;
+          this.addLinear(
+            [...artifact.terms],
+            artifact.comparator,
+            artifact.targetValue,
+            constraintId,
+          );
+          this.#reportHardConstraint(rule, artifact);
+          break;
+        }
+        case "soft-constraint": {
+          if (!this.#isOptimizing()) {
+            break;
+          }
+          const solverConstraintId =
+            artifact.validation.strategy === "report" ? artifact.constraintId : undefined;
+          this.addSoftLinear(
+            [...artifact.terms],
+            artifact.comparator,
+            artifact.targetValue,
+            artifact.penalty,
+            solverConstraintId,
+            artifact.stage,
+          );
+          this.#reportSoftConstraint(rule, artifact);
+          break;
+        }
+        case "objective": {
+          if (!this.#isOptimizing()) {
+            break;
+          }
+          this.#markObjectiveStageReference(artifact.stage);
+          for (const term of artifact.terms) {
+            this.#addPenalty(term.var, term.coeff, artifact.stage);
+          }
+          break;
+        }
+        case "coverage-exclusion": {
+          this.reporter.excludeFromCoverage({
+            memberId: artifact.memberId,
+            day: artifact.day,
+            startTime: artifact.startTime,
+            endTime: artifact.endTime,
+          });
+          break;
+        }
+        case "pre-solve-feedback": {
+          break;
+        }
+        case "post-solve-feedback": {
+          if (!this.#isOptimizing()) {
+            break;
+          }
+          this.#postSolveValidators.push(artifact);
+          break;
+        }
+        case "cost": {
+          if (!this.#isOptimizing()) {
+            break;
+          }
+          artifact.compileObjective?.(this);
+          this.#costArtifacts.push(artifact);
+          break;
+        }
+      }
+    }
+  }
+
+  #reportHardConstraint(
+    rule: string,
+    artifact: Extract<RuleArtifact, { kind: "hard-constraint" }>,
+  ): void {
+    if (artifact.validation.strategy !== "report") {
+      return;
+    }
+
+    this.reporter.trackConstraint({
+      id: artifact.validation.id,
+      type: "rule",
+      source: "hard",
+      rule,
+      description: artifact.description,
+      targetValue: artifact.targetValue,
+      comparator: artifact.comparator,
+      context: artifact.context,
+      group: artifact.group,
+    });
+  }
+
+  #reportSoftConstraint(
+    rule: string,
+    artifact: Extract<RuleArtifact, { kind: "soft-constraint" }>,
+  ): void {
+    if (artifact.validation.strategy !== "report") {
+      return;
+    }
+
+    this.reporter.trackConstraint({
+      id: artifact.constraintId,
+      type: "rule",
+      source: "soft",
+      rule,
+      description: artifact.description,
+      targetValue: artifact.targetValue,
+      comparator: artifact.comparator,
+      context: artifact.context,
+      group: artifact.group,
+    });
+  }
+
   #buildRequest(): SolverRequest {
+    if (!this.#isOptimizing()) {
+      return {
+        variables: Array.from(this.#variables.values()),
+        constraints: this.#constraints,
+        mode: "satisfy",
+        options: this.#satisfyOptions(),
+      };
+    }
+
+    const objectiveStageOrder = this.#resolveObjectiveStageOrder();
+
+    if (objectiveStageOrder) {
+      return {
+        variables: Array.from(this.#variables.values()),
+        constraints: this.#constraintsForStagedRequest(),
+        objectiveStages: this.#buildObjectiveStages(objectiveStageOrder),
+        options: this.options,
+      };
+    }
+
     return {
       variables: Array.from(this.#variables.values()),
       constraints: this.#constraints,
@@ -819,6 +1158,135 @@ export class ModelBuilder {
         this.#objective.length > 0 ? { sense: "minimize", terms: this.#objective } : undefined,
       options: this.options,
     };
+  }
+
+  #markObjectiveStageReference(stage: string | undefined): void {
+    if (stage === undefined) {
+      return;
+    }
+    this.#referencedObjectiveStages.add(stage);
+  }
+
+  #isOptimizing(): boolean {
+    return this.strategy.type === "optimize";
+  }
+
+  #satisfyOptions(): NonNullable<SolverRequest["options"]> {
+    return {
+      ...this.options,
+      solutionLimit: this.options?.solutionLimit ?? 1,
+    };
+  }
+
+  #resolveObjectiveStageOrder(): readonly string[] | undefined {
+    const referencedStages = [...this.#referencedObjectiveStages];
+    if (referencedStages.length === 0) {
+      return undefined;
+    }
+
+    this.#validateReferencedObjectiveStages(referencedStages);
+
+    if (this.options?.solutionLimit === 1) {
+      throw new Error(
+        "ModelBuilder objectiveStageOrder cannot be used with solverOptions.solutionLimit=1.",
+      );
+    }
+
+    const stageOrder = this.#objectiveStageOrder;
+    if (stageOrder === undefined) {
+      if (referencedStages.length === 1) {
+        return [referencedStages[0]!];
+      }
+      throw new Error(
+        `Multiple objective stages were referenced (${referencedStages.join(", ")}); provide ModelBuilder objectiveStageOrder explicitly.`,
+      );
+    }
+
+    if (referencedStages.includes(TARGET_PEAK_CONCURRENT_ASSIGNMENTS_OBJECTIVE_STAGE_ID)) {
+      throw new Error(
+        "targetPeakConcurrentAssignments cannot be combined with ModelBuilder objectiveStageOrder until the multi-stage objective API is public.",
+      );
+    }
+
+    if (stageOrder.length === 0) {
+      throw new Error("ModelBuilder objectiveStageOrder cannot be empty when provided.");
+    }
+
+    const declaredStages = new Set<string>();
+    for (const stage of stageOrder) {
+      if (stage.trim() === "") {
+        throw new Error("ModelBuilder objectiveStageOrder cannot contain an empty stage id.");
+      }
+      if (stage === UNSTAGED_OBJECTIVE_STAGE_ID) {
+        throw new Error(
+          `ModelBuilder objectiveStageOrder cannot contain reserved stage id "${UNSTAGED_OBJECTIVE_STAGE_ID}".`,
+        );
+      }
+      if (declaredStages.has(stage)) {
+        throw new Error(`Duplicate objective stage id "${stage}" in objectiveStageOrder.`);
+      }
+      declaredStages.add(stage);
+    }
+
+    const allowedStages = new Set(declaredStages);
+    allowedStages.add(UNSTAGED_OBJECTIVE_STAGE_ID);
+    for (const stage of referencedStages) {
+      if (stage === UNSTAGED_OBJECTIVE_STAGE_ID) {
+        throw new Error(
+          `Rule artifacts cannot use reserved objective stage id "${UNSTAGED_OBJECTIVE_STAGE_ID}".`,
+        );
+      }
+      if (!allowedStages.has(stage)) {
+        throw new Error(
+          `Objective stage "${stage}" is not declared in ModelBuilder objectiveStageOrder.`,
+        );
+      }
+    }
+
+    return stageOrder;
+  }
+
+  #validateReferencedObjectiveStages(referencedStages: readonly string[]): void {
+    for (const stage of referencedStages) {
+      if (stage.trim() === "") {
+        throw new Error("Rule artifacts cannot use an empty objective stage id.");
+      }
+      if (stage === UNSTAGED_OBJECTIVE_STAGE_ID) {
+        throw new Error(
+          `Rule artifacts cannot use reserved objective stage id "${UNSTAGED_OBJECTIVE_STAGE_ID}".`,
+        );
+      }
+    }
+  }
+
+  #constraintsForStagedRequest(): SolverConstraint[] {
+    return this.#constraints.map((constraint) => {
+      if (constraint.type !== "soft_linear" || constraint.stage !== undefined) {
+        return constraint;
+      }
+      return { ...constraint, stage: UNSTAGED_OBJECTIVE_STAGE_ID };
+    });
+  }
+
+  #buildObjectiveStages(objectiveStageOrder: readonly string[]): SolverObjectiveStage[] {
+    const stages = objectiveStageOrder.map((id) => ({
+      id,
+      sense: "minimize" as const,
+      terms: this.#objectiveStageTerms.get(id) ?? [],
+    }));
+    const hasTailSoftConstraint = this.#constraints.some(
+      (constraint) => constraint.type === "soft_linear" && constraint.stage === undefined,
+    );
+
+    if (this.#objective.length > 0 || hasTailSoftConstraint) {
+      stages.push({
+        id: UNSTAGED_OBJECTIVE_STAGE_ID,
+        sense: "minimize",
+        terms: this.#objective,
+      });
+    }
+
+    return stages;
   }
 
   #dayOffset(day: string): number {
@@ -843,6 +1311,23 @@ type ExclusionWindow = {
   startMinutes: number;
   endMinutes: number;
 };
+
+function resolveModelSolveStrategy(strategy: unknown): ModelSolveStrategy {
+  if (strategy === undefined) {
+    return { type: "optimize" };
+  }
+
+  if (typeof strategy !== "object" || strategy === null || !("type" in strategy)) {
+    throw new Error("ModelBuilder strategy must be an object with a type field.");
+  }
+
+  const strategyType = (strategy as { type: unknown }).type;
+  if (strategyType === "optimize" || strategyType === "feasibility-only") {
+    return { type: strategyType };
+  }
+
+  throw new Error(`Unknown ModelBuilder strategy "${String(strategyType)}".`);
+}
 
 function recordBucketIssue(
   bucketIssues: Map<string, BucketIssueGroup>,

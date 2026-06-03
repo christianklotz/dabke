@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import type { DateString } from "../../src/types.js";
+import { schedulingDay } from "../../src/types.js";
 import {
   defineSemanticTimes,
   isConcreteCoverage,
@@ -12,6 +14,7 @@ import type {
 import type { TimeOfDay } from "../../src/types.js";
 
 const t = (hours: number, minutes = 0): TimeOfDay => ({ hours, minutes });
+const toSchedulingDay = (iso: string) => schedulingDay(iso as DateString);
 
 describe("defineSemanticTimes", () => {
   describe("basic usage", () => {
@@ -55,7 +58,7 @@ describe("defineSemanticTimes", () => {
         { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
       ]);
 
-      const days = ["2026-01-12", "2026-01-13", "2026-01-14"];
+      const days = ["2026-01-12", "2026-01-13", "2026-01-14"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(3);
@@ -86,7 +89,7 @@ describe("defineSemanticTimes", () => {
       ]);
 
       // 2026-01-10 is Saturday, 2026-01-11 is Sunday, 2026-01-12 is Monday
-      const days = ["2026-01-10", "2026-01-11", "2026-01-12"];
+      const days = ["2026-01-10", "2026-01-11", "2026-01-12"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(2);
@@ -107,7 +110,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const days = ["2026-01-11", "2026-01-12", "2026-01-13"];
+      const days = ["2026-01-11", "2026-01-12", "2026-01-13"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(1);
@@ -131,7 +134,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const days = ["2026-01-13", "2026-01-14", "2026-01-15"];
+      const days = ["2026-01-13", "2026-01-14", "2026-01-15"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(1);
@@ -162,7 +165,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const days = ["2026-01-13", "2026-01-14", "2026-01-15"];
+      const days = ["2026-01-13", "2026-01-14", "2026-01-15"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(0);
@@ -185,7 +188,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const days = ["2026-01-13", "2026-01-14"];
+      const days = ["2026-01-13", "2026-01-14"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(3);
@@ -216,7 +219,7 @@ describe("defineSemanticTimes", () => {
       ]);
 
       // 2026-01-09 is Friday, 2026-01-10 is Saturday
-      const days = ["2026-01-09", "2026-01-10"];
+      const days = ["2026-01-09", "2026-01-10"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(2);
@@ -243,7 +246,7 @@ describe("defineSemanticTimes", () => {
         { semanticTime: "closing", roleIds: ["server"], targetCount: 2 },
       ]);
 
-      const days = ["2025-12-31", "2026-01-01", "2026-01-02"];
+      const days = ["2025-12-31", "2026-01-01", "2026-01-02"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(3);
@@ -274,7 +277,7 @@ describe("defineSemanticTimes", () => {
       ]);
 
       // 2026-01-10 is Saturday - no variant matches
-      const days = ["2026-01-10"];
+      const days = ["2026-01-10"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(0);
@@ -293,7 +296,7 @@ describe("defineSemanticTimes", () => {
       ]);
 
       // 2026-01-09 Friday (uses default), 2026-01-10 Saturday (uses variant)
-      const days = ["2026-01-09", "2026-01-10"];
+      const days = ["2026-01-09", "2026-01-10"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       const friday = resolved.find((r) => r.day === "2026-01-09");
@@ -356,7 +359,7 @@ describe("defineSemanticTimes", () => {
         { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
       expect(resolved[0]?.priority).toBe("MANDATORY");
     });
 
@@ -374,7 +377,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
       expect(resolved[0]?.priority).toBe("MANDATORY");
     });
   });
@@ -394,7 +397,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      expect(() => times.resolve(coverage, ["2026-01-12"])).toThrow(
+      expect(() => times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay))).toThrow(
         "Unknown semantic time: dinner",
       );
     });
@@ -415,7 +418,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
 
       expect(resolved).toHaveLength(1);
       expect(resolved[0]).toMatchObject({
@@ -444,7 +447,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
 
       expect(resolved).toHaveLength(1);
       expect(resolved[0]?.roleIds).toEqual(["waiter"]);
@@ -466,7 +469,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
 
       expect(resolved).toHaveLength(1);
       expect(resolved[0]?.skillIds).toEqual(["keyholder"]);
@@ -490,7 +493,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
 
       expect(resolved).toHaveLength(1);
       expect(resolved[0]?.roleIds).toEqual(["waiter"]);
@@ -506,7 +509,7 @@ describe("defineSemanticTimes", () => {
         { semanticTime: "lunch", roleIds: ["server"], targetCount: 3 },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
 
       expect(resolved[0]).not.toHaveProperty("skills");
     });
@@ -525,7 +528,7 @@ describe("defineSemanticTimes", () => {
         },
       ]);
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
 
       expect(resolved[0]?.roleIds).toEqual(["server"]);
       expect(resolved[0]?.skillIds).toEqual(["senior"]);
@@ -546,7 +549,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      const days = ["2026-01-12", "2026-01-13", "2026-01-14"];
+      const days = ["2026-01-12", "2026-01-13", "2026-01-14"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(3);
@@ -570,7 +573,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      const days = ["2026-01-12", "2026-01-13", "2026-01-14"];
+      const days = ["2026-01-12", "2026-01-13", "2026-01-14"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(3);
@@ -593,7 +596,7 @@ describe("defineSemanticTimes", () => {
       ];
 
       // 2026-01-09 Fri, 2026-01-10 Sat, 2026-01-11 Sun, 2026-01-12 Mon
-      const days = ["2026-01-09", "2026-01-10", "2026-01-11", "2026-01-12"];
+      const days = ["2026-01-09", "2026-01-10", "2026-01-11", "2026-01-12"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(4);
@@ -621,7 +624,7 @@ describe("defineSemanticTimes", () => {
       ];
 
       // 2026-01-09 Fri, 2026-01-10 Sat (has date override), 2026-01-17 Sat (dayOfWeek only)
-      const days = ["2026-01-09", "2026-01-10", "2026-01-17"];
+      const days = ["2026-01-09", "2026-01-10", "2026-01-17"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(3);
@@ -644,7 +647,7 @@ describe("defineSemanticTimes", () => {
       ];
 
       // 2026-01-09 is Friday
-      const days = ["2026-01-09"];
+      const days = ["2026-01-09"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(0);
@@ -666,7 +669,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      const days = ["2026-01-12", "2026-01-13"];
+      const days = ["2026-01-12", "2026-01-13"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved.find((r) => r.day === "2026-01-12")?.priority).toBe("MANDATORY");
@@ -686,7 +689,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      const resolved = times.resolve(coverage, ["2026-01-12"]);
+      const resolved = times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay));
       expect(resolved[0]?.priority).toBe("MANDATORY");
     });
 
@@ -703,7 +706,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      const resolved = times.resolve(coverage, ["2026-01-12", "2026-01-13"]);
+      const resolved = times.resolve(coverage, ["2026-01-12", "2026-01-13"].map(toSchedulingDay));
       // All resolved entries from the same variant cover share a group key
       expect(resolved[0]?.group?.title).toBe("waiter during dinner");
       expect(resolved[1]?.group?.title).toBe("waiter during dinner");
@@ -723,7 +726,7 @@ describe("defineSemanticTimes", () => {
       ];
 
       // 2026-01-09 Fri, 2026-01-10 Sat
-      const days = ["2026-01-09", "2026-01-10"];
+      const days = ["2026-01-09", "2026-01-10"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(2);
@@ -750,7 +753,7 @@ describe("defineSemanticTimes", () => {
       ];
 
       // 2026-01-09 Fri, 2026-01-10 Sat
-      const days = ["2026-01-09", "2026-01-10"];
+      const days = ["2026-01-09", "2026-01-10"].map(toSchedulingDay);
       const resolved = times.resolve(coverage, days);
 
       expect(resolved).toHaveLength(2);
@@ -779,7 +782,7 @@ describe("defineSemanticTimes", () => {
         },
       ];
 
-      expect(() => times.resolve(coverage, ["2026-01-12"])).toThrow(
+      expect(() => times.resolve(coverage, ["2026-01-12"].map(toSchedulingDay))).toThrow(
         "Unknown semantic time: dinner",
       );
     });

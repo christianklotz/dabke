@@ -1,21 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { createAssignmentPriorityRule } from "../src/cpsat/rules/assignment-priority.js";
+import { AssignmentPrioritySchema } from "../src/cpsat/rules/assignment-priority.js";
+
+const createAssignmentPriorityRule = (config: unknown) => AssignmentPrioritySchema.parse(config);
 
 describe("member-assignment-priority schema validation", () => {
-  it("accepts valid high preference config", () => {
+  it("accepts valid prefer config", () => {
     expect(() =>
       createAssignmentPriorityRule({
         memberIds: ["alice"],
-        preference: "high",
+        preference: "prefer",
       }),
     ).not.toThrow();
   });
 
-  it("accepts valid low preference config", () => {
+  it("accepts valid avoid config", () => {
     expect(() =>
       createAssignmentPriorityRule({
         memberIds: ["alice"],
-        preference: "low",
+        preference: "avoid",
       }),
     ).not.toThrow();
   });
@@ -24,24 +26,21 @@ describe("member-assignment-priority schema validation", () => {
     expect(() =>
       createAssignmentPriorityRule({
         memberIds: ["alice"],
-        // @ts-expect-error - testing invalid value
+        preference: "high",
+      }),
+    ).toThrow(/preference/i);
+
+    expect(() =>
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
+        preference: "low",
+      }),
+    ).toThrow(/preference/i);
+
+    expect(() =>
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
         preference: "mandatory",
-      }),
-    ).toThrow(/preference/i);
-
-    expect(() =>
-      createAssignmentPriorityRule({
-        memberIds: ["alice"],
-        // @ts-expect-error - testing invalid value
-        preference: "MANDATORY",
-      }),
-    ).toThrow(/preference/i);
-
-    expect(() =>
-      createAssignmentPriorityRule({
-        memberIds: ["alice"],
-        // @ts-expect-error - testing invalid value
-        preference: "medium",
       }),
     ).toThrow(/preference/i);
   });
@@ -50,7 +49,7 @@ describe("member-assignment-priority schema validation", () => {
     expect(() =>
       createAssignmentPriorityRule({
         roleIds: ["senior"],
-        preference: "high",
+        preference: "prefer",
       }),
     ).not.toThrow();
   });
@@ -59,7 +58,7 @@ describe("member-assignment-priority schema validation", () => {
     expect(() =>
       createAssignmentPriorityRule({
         skillIds: ["keyholder"],
-        preference: "high",
+        preference: "prefer",
       }),
     ).not.toThrow();
   });
@@ -68,8 +67,18 @@ describe("member-assignment-priority schema validation", () => {
     expect(() =>
       createAssignmentPriorityRule({
         memberIds: ["alice"],
-        preference: "high",
+        preference: "prefer",
         dayOfWeek: ["monday", "tuesday"],
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts priority option", () => {
+    expect(() =>
+      createAssignmentPriorityRule({
+        memberIds: ["alice"],
+        preference: "avoid",
+        priority: "HIGH",
       }),
     ).not.toThrow();
   });

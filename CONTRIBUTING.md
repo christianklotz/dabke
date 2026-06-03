@@ -39,8 +39,35 @@ The rule system is the main extension point. Study these files in order:
 
 1. `src/cpsat/rules/max-hours-day.ts` — simplest rule, good starting template
 2. `src/cpsat/rules/scope.types.ts` — how entity/time scoping works
-3. `src/cpsat/rules/rules.types.ts` — type registry
-4. `src/cpsat/rules/registry.ts` — built-in rule registration
+3. `src/cpsat/rule-descriptor.ts` — descriptor and artifact contracts
+4. `src/cpsat/rules/artifact-helpers.ts` — common artifact constructors
+5. `src/cpsat/rules/rules.types.ts` — type registry
+6. `src/cpsat/rules/registry.ts` — built-in rule registration
+
+### Feedback model
+
+Rules are the feedback unit. Validation groups summarize rule outcomes for
+presentation. Individual solver constraints are implementation details.
+
+That means every rule must make its diagnostic intent explicit:
+
+- If a constraint or check should contribute to user-visible feedback, emit it
+  as a tracked hard constraint, soft constraint, precheck, or post-solve
+  validator.
+- If a constraint is only internal scaffolding, mark it as internal-only with
+  an explicit reason. Do not rely on silence or comments as a convention.
+
+When in doubt:
+
+- use a **tracked hard constraint** when a modeled requirement should explain an
+  infeasible or violated rule
+- use a **soft constraint** when the rule may be violated but should still be
+  reported
+- use a **precheck** when the impossibility is knowable before solving
+- use a **post-solve validator** when the feedback depends on interpreting the
+  solved assignment rather than a single tracked constraint
+
+Do not add raw solver-style escape hatches that bypass this feedback model.
 
 ### Architecture: co-locate rule knowledge
 
@@ -70,27 +97,34 @@ Every rule follows the same structure:
 1. **Zod schema** using `PrioritySchema`, `entityScope()`, and `timeScope()`
    from `scope.types.ts` for standard fields
 2. **Config type** inferred from the schema (`z.infer<typeof Schema>`)
-3. **Factory function** returning a `CompilationRule` with `compile(builder)`
-4. **Optional `validate()`** for post-solve validation
-5. **Optional `cost()`** for post-solve cost calculation
+3. **Rule descriptor** via `defineRuleDescriptor({ name, schema, compile })`
+4. **Artifact emission** from `compile(config, ctx)`
+5. **Built-in registration** in `src/cpsat/rules/index.ts`, `registry.ts`, and
+   `rules.types.ts`
 
-The builder API inside `compile()`:
+The compile function should emit declarative artifacts instead of mutating the
+solver model directly. Common helpers live in `artifact-helpers.ts`:
 
-- `b.assignment(memberId, patternId, day)` — variable name
-- `b.canAssign(member, pattern)` — role restriction check
-- `b.patternAvailableOnDay(pattern, day)` — day-of-week filter
-- `b.patternDuration(patternId)` — duration in minutes
-- `b.addLinear(terms, op, bound)` — hard constraint
-- `b.addSoftLinear(terms, op, bound, penalty)` — soft constraint
+- `boolVariableArtifact()` / `intVariableArtifact()` — declare variables
+- `hardConstraintArtifact()` — hard constraints that must contribute to rule
+  feedback
+- `softConstraintArtifact()` — tracked soft constraints
+- `hardConstraintArtifactWithoutFeedback()` — explicit opt-out for helper
+  constraints that should not contribute to rule feedback
+
+Rule code may still use compile helpers like `canAssignMemberToPattern()` or
+`isPatternAvailableOnDay()`, but the output contract is artifacts, not direct
+builder mutation.
 
 ### Registration (built-in rules only)
 
-1. Export factory from `src/cpsat/rules/index.ts`
-2. Add to `builtInCpsatRuleFactories` in `registry.ts`
-3. Add config type to `CpsatRuleRegistry` in `rules.types.ts`
+1. Export the descriptor from `src/cpsat/rules/index.ts`
+2. Add it to `builtInCpsatRuleRegistry` in `registry.ts`
+3. Add its config type to `BuiltInCpsatRuleConfigRegistry` in `rules.types.ts`
 4. Add unit test + integration test
 
-For rules in your own project, use `createCpsatRuleFactory()` — no changes to dabke needed.
+For rules in your own project, use `createCpsatRuleRegistry()` — no changes to
+dabke needed.
 
 ## Code Style
 

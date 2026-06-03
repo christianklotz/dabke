@@ -1,18 +1,20 @@
 import * as z from "zod";
 import { DayOfWeekSchema } from "../../types.js";
-import type { CompilationRule } from "../model-builder.js";
-import type { Term } from "../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
 import { priorityToPenalty, splitIntoWeeks } from "../utils.js";
 import {
   PrioritySchema,
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
   ruleGroup,
+  timeScope,
 } from "./scope.types.js";
+import { assignmentTermsForDays } from "./assignment-terms.js";
+import { patternDurationMinutes } from "./pattern-time.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
 
 const MaxHoursWeekBase = z.object({
   hours: z.number().min(0),
@@ -20,102 +22,84 @@ const MaxHoursWeekBase = z.object({
   weekStartsOn: DayOfWeekSchema.optional(),
 });
 
-const MaxHoursWeekSchema = MaxHoursWeekBase.and(entityScope(["members", "roles", "skills"])).and(
-  timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]),
-);
+export const MaxHoursWeekSchema = MaxHoursWeekBase.and(
+  entityScope(["members", "roles", "skills"]),
+).and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /**
- * Configuration for {@link createMaxHoursWeekRule}.
- *
- * - `hours` (required): maximum hours allowed per scheduling week
- * - `priority` (required): how strictly the solver enforces this rule
- * - `weekStartsOn` (optional): which day starts the week; defaults to {@link ModelBuilder.weekStartsOn}
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
- * Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
+ * Configuration for {@link maxHoursWeekRuleDescriptor}.
  */
 export type MaxHoursWeekConfig = z.infer<typeof MaxHoursWeekSchema>;
 
 /**
- * Caps total hours a person can work within each scheduling week.
+ * Low-level descriptor for the `max-hours-week` rule.
  *
- * @param config - See {@link MaxHoursWeekConfig}
- * @example Limit everyone to 40 hours per week
- * ```ts
- * createMaxHoursWeekRule({ hours: 40, priority: "HIGH" });
- * ```
- *
- * @example Students limited to 20 hours during term time
- * ```ts
- * createMaxHoursWeekRule({
- *   roleIds: ["student"],
- *   hours: 20,
- *   recurringPeriods: [
- *     { name: "fall-term", startMonth: 9, startDay: 1, endMonth: 12, endDay: 15 },
- *   ],
- *   priority: "MANDATORY",
- * });
- * ```
+ * @category Rules
  */
-export function createMaxHoursWeekRule(config: MaxHoursWeekConfig): CompilationRule {
-  const parsed = MaxHoursWeekSchema.parse(config);
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-  const { hours, priority, weekStartsOn } = parsed;
-  const maxMinutes = hours * 60;
-  const group = ruleGroup(
-    `max-hours-week:${hours}`,
-    `Max ${hours}h per week`,
-    entityScopeValue,
-    timeScopeValue,
-  );
+export const maxHoursWeekRuleDescriptor = defineRuleDescriptor({
+  name: "max-hours-week",
+  schema: MaxHoursWeekSchema,
+  compile(config, ctx) {
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+    const { hours, priority, weekStartsOn } = config;
+    const maxMinutes = hours * 60;
+    const group = ruleGroup(
+      `max-hours-week:${hours}`,
+      `Max ${hours}h per week`,
+      entityScopeValue,
+      timeScopeValue,
+    );
+    const targetMembers = resolveMembersFromScope(entityScopeValue, [...ctx.members]);
+    const activeDays = resolveActiveDaysFromScope(timeScopeValue, [...ctx.days]);
+    const weeks = splitIntoWeeks(activeDays, weekStartsOn ?? ctx.weekStartsOn);
 
-  return {
-    compile(b) {
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+    const artifacts = targetMembers.flatMap((member) =>
+      weeks.flatMap((weekDays) => {
+        const weekStart = weekDays[0];
+        if (!weekStart) return [];
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const terms = assignmentTermsForDays(
+          member,
+          weekDays,
+          ctx.shiftPatterns,
+          patternDurationMinutes,
+        );
+        if (terms.length === 0) return [];
 
-      const weeks = splitIntoWeeks(activeDays, weekStartsOn ?? b.weekStartsOn);
+        const description = `${member.id} max ${hours}h in week starting ${weekStart.iso}`;
+        const context = { memberIds: [member.id], days: weekDays.map((day) => day.iso) };
+        const constraintId = `max-hours-week:${member.id}:${weekStart.iso}`;
 
-      for (const emp of targetMembers) {
-        for (const weekDays of weeks) {
-          const terms: Term[] = [];
-          for (const day of weekDays) {
-            for (const pattern of b.shiftPatterns) {
-              if (!b.canAssign(emp, pattern)) continue;
-              if (!b.patternAvailableOnDay(pattern, day)) continue;
-              terms.push({
-                var: b.assignment(emp.id, pattern.id, day),
-                coeff: b.patternDuration(pattern.id),
-              });
-            }
-          }
+        return [
+          priority === "MANDATORY"
+            ? hardConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(constraintId),
+                terms,
+                comparator: "<=",
+                targetValue: maxMinutes,
+              })
+            : softConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(),
+                terms,
+                comparator: "<=",
+                targetValue: maxMinutes,
+                penalty: priorityToPenalty(priority),
+                constraintId,
+              }),
+        ];
+      }),
+    );
 
-          if (terms.length === 0) continue;
-
-          const weekLabel = weekDays[0]!;
-          const constraintId = `max-hours-week:${emp.id}:${weekLabel}`;
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, "<=", maxMinutes);
-          } else {
-            b.addSoftLinear(terms, "<=", maxMinutes, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "max-hours-week",
-              description: `${emp.id} max ${hours}h in week starting ${weekLabel}`,
-              targetValue: maxMinutes,
-              comparator: "<=",
-              day: weekLabel,
-              context: { memberIds: [emp.id], days: weekDays },
-              group,
-            });
-          }
-        }
-      }
-    },
-  };
-}
+    return {
+      rule: "max-hours-week",
+      artifacts,
+    };
+  },
+});

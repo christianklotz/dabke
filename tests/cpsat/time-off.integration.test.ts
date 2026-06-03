@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
+import type { DateString } from "../../src/types.js";
 import { createBaseConfig, decodeAssignments, solveWithRules, getSolverClient } from "./helpers.js";
 
 describe("CP-SAT: time-off rule", () => {
@@ -25,12 +26,12 @@ describe("CP-SAT: time-off rule", () => {
         {
           name: "assignment-priority",
           memberIds: ["alice"],
-          preference: "high",
+          preference: "prefer",
         },
         {
           name: "assignment-priority",
           memberIds: ["bob"],
-          preference: "low",
+          preference: "avoid",
         },
       ];
 
@@ -179,6 +180,59 @@ describe("CP-SAT: time-off rule", () => {
       expect(response.status).toBe("OPTIMAL");
       const assignments = decodeAssignments(response.values);
       expect(assignments).toContainEqual(expect.objectContaining({ memberId: "solo" }));
+    }, 30_000);
+
+    it("scales the soft penalty with each violating assignment on the same day", async () => {
+      const baseConfig = createBaseConfig({
+        members: [{ id: "solo", roleIds: ["barista"] }],
+        shiftPatterns: [
+          {
+            id: "morning",
+            roleIds: ["barista"],
+            startTime: { hours: 8, minutes: 0 },
+            endTime: { hours: 12, minutes: 0 },
+          },
+          {
+            id: "afternoon",
+            roleIds: ["barista"],
+            startTime: { hours: 13, minutes: 0 },
+            endTime: { hours: 17, minutes: 0 },
+          },
+        ],
+        schedulingPeriod: { dateRange: { start: "2024-02-04", end: "2024-02-04" } },
+        coverage: [
+          {
+            day: "2024-02-04",
+            roleIds: ["barista"],
+            startTime: { hours: 8, minutes: 0 },
+            endTime: { hours: 12, minutes: 0 },
+            targetCount: 1,
+            priority: "MANDATORY",
+          },
+          {
+            day: "2024-02-04",
+            roleIds: ["barista"],
+            startTime: { hours: 13, minutes: 0 },
+            endTime: { hours: 17, minutes: 0 },
+            targetCount: 1,
+            priority: "MANDATORY",
+          },
+        ],
+      });
+
+      const response = await solveWithRules(client, baseConfig, [
+        {
+          name: "time-off",
+          memberIds: ["solo"],
+          specificDates: ["2024-02-04"],
+          priority: "LOW",
+        },
+      ] satisfies CpsatRuleConfigEntry[]);
+
+      expect(response.status).toBe("OPTIMAL");
+      expect(response.softConstraintViolations).toHaveLength(1);
+      expect(response.softConstraintViolations?.[0]?.constraintId).toContain("time-off:");
+      expect(response.softConstraintViolations?.[0]?.violationAmount).toBe(2);
     }, 30_000);
   });
 
@@ -415,64 +469,69 @@ describe("CP-SAT: time-off rule", () => {
   describe("validation", () => {
     it("validates date string format in specificDates", async () => {
       const baseConfig = createBaseConfig({ roleId: "cashier" });
-      await expect(
-        solveWithRules(client, baseConfig, [
-          {
-            name: "time-off",
+      const invalidSpecificDateRules: CpsatRuleConfigEntry[] = [
+        {
+          name: "time-off",
+          memberIds: ["alice"],
+          // @ts-expect-error: deliberately invalid date to test runtime validation
+          specificDates: ["Feb 1, 2024"],
+          priority: "MANDATORY",
+        },
+      ];
 
-            memberIds: ["alice"],
-            specificDates: ["Feb 1, 2024"],
-            priority: "MANDATORY",
-          },
-        ] as CpsatRuleConfigEntry[]),
-      ).rejects.toThrow(/Invalid.*date/i);
+      await expect(solveWithRules(client, baseConfig, invalidSpecificDateRules)).rejects.toThrow(
+        /Invalid.*date/i,
+      );
     });
 
     it("validates date string format in dateRange", async () => {
       const baseConfig = createBaseConfig({ roleId: "cashier" });
-      await expect(
-        solveWithRules(client, baseConfig, [
-          {
-            name: "time-off",
+      const invalidDateRangeRules: CpsatRuleConfigEntry[] = [
+        {
+          name: "time-off",
+          memberIds: ["alice"],
+          // @ts-expect-error: deliberately invalid date range to test runtime validation
+          dateRange: { start: "2024/02/01", end: "2024/02/05" },
+          priority: "MANDATORY",
+        },
+      ];
 
-            memberIds: ["alice"],
-            dateRange: { start: "2024/02/01", end: "2024/02/05" },
-            priority: "MANDATORY",
-          },
-        ] as CpsatRuleConfigEntry[]),
-      ).rejects.toThrow(/Invalid.*date/i);
+      await expect(solveWithRules(client, baseConfig, invalidDateRangeRules)).rejects.toThrow(
+        /Invalid.*date/i,
+      );
     });
 
     it("requires time scoping", async () => {
       const baseConfig = createBaseConfig({ roleId: "cashier" });
-      await expect(
-        solveWithRules(client, baseConfig, [
-          {
-            name: "time-off",
-            // @ts-expect-error: deliberately missing time scope to test runtime validation
-            config: {
-              memberIds: ["alice"],
-              priority: "MANDATORY",
-            },
-          },
-        ]),
-      ).rejects.toThrow(/Must provide time scoping/i);
+      const missingTimeScopeRules: CpsatRuleConfigEntry[] = [
+        // @ts-expect-error: deliberately missing time scope to test runtime validation
+        {
+          name: "time-off",
+          memberIds: ["alice"],
+          priority: "MANDATORY",
+        },
+      ];
+
+      await expect(solveWithRules(client, baseConfig, missingTimeScopeRules)).rejects.toThrow(
+        /Must provide time scoping/i,
+      );
     });
 
     it("requires both startTime and endTime together", async () => {
       const baseConfig = createBaseConfig({ roleId: "cashier" });
-      await expect(
-        solveWithRules(client, baseConfig, [
-          {
-            name: "time-off",
+      const partialTimeWindowRules: CpsatRuleConfigEntry[] = [
+        {
+          name: "time-off",
+          memberIds: ["alice"],
+          specificDates: ["2024-02-01"],
+          startTime: { hours: 9, minutes: 0 },
+          priority: "MANDATORY",
+        },
+      ];
 
-            memberIds: ["alice"],
-            specificDates: ["2024-02-01"],
-            startTime: { hours: 9, minutes: 0 },
-            priority: "MANDATORY",
-          },
-        ] as CpsatRuleConfigEntry[]),
-      ).rejects.toThrow(/Both startTime and endTime/i);
+      await expect(solveWithRules(client, baseConfig, partialTimeWindowRules)).rejects.toThrow(
+        /Both startTime and endTime/i,
+      );
     });
   });
 
@@ -764,6 +823,8 @@ describe("CP-SAT: time-off rule", () => {
     }, 60_000);
 
     it("combines time-off with min-rest-between-shifts", async () => {
+      const days: DateString[] = ["2024-02-05", "2024-02-06", "2024-02-07"];
+
       const builder = new ModelBuilder({
         members: [
           { id: "alice", roleIds: ["nurse"] },
@@ -782,7 +843,7 @@ describe("CP-SAT: time-off rule", () => {
           },
         ],
         schedulingPeriod: { dateRange: { start: "2024-02-05", end: "2024-02-07" } },
-        coverage: ["2024-02-05", "2024-02-06", "2024-02-07"].flatMap((day) => [
+        coverage: days.flatMap((day) => [
           {
             day,
             roleIds: ["nurse"],

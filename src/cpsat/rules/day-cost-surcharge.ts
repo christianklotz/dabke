@@ -1,101 +1,122 @@
 import * as z from "zod";
-import type { CompilationRule, CostContribution } from "../model-builder.js";
-import type { ShiftPattern, SchedulingMember } from "../types.js";
-import type { ShiftAssignment } from "../response.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { CostArtifact } from "../rule-descriptor.js";
 import { COST_CATEGORY } from "../cost.js";
 import {
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
+  timeScope,
 } from "./scope.types.js";
-import { patternDurationMinutes } from "./cost-utils.js";
+import { patternDurationMinutes } from "./pattern-time.js";
 
-const DayCostSurchargeSchema = z
+export const DayCostSurchargeSchema = z
   .object({
     amountPerHour: z.number().min(0),
   })
   .and(entityScope(["members", "roles", "skills"]))
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
-/** Configuration for {@link createDayCostSurchargeRule}. */
+/** Configuration for {@link dayCostSurchargeRuleDescriptor}. */
 export type DayCostSurchargeConfig = z.infer<typeof DayCostSurchargeSchema>;
 
 /**
- * Creates a day-based flat surcharge rule.
+ * Low-level descriptor for the `day-cost-surcharge` rule.
  *
- * Adds a flat extra amount per hour for assignments on matching days,
- * independent of the member's base rate.
+ * @remarks
+ * This artifact always contributes to post-solve cost calculation. It only adds
+ * solver objective terms when `minimize-cost` is active.
  *
- * When `minimizeCost()` is not present, no solver terms are emitted,
- * but the `cost()` method still contributes to post-solve calculation.
+ * @category Rules
  */
-export function createDayCostSurchargeRule(config: DayCostSurchargeConfig): CompilationRule {
-  const parsed = DayCostSurchargeSchema.parse(config);
-  const { amountPerHour } = parsed;
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
+export const dayCostSurchargeRuleDescriptor = defineRuleDescriptor({
+  name: "day-cost-surcharge",
+  schema: DayCostSurchargeSchema,
+  compile(config) {
+    const { amountPerHour } = config;
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
 
-  return {
-    compile(b) {
-      if (!b.costContext?.active) return;
-      if (amountPerHour <= 0) return;
+    const validation = {
+      strategy: "skip" as const,
+      category: "no-meaningful-feedback" as const,
+      rationale:
+        amountPerHour <= 0
+          ? "A zero surcharge does not change optimization or cost accounting."
+          : "Day cost surcharges only affect optimization when minimize-cost is active.",
+    };
 
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+    const costArtifact: CostArtifact = {
+      kind: "cost",
+      validation,
+      compileObjective(builder) {
+        if (!builder.costContext?.active || amountPerHour <= 0) return;
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const targetMembers = resolveMembersFromScope(entityScopeValue, builder.members);
+        const activeDays = resolveActiveDaysFromScope(timeScopeValue, builder.days);
+        if (targetMembers.length === 0 || activeDays.length === 0) return;
 
-      const { normalizationFactor } = b.costContext;
-
-      for (const emp of targetMembers) {
-        for (const pattern of b.shiftPatterns) {
-          if (!b.canAssign(emp, pattern)) continue;
-          for (const day of activeDays) {
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            const duration = patternDurationMinutes(pattern);
-            const surcharge = (amountPerHour * duration) / 60;
-            const normalizedPenalty = surcharge / normalizationFactor;
-            b.addPenalty(b.assignment(emp.id, pattern.id, day), Math.max(1, normalizedPenalty));
+        const { normalizationFactor } = builder.costContext;
+        for (const member of targetMembers) {
+          for (const pattern of builder.shiftPatterns) {
+            if (!builder.canAssign(member, pattern)) continue;
+            for (const day of activeDays) {
+              if (!builder.patternAvailableOnDay(pattern, day)) continue;
+              const duration = patternDurationMinutes(pattern);
+              const surcharge = (amountPerHour * duration) / 60;
+              const normalizedPenalty = surcharge / normalizationFactor;
+              builder.addPenalty(
+                builder.assignment(member.id, pattern.id, day),
+                Math.max(1, normalizedPenalty),
+              );
+            }
           }
         }
-      }
-    },
+      },
+      calculateCost(assignments, costContext) {
+        if (amountPerHour <= 0) return { entries: [] };
 
-    cost(
-      assignments: ShiftAssignment[],
-      members: ReadonlyArray<SchedulingMember>,
-      shiftPatterns: ReadonlyArray<ShiftPattern>,
-    ): CostContribution {
-      if (amountPerHour <= 0) return { entries: [] };
+        const patternMap = new Map(
+          costContext.shiftPatterns.map((pattern) => [pattern.id, pattern]),
+        );
+        const activeDays = new Set(
+          resolveActiveDaysFromScope(timeScopeValue, [...costContext.days]).map((day) => day.iso),
+        );
+        const targetMemberIds = new Set(
+          resolveMembersFromScope(entityScopeValue, [...costContext.members]).map(
+            (member) => member.id,
+          ),
+        );
 
-      const patternMap = new Map(shiftPatterns.map((p) => [p.id, p]));
-      const allDays = [...new Set(assignments.map((a) => a.day))].toSorted();
-      const activeDays = new Set(resolveActiveDaysFromScope(timeScopeValue, allDays));
-      const targetEmpIds = new Set(
-        resolveMembersFromScope(entityScopeValue, [...members]).map((e) => e.id),
-      );
+        const entries = [] as Array<{
+          memberId: string;
+          day: string;
+          category: string;
+          amount: number;
+        }>;
+        for (const assignment of assignments) {
+          if (!activeDays.has(assignment.day) || !targetMemberIds.has(assignment.memberId))
+            continue;
+          const pattern = patternMap.get(assignment.shiftPatternId);
+          if (!pattern) continue;
+          const duration = patternDurationMinutes(pattern);
+          entries.push({
+            memberId: assignment.memberId,
+            day: assignment.day,
+            category: COST_CATEGORY.PREMIUM,
+            amount: (amountPerHour * duration) / 60,
+          });
+        }
 
-      const entries: CostContribution["entries"] = [];
+        return { entries };
+      },
+    };
 
-      for (const a of assignments) {
-        if (!activeDays.has(a.day)) continue;
-        if (!targetEmpIds.has(a.memberId)) continue;
-        const pattern = patternMap.get(a.shiftPatternId);
-        if (!pattern) continue;
-        const duration = patternDurationMinutes(pattern);
-        const amount = (amountPerHour * duration) / 60;
-        entries.push({
-          memberId: a.memberId,
-          day: a.day,
-          category: COST_CATEGORY.PREMIUM,
-          amount,
-        });
-      }
-
-      return { entries };
-    },
-  };
-}
+    return {
+      rule: "day-cost-surcharge",
+      artifacts: [costArtifact],
+    };
+  },
+});

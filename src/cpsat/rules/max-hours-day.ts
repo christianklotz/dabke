@@ -1,19 +1,21 @@
 import * as z from "zod";
-import type { CompilationRule } from "../model-builder.js";
-import type { Term } from "../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
 import { priorityToPenalty } from "../utils.js";
 import {
   PrioritySchema,
   entityScope,
-  timeScope,
   parseEntityScope,
   parseTimeScope,
-  resolveMembersFromScope,
   resolveActiveDaysFromScope,
+  resolveMembersFromScope,
   ruleGroup,
+  timeScope,
 } from "./scope.types.js";
+import { assignmentTermsForDay } from "./assignment-terms.js";
+import { patternDurationMinutes } from "./pattern-time.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
 
-const MaxHoursDaySchema = z
+export const MaxHoursDaySchema = z
   .object({
     hours: z.number().min(0),
     priority: PrioritySchema,
@@ -22,92 +24,70 @@ const MaxHoursDaySchema = z
   .and(timeScope(["dateRange", "specificDates", "dayOfWeek", "recurring"]));
 
 /**
- * Configuration for {@link createMaxHoursDayRule}.
- *
- * - `hours` (required): maximum hours allowed per day
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
- * Time scoping (at most one, optional): `dateRange`, `specificDates`, `dayOfWeek`, `recurringPeriods`
+ * Configuration for {@link maxHoursDayRuleDescriptor}.
  */
 export type MaxHoursDayConfig = z.infer<typeof MaxHoursDaySchema>;
 
 /**
- * Limits how many hours a person can work in a single day.
+ * Low-level descriptor for the `max-hours-day` rule.
  *
- * @param config - See {@link MaxHoursDayConfig}
- * @example Limit everyone to 8 hours per day
- * ```ts
- * createMaxHoursDayRule({
- *   hours: 8,
- *   priority: "MANDATORY",
- * });
- * ```
- *
- * @example Students limited to 4 hours on weekdays during term
- * ```ts
- * createMaxHoursDayRule({
- *   roleIds: ["student"],
- *   hours: 4,
- *   dayOfWeek: ["monday", "tuesday", "wednesday", "thursday", "friday"],
- *   priority: "MANDATORY",
- * });
- * ```
+ * @category Rules
  */
-export function createMaxHoursDayRule(config: MaxHoursDayConfig): CompilationRule {
-  const parsed = MaxHoursDaySchema.parse(config);
-  const entityScopeValue = parseEntityScope(parsed);
-  const timeScopeValue = parseTimeScope(parsed);
-  const { hours, priority } = parsed;
-  const maxMinutes = hours * 60;
-  const group = ruleGroup(
-    `max-hours-day:${hours}`,
-    `Max ${hours}h per day`,
-    entityScopeValue,
-    timeScopeValue,
-  );
+export const maxHoursDayRuleDescriptor = defineRuleDescriptor({
+  name: "max-hours-day",
+  schema: MaxHoursDaySchema,
+  compile(config, ctx) {
+    const entityScopeValue = parseEntityScope(config);
+    const timeScopeValue = parseTimeScope(config);
+    const { hours, priority } = config;
+    const maxMinutes = hours * 60;
+    const group = ruleGroup(
+      `max-hours-day:${hours}`,
+      `Max ${hours}h per day`,
+      entityScopeValue,
+      timeScopeValue,
+    );
+    const targetMembers = resolveMembersFromScope(entityScopeValue, [...ctx.members]);
+    const activeDays = resolveActiveDaysFromScope(timeScopeValue, [...ctx.days]);
 
-  return {
-    compile(b) {
-      const targetMembers = resolveMembersFromScope(entityScopeValue, b.members);
-      const activeDays = resolveActiveDaysFromScope(timeScopeValue, b.days);
+    const artifacts = targetMembers.flatMap((member) =>
+      activeDays.flatMap((day) => {
+        const terms = assignmentTermsForDay(member, day, ctx.shiftPatterns, patternDurationMinutes);
+        if (terms.length === 0) return [];
 
-      if (targetMembers.length === 0 || activeDays.length === 0) return;
+        const description = `${member.id} max ${hours}h on ${day.iso}`;
+        const context = { memberIds: [member.id], days: [day.iso] };
+        const constraintId = `max-hours-day:${member.id}:${day.iso}`;
 
-      for (const emp of targetMembers) {
-        for (const day of activeDays) {
-          const terms: Term[] = [];
-          for (const pattern of b.shiftPatterns) {
-            if (!b.canAssign(emp, pattern)) continue;
-            if (!b.patternAvailableOnDay(pattern, day)) continue;
-            terms.push({
-              var: b.assignment(emp.id, pattern.id, day),
-              coeff: b.patternDuration(pattern.id),
-            });
-          }
+        return [
+          priority === "MANDATORY"
+            ? hardConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(constraintId),
+                terms,
+                comparator: "<=",
+                targetValue: maxMinutes,
+              })
+            : softConstraint({
+                group,
+                description,
+                context,
+                validation: reportValidation(),
+                terms,
+                comparator: "<=",
+                targetValue: maxMinutes,
+                penalty: priorityToPenalty(priority),
+                constraintId,
+              }),
+        ];
+      }),
+    );
 
-          if (terms.length === 0) continue;
-
-          const constraintId = `max-hours-day:${emp.id}:${day}`;
-
-          if (priority === "MANDATORY") {
-            b.addLinear(terms, "<=", maxMinutes);
-          } else {
-            b.addSoftLinear(terms, "<=", maxMinutes, priorityToPenalty(priority), constraintId);
-            b.reporter.trackConstraint({
-              id: constraintId,
-              type: "rule",
-              rule: "max-hours-day",
-              description: `${emp.id} max ${hours}h on ${day}`,
-              targetValue: maxMinutes,
-              comparator: "<=",
-              day,
-              context: { memberIds: [emp.id], days: [day] },
-              group,
-            });
-          }
-        }
-      }
-    },
-  };
-}
+    return {
+      rule: "max-hours-day",
+      artifacts,
+    };
+  },
+});

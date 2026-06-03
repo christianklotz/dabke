@@ -1,5 +1,4 @@
-import type { SchedulingMember, ShiftPattern } from "../types.js";
-import { timeOfDayToMinutes, normalizeEndMinutes } from "../utils.js";
+import type { SchedulingMember } from "../types.js";
 
 /** Returns the hourly rate for a member, or undefined if not hourly. */
 export function getHourlyRate(member: SchedulingMember): number | undefined {
@@ -15,11 +14,4 @@ export function getSalariedPay(
   if (!member.pay) return undefined;
   if ("annual" in member.pay) return member.pay;
   return undefined;
-}
-
-/** Computes shift duration in minutes from a pattern. */
-export function patternDurationMinutes(pattern: ShiftPattern): number {
-  const start = timeOfDayToMinutes(pattern.startTime);
-  const end = normalizeEndMinutes(start, timeOfDayToMinutes(pattern.endTime));
-  return end - start;
 }

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 This changelog was generated from the git history of the project when it was
 named `scheduling-core`, prior to the rename to `dabke` in v0.78.0.
 
+## 0.84.0 (2026-06-03)
+
+### Breaking Changes
+
+- Replace string day representations in compiled model internals with `SchedulingDay` values.
+- Replace the older assignment preference helper shape with `preferAssignment()` and `avoidAssignment()`, and add role-specific preference support with `preferRole()`.
+
+### Features
+
+- Add `targetPeakConcurrentAssignments()` for soft peak-concurrency targets that can be paired with `maxConcurrentAssignments()` hard caps.
+- Add feasibility-only solve strategy support for finding any hard-feasible schedule while ignoring soft objectives.
+- Report assigned roles in solver assignments when a shift can satisfy multiple roles.
+- Report hard constraint conflicts for infeasible schedules when hard diagnostics are enabled.
+
+### Improvements
+
+- Compile rules through descriptors and artifacts for more consistent constraint tracking and validation.
+- Add staged objective transport so the solver can optimize objective stages in priority order.
+- Fail fast when staged solve requests return an unexpected solver error.
+- Update devDependencies.
+
 ## 0.83.0 (2026-03-21)
 
 ### Breaking Changes

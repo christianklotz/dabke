@@ -72,7 +72,7 @@ describe("CP-SAT: must-assign rule", () => {
     expect(assignments.filter((a) => a.memberId === "bob").length).toBe(0);
 
     // Soft violation reported for bob
-    const violations = result.softViolations ?? [];
+    const violations = result.softConstraintViolations ?? [];
     const mustAssignViolation = violations.find((v) =>
       v.constraintId.startsWith("must-assign:bob:"),
     );

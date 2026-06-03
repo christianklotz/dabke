@@ -1,8 +1,22 @@
 import assert from "node:assert";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { ModelBuilder } from "../../src/cpsat/model-builder.js";
+import { defineRuleDescriptor } from "../../src/cpsat/rule-descriptor.js";
+import {
+  boolVariable,
+  reportValidation,
+  skipValidation,
+  softConstraint,
+} from "../../src/cpsat/rules/artifacts.js";
+import { createCpsatRuleRegistry } from "../../src/cpsat/rules/registry.js";
 import type { CpsatRuleConfigEntry } from "../../src/cpsat/rules.js";
-import type { CoverageRequirement, SchedulingMember, ShiftPattern } from "../../src/cpsat/types.js";
+import type {
+  CoverageRequirement,
+  ModelSolveStrategy,
+  SchedulingMember,
+  ShiftPattern,
+} from "../../src/cpsat/types.js";
 
 function baseCoverage(override: Partial<CoverageRequirement> = {}): CoverageRequirement {
   return {
@@ -15,6 +29,155 @@ function baseCoverage(override: Partial<CoverageRequirement> = {}): CoverageRequ
     ...override,
   };
 }
+
+const objectiveValidation = skipValidation(
+  "no-meaningful-feedback",
+  "Test objective artifacts only verify staged request construction.",
+);
+
+const stagedObjectiveRuleDescriptor = defineRuleDescriptor({
+  name: "staged-objective-test",
+  schema: z.object({}),
+  compile() {
+    return {
+      rule: "staged-objective-test",
+      artifacts: [
+        boolVariable("staged-objective:primary"),
+        boolVariable("staged-objective:secondary"),
+        {
+          kind: "objective" as const,
+          stage: "primary",
+          terms: [{ var: "staged-objective:primary", coeff: 11 }],
+          validation: objectiveValidation,
+        },
+        {
+          kind: "objective" as const,
+          stage: "secondary",
+          terms: [{ var: "staged-objective:secondary", coeff: 7 }],
+          validation: objectiveValidation,
+        },
+      ],
+    };
+  },
+});
+
+const stagedSoftConstraintRuleDescriptor = defineRuleDescriptor({
+  name: "staged-soft-constraint-test",
+  schema: z.object({}),
+  compile() {
+    return {
+      rule: "staged-soft-constraint-test",
+      artifacts: [
+        boolVariable("staged-soft:value"),
+        softConstraint({
+          stage: "critical",
+          validation: reportValidation(),
+          description: "Require the staged soft test variable",
+          context: {},
+          terms: [{ var: "staged-soft:value", coeff: 1 }],
+          comparator: ">=",
+          targetValue: 1,
+          penalty: 13,
+          constraintId: "staged-soft:critical",
+        }),
+      ],
+    };
+  },
+});
+
+const mixedStagedRuleDescriptor = defineRuleDescriptor({
+  name: "mixed-staged-test",
+  schema: z.object({}),
+  compile() {
+    return {
+      rule: "mixed-staged-test",
+      artifacts: [
+        boolVariable("mixed:staged-objective"),
+        boolVariable("mixed:tail-objective"),
+        boolVariable("mixed:staged-soft"),
+        boolVariable("mixed:tail-soft"),
+        {
+          kind: "objective" as const,
+          stage: "critical",
+          terms: [{ var: "mixed:staged-objective", coeff: 2 }],
+          validation: objectiveValidation,
+        },
+        {
+          kind: "objective" as const,
+          terms: [{ var: "mixed:tail-objective", coeff: 3 }],
+          validation: objectiveValidation,
+        },
+        softConstraint({
+          stage: "critical",
+          validation: reportValidation(),
+          description: "Require the staged mixed soft variable",
+          context: {},
+          terms: [{ var: "mixed:staged-soft", coeff: 1 }],
+          comparator: ">=",
+          targetValue: 1,
+          penalty: 5,
+          constraintId: "mixed:staged-soft",
+        }),
+        softConstraint({
+          validation: reportValidation(),
+          description: "Require the unstaged mixed soft variable",
+          context: {},
+          terms: [{ var: "mixed:tail-soft", coeff: 1 }],
+          comparator: ">=",
+          targetValue: 1,
+          penalty: 6,
+          constraintId: "mixed:tail-soft",
+        }),
+      ],
+    };
+  },
+});
+
+const reservedStageRuleDescriptor = defineRuleDescriptor({
+  name: "reserved-stage-test",
+  schema: z.object({}),
+  compile() {
+    return {
+      rule: "reserved-stage-test",
+      artifacts: [
+        boolVariable("reserved-stage:value"),
+        {
+          kind: "objective" as const,
+          stage: "__dabke_unstaged__",
+          terms: [{ var: "reserved-stage:value", coeff: 1 }],
+          validation: objectiveValidation,
+        },
+      ],
+    };
+  },
+});
+
+const emptyStageRuleDescriptor = defineRuleDescriptor({
+  name: "empty-stage-test",
+  schema: z.object({}),
+  compile() {
+    return {
+      rule: "empty-stage-test",
+      artifacts: [
+        boolVariable("empty-stage:value"),
+        {
+          kind: "objective" as const,
+          stage: "",
+          terms: [{ var: "empty-stage:value", coeff: 1 }],
+          validation: objectiveValidation,
+        },
+      ],
+    };
+  },
+});
+
+const stagedTestRuleRegistry = createCpsatRuleRegistry({
+  "staged-objective-test": stagedObjectiveRuleDescriptor,
+  "staged-soft-constraint-test": stagedSoftConstraintRuleDescriptor,
+  "mixed-staged-test": mixedStagedRuleDescriptor,
+  "reserved-stage-test": reservedStageRuleDescriptor,
+  "empty-stage-test": emptyStageRuleDescriptor,
+});
 
 describe("ModelBuilder (CP-SAT)", () => {
   it("builds a no-op request for empty inputs", () => {
@@ -30,6 +193,154 @@ describe("ModelBuilder (CP-SAT)", () => {
     expect(request.variables).toHaveLength(0);
     expect(request.constraints).toHaveLength(0);
     expect(request.objective).toBeUndefined();
+  });
+
+  it("rejects unknown ModelBuilder strategy types", () => {
+    expect(
+      () =>
+        new ModelBuilder({
+          members: [],
+          shiftPatterns: [],
+          schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+          coverage: [],
+          strategy: { type: "optimise" } as unknown as ModelSolveStrategy,
+        }),
+    ).toThrow(/Unknown ModelBuilder strategy/);
+  });
+
+  it("emits staged objective artifacts using the configured stage order", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "staged-objective-test" }],
+      objectiveStageOrder: ["secondary", "primary"],
+    });
+
+    const { request } = builder.compile();
+
+    expect(request.objective).toBeUndefined();
+    expect(request.objectiveStages?.map((stage) => stage.id)).toEqual(["secondary", "primary"]);
+    expect(request.objectiveStages?.[0]?.terms).toEqual([
+      { var: "staged-objective:secondary", coeff: 7 },
+    ]);
+    expect(request.objectiveStages?.[1]?.terms).toEqual([
+      { var: "staged-objective:primary", coeff: 11 },
+    ]);
+  });
+
+  it("infers a single objective stage from staged soft constraints", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "staged-soft-constraint-test" }],
+    });
+
+    const { request } = builder.compile();
+
+    expect(request.objective).toBeUndefined();
+    expect(request.objectiveStages?.map((stage) => stage.id)).toEqual(["critical"]);
+    const stagedSoftConstraint = request.constraints.find(
+      (constraint) => constraint.type === "soft_linear" && constraint.id === "staged-soft:critical",
+    );
+    assert(stagedSoftConstraint?.type === "soft_linear");
+    expect(stagedSoftConstraint.stage).toBe("critical");
+  });
+
+  it("keeps unstaged objective and soft terms in a deterministic tail stage", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "mixed-staged-test" }],
+      objectiveStageOrder: ["critical"],
+    });
+
+    const { request } = builder.compile();
+
+    expect(request.objective).toBeUndefined();
+    expect(request.objectiveStages?.map((stage) => stage.id)).toEqual([
+      "critical",
+      "__dabke_unstaged__",
+    ]);
+    expect(request.objectiveStages?.[0]?.terms).toEqual([
+      { var: "mixed:staged-objective", coeff: 2 },
+    ]);
+    expect(request.objectiveStages?.[1]?.terms).toEqual([
+      { var: "mixed:tail-objective", coeff: 3 },
+    ]);
+
+    const stagedSoftConstraint = request.constraints.find(
+      (constraint) => constraint.type === "soft_linear" && constraint.id === "mixed:staged-soft",
+    );
+    const tailSoftConstraint = request.constraints.find(
+      (constraint) => constraint.type === "soft_linear" && constraint.id === "mixed:tail-soft",
+    );
+    assert(stagedSoftConstraint?.type === "soft_linear");
+    assert(tailSoftConstraint?.type === "soft_linear");
+    expect(stagedSoftConstraint.stage).toBe("critical");
+    expect(tailSoftConstraint.stage).toBe("__dabke_unstaged__");
+  });
+
+  it("rejects multiple staged artifact IDs when no objective stage order is provided", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "staged-objective-test" }],
+    });
+
+    expect(() => builder.compile()).toThrow(/provide ModelBuilder objectiveStageOrder/);
+  });
+
+  it("rejects reserved inferred objective stage IDs", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "reserved-stage-test" }],
+    });
+
+    expect(() => builder.compile()).toThrow(/reserved objective stage id/);
+  });
+
+  it("rejects empty inferred objective stage IDs", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "empty-stage-test" }],
+    });
+
+    expect(() => builder.compile()).toThrow(/empty objective stage id/);
+  });
+
+  it("rejects staged objective requests with solutionLimit 1", () => {
+    const builder = new ModelBuilder({
+      members: [],
+      shiftPatterns: [],
+      schedulingPeriod: { dateRange: { start: "2024-02-01", end: "2024-02-01" } },
+      coverage: [],
+      ruleRegistry: stagedTestRuleRegistry,
+      ruleConfigs: [{ name: "staged-objective-test" }],
+      objectiveStageOrder: ["primary", "secondary"],
+      solverOptions: { solutionLimit: 1 },
+    });
+
+    expect(() => builder.compile()).toThrow(/solutionLimit=1/);
   });
 
   it("propagates solver timeout and solution limits into the request", () => {
@@ -111,6 +422,7 @@ describe("ModelBuilder (CP-SAT)", () => {
     expect(coverageConstraint).toBeDefined();
 
     expect(request.objective?.sense).toBe("minimize");
+    expect(request.objectiveStages).toBeUndefined();
     expect(request.objective?.terms).toContainEqual({
       var: "shift:p1:2024-01-01",
       coeff: 1000, // Primary objective: minimize active shifts
@@ -165,15 +477,16 @@ describe("ModelBuilder (CP-SAT)", () => {
     );
     expect(hasHoursConstraint).toBe(true);
 
-    const conflictVar = request.variables.find((v) =>
-      v.name.startsWith("rest_conflict_emp_early_2024-01-01_late_2024-01-01"),
+    const restConstraint = request.constraints.find(
+      (constraint) =>
+        constraint.type === "soft_linear" &&
+        constraint.id?.startsWith("min-rest-between-shifts:emp:early:2024-01-01:late:2024-01-01"),
     );
-    expect(conflictVar).toBeDefined();
-
-    const penaltyTerm = request.objective?.terms.find((t) =>
-      t.var.startsWith("rest_conflict_emp_early_2024-01-01_late_2024-01-01"),
-    );
-    expect(penaltyTerm?.coeff).toBeGreaterThan(0);
+    expect(restConstraint).toBeDefined();
+    expect(restConstraint?.type).toBe("soft_linear");
+    if (restConstraint?.type === "soft_linear") {
+      expect(restConstraint.penalty).toBeGreaterThan(0);
+    }
   });
 
   it("rejects member IDs containing colons", () => {
@@ -796,7 +1109,7 @@ describe("ModelBuilder (CP-SAT)", () => {
         coverage: [],
       });
 
-      expect(builder.days).toEqual(["2025-02-03", "2025-02-04", "2025-02-05"]);
+      expect(builder.days.map((d) => d.iso)).toEqual(["2025-02-03", "2025-02-04", "2025-02-05"]);
     });
 
     it("accepts schedulingPeriod with dateRange and dayOfWeek filter", () => {
@@ -812,7 +1125,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       });
 
       // Mon/Tue filtered out
-      expect(builder.days).toEqual([
+      expect(builder.days.map((d) => d.iso)).toEqual([
         "2025-02-05", // Wednesday
         "2025-02-06", // Thursday
         "2025-02-07", // Friday
@@ -833,7 +1146,7 @@ describe("ModelBuilder (CP-SAT)", () => {
       });
 
       // Only the specified dates within range, sorted
-      expect(builder.days).toEqual(["2025-02-05", "2025-02-07", "2025-02-10"]);
+      expect(builder.days.map((d) => d.iso)).toEqual(["2025-02-05", "2025-02-07", "2025-02-10"]);
     });
 
     it("creates assignment variables for resolved days", () => {
@@ -997,7 +1310,12 @@ describe("ModelBuilder (CP-SAT)", () => {
       });
 
       // Should only include Sat Feb 1, Sun Feb 2, Sat Feb 8, Sun Feb 9
-      expect(builder.days).toEqual(["2025-02-01", "2025-02-02", "2025-02-08", "2025-02-09"]);
+      expect(builder.days.map((d) => d.iso)).toEqual([
+        "2025-02-01",
+        "2025-02-02",
+        "2025-02-08",
+        "2025-02-09",
+      ]);
     });
 
     it("single day filter works across multiple weeks", () => {
@@ -1013,7 +1331,12 @@ describe("ModelBuilder (CP-SAT)", () => {
       });
 
       // Mondays in Feb 2025: 3, 10, 17, 24
-      expect(builder.days).toEqual(["2025-02-03", "2025-02-10", "2025-02-17", "2025-02-24"]);
+      expect(builder.days.map((d) => d.iso)).toEqual([
+        "2025-02-03",
+        "2025-02-10",
+        "2025-02-17",
+        "2025-02-24",
+      ]);
     });
   });
 });

@@ -13,23 +13,6 @@ import type { ShiftPattern } from "../cpsat/types.js";
  * @remarks
  * Each pattern repeats daily unless filtered by `dayOfWeek`.
  *
- * @example
- * ```typescript
- * shiftPatterns: [
- *   shift("morning", t(11, 30), t(15)),
- *   shift("evening", t(17), t(22)),
- *
- *   // Role-restricted shift
- *   shift("kitchen", t(6), t(14), { roleIds: ["chef", "prep_cook"] }),
- *
- *   // Day-restricted shift
- *   shift("saturday_short", t(9), t(14), { dayOfWeek: ["saturday"] }),
- *
- *   // Location-specific shift
- *   shift("terrace_lunch", t(12), t(16), { locationId: "terrace" }),
- * ]
- * ```
- *
  * @category Shift Patterns
  */
 export function shift(

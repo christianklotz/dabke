@@ -6,6 +6,7 @@ import { parseSolverResponse } from "../../src/cpsat/response.js";
 import { calculateScheduleCost, COST_CATEGORY } from "../../src/cpsat/cost.js";
 import { resolveDaysFromPeriod } from "../../src/datetime.utils.js";
 import type { HttpSolverClient } from "../../src/client.js";
+import type { SchedulingPeriod } from "../../src/types.js";
 
 describe("CP-SAT: day-cost-multiplier rule", () => {
   let client: HttpSolverClient;
@@ -23,7 +24,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
     // Setup: 2 members, 2 days (Fri + Sat), coverage of 1 per day.
     // With 1.5x weekend multiplier + fair distribution turned off,
     // solver should assign the cheaper member to Saturday.
-    const period = {
+    const period: SchedulingPeriod = {
       dateRange: { start: "2026-02-13", end: "2026-02-14" },
     };
     const days = resolveDaysFromPeriod(period);
@@ -43,7 +44,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       ],
       schedulingPeriod: period,
       coverage: days.map((day) => ({
-        day,
+        day: day.iso,
         roleIds: ["waiter"] as [string, ...string[]],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
@@ -76,7 +77,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
   }, 30_000);
 
   it("post-solve cost includes multiplier premium", async () => {
-    const period = {
+    const period: SchedulingPeriod = {
       dateRange: { start: "2026-02-14", end: "2026-02-14" },
     };
     const days = resolveDaysFromPeriod(period);
@@ -93,7 +94,7 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       ],
       schedulingPeriod: period,
       coverage: days.map((day) => ({
-        day,
+        day: day.iso,
         roleIds: ["waiter"] as [string, ...string[]],
         startTime: { hours: 9, minutes: 0 },
         endTime: { hours: 17, minutes: 0 },
@@ -122,6 +123,8 @@ describe("CP-SAT: day-cost-multiplier rule", () => {
       members: config.members,
       shiftPatterns: config.shiftPatterns,
       rules: builder.rules,
+      days: builder.days,
+      weekStartsOn: builder.weekStartsOn,
     });
 
     // 8 hours * 2000 = 16000 base, 8 * 2000 * 0.5 = 8000 premium

@@ -24,12 +24,12 @@ describe("CP-SAT: min-consecutive-days rule", () => {
       {
         name: "assignment-priority",
         memberIds: ["alice"],
-        preference: "high",
+        preference: "prefer",
       },
       {
         name: "assignment-priority",
         memberIds: ["bob"],
-        preference: "low",
+        preference: "avoid",
       },
       {
         name: "time-off",

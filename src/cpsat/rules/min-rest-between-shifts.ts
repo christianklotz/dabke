@@ -1,8 +1,10 @@
 import * as z from "zod";
-import type { CompilationRule, RuleValidationContext } from "../model-builder.js";
+import { schedulingDay, type DateString, type SchedulingDay } from "../../types.js";
+import { defineRuleDescriptor } from "../rule-descriptor.js";
+import type { RuleArtifact, RuleCompileContext } from "../rule-descriptor.js";
+import type { ValidationReporter } from "../validation-reporter.js";
 import type { ResolvedShiftAssignment } from "../response.js";
 import { normalizeEndMinutes, priorityToPenalty, timeOfDayToMinutes } from "../utils.js";
-import type { ValidationReporter } from "../validation-reporter.js";
 import {
   PrioritySchema,
   entityScope,
@@ -10,8 +12,11 @@ import {
   resolveMembersFromScope,
   ruleGroup,
 } from "./scope.types.js";
+import { assignmentVar } from "./variables.js";
+import { hardConstraint, reportValidation, softConstraint } from "./artifacts.js";
+import { canAssignMemberToPattern, isPatternAvailableOnDay } from "./pattern-eligibility.js";
 
-const MinRestBetweenShiftsSchema = z
+export const MinRestBetweenShiftsSchema = z
   .object({
     hours: z.number().min(0),
     priority: PrioritySchema,
@@ -19,197 +24,205 @@ const MinRestBetweenShiftsSchema = z
   .and(entityScope(["members", "roles", "skills"]));
 
 /**
- * Configuration for {@link createMinRestBetweenShiftsRule}.
- *
- * - `hours` (required): minimum rest hours required between consecutive shifts
- * - `priority` (required): how strictly the solver enforces this rule
- *
- * Entity scoping (at most one): `memberIds`, `roleIds`, `skillIds`
+ * Configuration for {@link minRestBetweenShiftsRuleDescriptor}.
  */
 export type MinRestBetweenShiftsConfig = z.infer<typeof MinRestBetweenShiftsSchema>;
 
 /**
- * Enforces a minimum rest period between any two shifts a person works.
+ * Low-level descriptor for the `min-rest-between-shifts` rule.
  *
- * @param config - See {@link MinRestBetweenShiftsConfig}
- * @example
- * ```ts
- * createMinRestBetweenShiftsRule({ hours: 10, priority: "MANDATORY" });
- * ```
+ * @category Rules
  */
-export function createMinRestBetweenShiftsRule(
-  config: MinRestBetweenShiftsConfig,
-): CompilationRule {
-  const parsed = MinRestBetweenShiftsSchema.parse(config);
-  const scope = parseEntityScope(parsed);
-  const { hours, priority } = parsed;
-  const minMinutes = hours * 60;
-  const group = ruleGroup(
-    `min-rest-between-shifts:${hours}`,
-    `Min ${hours}h rest between shifts`,
-    scope,
-  );
+export const minRestBetweenShiftsRuleDescriptor = defineRuleDescriptor({
+  name: "min-rest-between-shifts",
+  schema: MinRestBetweenShiftsSchema,
+  compile(config, ctx) {
+    const scope = parseEntityScope(config);
+    const { hours, priority } = config;
+    const minMinutes = hours * 60;
+    const group = ruleGroup(
+      `min-rest-between-shifts:${hours}`,
+      `Min ${hours}h rest between shifts`,
+      scope,
+    );
+    const members = resolveMembersFromScope(scope, [...ctx.members]);
 
-  return {
-    compile(b) {
-      const members = resolveMembersFromScope(scope, b.members);
+    const artifacts = members.flatMap((member) => {
+      const memberArtifacts: RuleArtifact[] = [];
 
-      for (const emp of members) {
-        for (let i = 0; i < b.days.length; i++) {
-          const day1 = b.days[i];
-          if (!day1) continue;
+      for (let dayIndex = 0; dayIndex < ctx.days.length; dayIndex++) {
+        const day1 = ctx.days[dayIndex];
+        if (!day1) continue;
 
-          const checkDays: string[] = [day1];
-          const nextDay = b.days[i + 1];
-          if (nextDay) checkDays.push(nextDay);
+        const checkDays = [day1];
+        const nextDay = ctx.days[dayIndex + 1];
+        if (nextDay) checkDays.push(nextDay);
 
-          for (const pattern1 of b.shiftPatterns) {
-            if (!b.canAssign(emp, pattern1)) continue;
-            if (!b.patternAvailableOnDay(pattern1, day1)) continue;
-            const end1 = b.endMinutes(pattern1, day1);
+        for (const pattern1 of ctx.shiftPatterns) {
+          if (
+            !canAssignMemberToPattern(member, pattern1) ||
+            !isPatternAvailableOnDay(pattern1, day1)
+          ) {
+            continue;
+          }
+          const end1 = patternEndMinutes(pattern1);
 
-            for (const day2 of checkDays) {
-              if (!day2) continue;
-              for (const pattern2 of b.shiftPatterns) {
-                if (!b.canAssign(emp, pattern2)) continue;
-                if (!b.patternAvailableOnDay(pattern2, day2)) continue;
-                if (day1 === day2 && pattern1.id === pattern2.id) continue;
+          for (const day2 of checkDays) {
+            for (const pattern2 of ctx.shiftPatterns) {
+              if (
+                !canAssignMemberToPattern(member, pattern2) ||
+                !isPatternAvailableOnDay(pattern2, day2) ||
+                (day1.iso === day2.iso && pattern1.id === pattern2.id)
+              ) {
+                continue;
+              }
 
-                const start2 = b.startMinutes(pattern2, day2);
-                const gap = start2 - end1;
+              const start2 = dayGapMinutes(day1, day2) + timeOfDayToMinutes(pattern2.startTime);
+              const gap = start2 - end1;
+              if (gap < 0 || gap >= minMinutes) continue;
 
-                if (gap >= 0 && gap < minMinutes) {
-                  const var1 = b.assignment(emp.id, pattern1.id, day1);
-                  const var2 = b.assignment(emp.id, pattern2.id, day2);
+              const description = `${member.id} needs ${hours}h rest between ${pattern1.id} on ${day1.iso} and ${pattern2.id} on ${day2.iso}`;
+              const context = { memberIds: [member.id], days: [day1.iso, day2.iso] };
+              const constraintId = `min-rest-between-shifts:${member.id}:${pattern1.id}:${day1.iso}:${pattern2.id}:${day2.iso}`;
+              const terms = [
+                { var: assignmentVar(member.id, pattern1.id, day1.iso), coeff: 1 },
+                { var: assignmentVar(member.id, pattern2.id, day2.iso), coeff: 1 },
+              ];
 
-                  if (priority === "MANDATORY") {
-                    b.addLinear(
-                      [
-                        { var: var1, coeff: 1 },
-                        { var: var2, coeff: 1 },
-                      ],
-                      "<=",
-                      1,
-                    );
-                  } else {
-                    const conflictVar = b.boolVar(
-                      `rest_conflict_${emp.id}_${pattern1.id}_${day1}_${pattern2.id}_${day2}`,
-                    );
-                    b.addLinear(
-                      [
-                        { var: var1, coeff: 1 },
-                        { var: var2, coeff: 1 },
-                        { var: conflictVar, coeff: -1 },
-                      ],
-                      "<=",
-                      1,
-                    );
-                    b.addLinear(
-                      [
-                        { var: conflictVar, coeff: 1 },
-                        { var: var1, coeff: -1 },
-                      ],
-                      "<=",
-                      0,
-                    );
-                    b.addLinear(
-                      [
-                        { var: conflictVar, coeff: 1 },
-                        { var: var2, coeff: -1 },
-                      ],
-                      "<=",
-                      0,
-                    );
-                    b.addPenalty(conflictVar, priorityToPenalty(priority));
-                  }
-                }
+              if (priority === "MANDATORY") {
+                memberArtifacts.push(
+                  hardConstraint({
+                    group,
+                    description,
+                    context,
+                    validation: reportValidation(constraintId),
+                    terms,
+                    comparator: "<=",
+                    targetValue: 1,
+                  }),
+                );
+              } else {
+                memberArtifacts.push(
+                  softConstraint({
+                    group,
+                    description,
+                    context,
+                    validation: reportValidation(),
+                    terms,
+                    comparator: "<=",
+                    targetValue: 1,
+                    penalty: priorityToPenalty(priority),
+                    constraintId,
+                  }),
+                );
               }
             }
           }
         }
       }
-    },
 
-    validate(
-      assignments: ResolvedShiftAssignment[],
-      reporter: ValidationReporter,
-      context: RuleValidationContext,
-    ) {
-      if (priority === "MANDATORY") return;
+      return memberArtifacts;
+    });
 
-      const members = resolveMembersFromScope(scope, context.members);
-      if (members.length === 0) return;
+    const validatorArtifacts =
+      priority === "MANDATORY"
+        ? []
+        : [
+            {
+              kind: "post-solve-feedback" as const,
+              run(
+                assignments: readonly ResolvedShiftAssignment[],
+                reporter: ValidationReporter,
+                validationContext: RuleCompileContext,
+              ) {
+                const validatorMembers = resolveMembersFromScope(scope, [
+                  ...validationContext.members,
+                ]);
+                if (validatorMembers.length === 0) return;
 
-      const memberIds = new Set(members.map((m) => m.id));
+                const dayLookup = new Map<SchedulingDay["iso"], SchedulingDay>(
+                  validationContext.days.map((day: SchedulingDay) => [day.iso, day] as const),
+                );
+                const memberIds = new Set(validatorMembers.map((member) => member.id));
+                const byMember = new Map<string, ResolvedShiftAssignment[]>();
 
-      // Group assignments by member, sort by day then start time
-      const byMember = new Map<string, ResolvedShiftAssignment[]>();
-      for (const a of assignments) {
-        if (!memberIds.has(a.memberId)) continue;
-        const list = byMember.get(a.memberId) ?? [];
-        list.push(a);
-        byMember.set(a.memberId, list);
-      }
+                for (const assignment of assignments) {
+                  if (!memberIds.has(assignment.memberId)) continue;
+                  const list = byMember.get(assignment.memberId) ?? [];
+                  list.push(assignment);
+                  byMember.set(assignment.memberId, list);
+                }
 
-      for (const [memberId, memberAssignments] of byMember) {
-        const sorted = memberAssignments.toSorted((a, b) => {
-          if (a.day !== b.day) return a.day < b.day ? -1 : 1;
-          return timeOfDayToMinutes(a.startTime) - timeOfDayToMinutes(b.startTime);
-        });
+                for (const [memberId, memberAssignments] of byMember) {
+                  const sorted = [...memberAssignments].toSorted((left, right) => {
+                    if (left.day !== right.day) return left.day < right.day ? -1 : 1;
+                    return timeOfDayToMinutes(left.startTime) - timeOfDayToMinutes(right.startTime);
+                  });
 
-        let violated = false;
-        for (let i = 0; i < sorted.length - 1; i++) {
-          const current = sorted[i]!;
-          const next = sorted[i + 1]!;
+                  let violated = false;
+                  for (let index = 0; index < sorted.length - 1; index++) {
+                    const current = sorted[index]!;
+                    const next = sorted[index + 1]!;
+                    const currentEnd = normalizeEndMinutes(
+                      timeOfDayToMinutes(current.startTime),
+                      timeOfDayToMinutes(current.endTime),
+                    );
+                    const nextStart = timeOfDayToMinutes(next.startTime);
+                    const gap =
+                      current.day === next.day
+                        ? nextStart - currentEnd
+                        : daysBetween(current.day, next.day, dayLookup) * 24 * 60 -
+                          currentEnd +
+                          nextStart;
 
-          const currentEndMin = timeOfDayToMinutes(current.endTime);
-          const normalizedEnd = normalizeEndMinutes(
-            timeOfDayToMinutes(current.startTime),
-            currentEndMin,
-          );
-          const nextStartMin = timeOfDayToMinutes(next.startTime);
+                    if (gap < 0 || gap >= minMinutes) continue;
+                    violated = true;
+                  }
 
-          // Calculate gap considering day boundaries
-          let gap: number;
-          if (current.day === next.day) {
-            gap = nextStartMin - normalizedEnd;
-          } else {
-            // Different days: account for the day boundary
-            const dayDiff = daysBetween(current.day, next.day);
-            gap = dayDiff * 24 * 60 - normalizedEnd + nextStartMin;
-          }
-
-          if (gap >= 0 && gap < minMinutes) {
-            reporter.reportRuleViolation({
-              rule: "min-rest-between-shifts",
-              message: `${memberId} has ${Math.round((gap / 60) * 10) / 10}h rest between shifts on ${current.day} and ${next.day}, need ${hours}h`,
-              context: { memberIds: [memberId], days: [current.day, next.day] },
-              shortfall: minMinutes - gap,
-              group,
-            });
-            violated = true;
-          }
-        }
-
-        if (!violated && sorted.length > 1) {
-          reporter.reportRulePassed({
-            rule: "min-rest-between-shifts",
-            message: `${memberId} has ${hours}h+ rest between all shifts`,
-            context: {
-              memberIds: [memberId],
-              days: [...new Set(sorted.map((a) => a.day))],
+                  if (!violated && sorted.length > 1) {
+                    reporter.reportRulePassed({
+                      rule: "min-rest-between-shifts",
+                      message: `${memberId} has ${hours}h+ rest between all shifts`,
+                      context: {
+                        memberIds: [memberId],
+                        days: [...new Set(sorted.map((assignment) => assignment.day))],
+                      },
+                      group,
+                    });
+                  }
+                }
+              },
             },
-            group,
-          });
-        }
-      }
-    },
-  };
+          ];
+
+    return {
+      rule: "min-rest-between-shifts",
+      artifacts: [...artifacts, ...validatorArtifacts],
+    };
+  },
+});
+
+function patternEndMinutes(pattern: {
+  startTime: { hours: number; minutes: number };
+  endTime: { hours: number; minutes: number };
+}): number {
+  return normalizeEndMinutes(
+    timeOfDayToMinutes(pattern.startTime),
+    timeOfDayToMinutes(pattern.endTime),
+  );
 }
 
-/** Compute day difference from YYYY-MM-DD strings. */
-function daysBetween(day1: string, day2: string): number {
-  const d1 = new Date(`${day1}T00:00:00Z`);
-  const d2 = new Date(`${day2}T00:00:00Z`);
-  return Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000));
+function dayGapMinutes(day1: SchedulingDay, day2: SchedulingDay): number {
+  return (day2.epochDay - day1.epochDay) * 24 * 60;
+}
+
+function daysBetween(
+  day1: DateString,
+  day2: DateString,
+  lookup: ReadonlyMap<DateString, SchedulingDay>,
+): number {
+  const left = lookup.get(day1);
+  const right = lookup.get(day2);
+  if (left && right) return right.epochDay - left.epochDay;
+  return schedulingDay(day2).epochDay - schedulingDay(day1).epochDay;
 }

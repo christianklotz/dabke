@@ -1,6 +1,21 @@
 /**
  * Cost optimization rules: minimize labor cost with modifiers.
  *
+ *
+ * @example
+ * ```typescript
+ * rules: [
+ *   minimizeCost(),
+ *   dayMultiplier(1.5, { dayOfWeek: weekend }),
+ *   overtimeMultiplier({ after: 40, factor: 1.5 }),
+ *   dailyOvertimeSurcharge({ after: 8, amount: 500 }),
+ *   tieredOvertimeMultiplier([
+ *     { after: 40, factor: 1.5 },
+ *     { after: 48, factor: 2.0 },
+ *   ]),
+ * ]
+ * ```
+ *
  * @module
  */
 
@@ -39,7 +54,10 @@ export interface CostRuleOptions {
 // Cost Rules
 // ============================================================================
 
-function makeCostRule(rule: string, fields: Record<string, unknown>): RuleEntry {
+function makeCostRule<const Name extends string, const Fields extends object>(
+  rule: Name,
+  fields: Fields,
+): RuleEntry<Name, Omit<Fields, "_type" | "_rule">> {
   return defineRule(rule, fields);
 }
 
@@ -64,14 +82,9 @@ function makeCostRule(rule: string, fields: Record<string, unknown>): RuleEntry 
  * - `dailyOvertimeSurcharge({ after, amount }, opts?)` - daily overtime surcharge
  * - `tieredOvertimeMultiplier(tiers, opts?)` - multiple overtime thresholds
  *
- * @example
- * ```ts
- * minimizeCost()
- * ```
- *
  * @category Cost Optimization
  */
-export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
+export function minimizeCost(opts?: CostRuleOptions): RuleEntry<"minimize-cost", CostRuleOptions> {
   return makeCostRule("minimize-cost", { ...opts });
 }
 
@@ -83,13 +96,11 @@ export function minimizeCost(opts?: CostRuleOptions): RuleEntry {
  * this rule adds only the extra portion above 1x.
  *
  * @category Cost Optimization
- *
- * @example Weekend multiplier
- * ```typescript
- * dayMultiplier(1.5, { dayOfWeek: weekend })
- * ```
  */
-export function dayMultiplier(factor: number, opts?: CostRuleOptions): RuleEntry {
+export function dayMultiplier(
+  factor: number,
+  opts?: CostRuleOptions,
+): RuleEntry<"day-cost-multiplier", { factor: number } & CostRuleOptions> {
   return makeCostRule("day-cost-multiplier", { factor, ...opts });
 }
 
@@ -100,13 +111,11 @@ export function dayMultiplier(factor: number, opts?: CostRuleOptions): RuleEntry
  * The surcharge is independent of the member's base rate.
  *
  * @category Cost Optimization
- *
- * @example Weekend surcharge
- * ```typescript
- * daySurcharge(500, { dayOfWeek: weekend })
- * ```
  */
-export function daySurcharge(amountPerHour: number, opts?: CostRuleOptions): RuleEntry {
+export function daySurcharge(
+  amountPerHour: number,
+  opts?: CostRuleOptions,
+): RuleEntry<"day-cost-surcharge", { amountPerHour: number } & CostRuleOptions> {
   return makeCostRule("day-cost-surcharge", { amountPerHour, ...opts });
 }
 
@@ -122,17 +131,15 @@ export function daySurcharge(amountPerHour: number, opts?: CostRuleOptions): Rul
  * @param opts - Entity and time scoping
  *
  * @category Cost Optimization
- *
- * @example Night differential
- * ```typescript
- * timeSurcharge(200, { from: t(22), until: t(6) })
- * ```
  */
 export function timeSurcharge(
   amountPerHour: number,
   window: { from: TimeOfDay; until: TimeOfDay },
   opts?: CostRuleOptions,
-): RuleEntry {
+): RuleEntry<
+  "time-cost-surcharge",
+  { amountPerHour: number; window: { from: TimeOfDay; until: TimeOfDay } } & CostRuleOptions
+> {
   return makeCostRule("time-cost-surcharge", { amountPerHour, window, ...opts });
 }
 
@@ -144,15 +151,10 @@ export function timeSurcharge(
  * counted by {@link minimizeCost}).
  *
  * @category Cost Optimization
- *
- * @example
- * ```typescript
- * overtimeMultiplier({ after: 40, factor: 1.5 })
- * ```
  */
 export function overtimeMultiplier(
   opts: { after: number; factor: number } & CostRuleOptions,
-): RuleEntry {
+): RuleEntry<"overtime-weekly-multiplier", { after: number; factor: number } & CostRuleOptions> {
   return makeCostRule("overtime-weekly-multiplier", { ...opts });
 }
 
@@ -163,15 +165,10 @@ export function overtimeMultiplier(
  * The surcharge is independent of the member's base rate.
  *
  * @category Cost Optimization
- *
- * @example
- * ```typescript
- * overtimeSurcharge({ after: 40, amount: 1000 })
- * ```
  */
 export function overtimeSurcharge(
   opts: { after: number; amount: number } & CostRuleOptions,
-): RuleEntry {
+): RuleEntry<"overtime-weekly-surcharge", { after: number; amount: number } & CostRuleOptions> {
   return makeCostRule("overtime-weekly-surcharge", { ...opts });
 }
 
@@ -183,15 +180,10 @@ export function overtimeSurcharge(
  * counted by {@link minimizeCost}).
  *
  * @category Cost Optimization
- *
- * @example
- * ```typescript
- * dailyOvertimeMultiplier({ after: 8, factor: 1.5 })
- * ```
  */
 export function dailyOvertimeMultiplier(
   opts: { after: number; factor: number } & CostRuleOptions,
-): RuleEntry {
+): RuleEntry<"overtime-daily-multiplier", { after: number; factor: number } & CostRuleOptions> {
   return makeCostRule("overtime-daily-multiplier", { ...opts });
 }
 
@@ -202,15 +194,10 @@ export function dailyOvertimeMultiplier(
  * The surcharge is independent of the member's base rate.
  *
  * @category Cost Optimization
- *
- * @example
- * ```typescript
- * dailyOvertimeSurcharge({ after: 8, amount: 500 })
- * ```
  */
 export function dailyOvertimeSurcharge(
   opts: { after: number; amount: number } & CostRuleOptions,
-): RuleEntry {
+): RuleEntry<"overtime-daily-surcharge", { after: number; amount: number } & CostRuleOptions> {
   return makeCostRule("overtime-daily-surcharge", { ...opts });
 }
 
@@ -222,21 +209,13 @@ export function dailyOvertimeSurcharge(
  * Tiers must be sorted by threshold ascending.
  *
  * @category Cost Optimization
- *
- * @example
- * ```typescript
- * // Hours 0-40: base rate
- * // Hours 40-48: 1.5x
- * // Hours 48+: 2.0x
- * tieredOvertimeMultiplier([
- *   { after: 40, factor: 1.5 },
- *   { after: 48, factor: 2.0 },
- * ])
- * ```
  */
 export function tieredOvertimeMultiplier(
   tiers: [OvertimeTier, ...OvertimeTier[]],
   opts?: CostRuleOptions,
-): RuleEntry {
+): RuleEntry<
+  "overtime-tiered-multiplier",
+  { tiers: [OvertimeTier, ...OvertimeTier[]] } & CostRuleOptions
+> {
   return makeCostRule("overtime-tiered-multiplier", { tiers, ...opts });
 }
